@@ -1,0 +1,37 @@
+"""FastAPI entrypoint for the VisualSprint API."""
+
+from __future__ import annotations
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from visualsprint_api.config import settings
+from visualsprint_api.routes.health import router as health_router
+from visualsprint_api.routes.meta import router as meta_router
+
+
+app = FastAPI(
+    title="VisualSprint API",
+    version=settings.version,
+    summary="Deterministic control-plane shell for the VisualSprint platform.",
+)
+
+if settings.allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.allowed_origins),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+app.include_router(health_router, prefix="/api")
+app.include_router(meta_router, prefix="/api")
+
+
+@app.get("/")
+def get_root() -> dict[str, str]:
+    return {
+        "name": "VisualSprint API",
+        "message": "Deterministic platform services are online.",
+    }
