@@ -1,11 +1,12 @@
 # Development Setup
 
-The repository now contains a runnable phase-2 foundation for VisualSprint, including:
+The repository now contains a runnable early implementation slice for VisualSprint, including:
 
 - the Next.js dashboard shell
 - the FastAPI control plane
 - local meeting session lifecycle endpoints
-- browser capture readiness checks in the UI
+- browser capture session bootstrap and chunk registration
+- mock transcript, reasoning, blocker, commitment, and memory outputs per chunk
 
 ## Web app
 
@@ -54,4 +55,6 @@ Capture-specific smoke test idea:
 2. Start the meeting.
 3. Begin browser capture from the dashboard.
 4. Let the recorder emit one or more chunks.
-5. Stop capture and confirm the recent chunk list updates.
+5. Confirm the recent chunk list shows processed chunk state.
+6. Confirm transcript segments, decisions, commitments, blockers, and memory matches appear in the dashboard.
+7. Stop capture and confirm the capture session closes cleanly.

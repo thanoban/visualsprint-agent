@@ -21,6 +21,9 @@ export type LiveEventKind =
   | "blocker"
   | "memory";
 export type CaptureSessionStatus = "idle" | "recording" | "completed";
+export type ChunkProcessingStatus = "registered" | "processing" | "processed";
+export type BlockerSeverity = "low" | "medium" | "high";
+export type MemoryMatchStrength = "related" | "recurring" | "critical";
 
 export interface PartnerTrack {
   slug: PartnerTrackSlug;
@@ -63,6 +66,9 @@ export interface CaptureChunkSummary {
   durationMs: number;
   byteSize: number;
   mimeType: string;
+  processingStatus: ChunkProcessingStatus;
+  transcriptSegmentCount: number;
+  signalCount: number;
 }
 
 export interface CaptureSessionSummary {
@@ -101,10 +107,55 @@ export interface LiveEvent {
   detail: string;
 }
 
+export interface TranscriptSegment {
+  id: string;
+  speakerLabel: string;
+  startedAt: string;
+  endedAt: string;
+  text: string;
+}
+
+export interface DecisionRecord {
+  id: string;
+  title: string;
+  rationale: string;
+  speakerLabel: string;
+  recordedAt: string;
+}
+
+export interface CommitmentRecord {
+  id: string;
+  ownerLabel: string;
+  action: string;
+  dueHint: string;
+  recordedAt: string;
+}
+
+export interface BlockerRecord {
+  id: string;
+  summary: string;
+  severity: BlockerSeverity;
+  ownerLabel: string;
+  recordedAt: string;
+}
+
+export interface MemoryMatch {
+  id: string;
+  summary: string;
+  sourceMeetingTitle: string;
+  strength: MemoryMatchStrength;
+  recordedAt: string;
+}
+
 export interface MeetingDetail extends MeetingSummary {
   latestEvents: LiveEvent[];
   activeCaptureSession: null | CaptureSessionSummary;
   recentCaptureChunks: CaptureChunkSummary[];
+  recentTranscriptSegments: TranscriptSegment[];
+  recentDecisions: DecisionRecord[];
+  recentCommitments: CommitmentRecord[];
+  recentBlockers: BlockerRecord[];
+  recentMemoryMatches: MemoryMatch[];
 }
 
 export interface CreateMeetingRequest {
@@ -283,5 +334,11 @@ export const captureStages = [
     label: "Chunk registration",
     description:
       "Emit time-based chunks and keep chunk metadata visible before storage and agent processing are added.",
+  },
+  {
+    id: "processing",
+    label: "Mock processing",
+    description:
+      "Simulate transcript, reasoning, and memory outputs so the live dashboard can evolve before real services are integrated.",
   },
 ] as const;

@@ -5,12 +5,17 @@ import {
   dashboardModules,
   partnerTracks,
   sourceConnectors,
+  type BlockerRecord,
   type CaptureChunkSummary,
   type CaptureSessionSummary,
+  type CommitmentRecord,
   type CreateMeetingRequest,
+  type DecisionRecord,
+  type MemoryMatch,
   type MeetingDetail,
   type MeetingSummary,
   type RegisterCaptureChunkRequest,
+  type TranscriptSegment,
 } from "@visualsprint/contracts";
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
@@ -306,6 +311,11 @@ export function MeetingDashboard() {
 
   const recentChunks = selectedMeeting?.recentCaptureChunks ?? [];
   const activeCaptureSession = selectedMeeting?.activeCaptureSession;
+  const recentTranscriptSegments = selectedMeeting?.recentTranscriptSegments ?? [];
+  const recentDecisions = selectedMeeting?.recentDecisions ?? [];
+  const recentCommitments = selectedMeeting?.recentCommitments ?? [];
+  const recentBlockers = selectedMeeting?.recentBlockers ?? [];
+  const recentMemoryMatches = selectedMeeting?.recentMemoryMatches ?? [];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.18),_transparent_28%),linear-gradient(180deg,#09121b_0%,#0a1521_30%,#f4efe2_30%,#f7f4ec_100%)] text-slate-100">
@@ -314,17 +324,17 @@ export function MeetingDashboard() {
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-4">
               <p className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-emerald-100">
-                Phase 3 capture bootstrap
+                Phase 4 live processing mock
               </p>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Register the browser capture stream before chunking and agents begin.
+                  Turn capture chunks into live transcript and reasoning signals.
                 </h1>
                 <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                  This slice adds real browser capture session bootstrapping, chunk
-                  metadata registration, and ingestion-state tracking so the
-                  deterministic control plane can observe capture progress before
-                  storage and AI processing are added.
+                  This slice keeps the real browser capture path and layers in a
+                  development-safe processing loop so each chunk now produces mock
+                  transcript, decision, blocker, commitment, and memory outputs for
+                  the dashboard.
                 </p>
               </div>
             </div>
@@ -524,6 +534,9 @@ export function MeetingDashboard() {
                     <MetricCard label="Capture events" value={String(selectedMeeting.metrics.captureEventsCount)} />
                     <MetricCard label="Capture chunks" value={String(selectedMeeting.metrics.captureChunksCount)} />
                     <MetricCard label="Captured bytes" value={formatBytes(selectedMeeting.metrics.capturedBytes)} />
+                    <MetricCard label="Decisions" value={String(selectedMeeting.metrics.decisionsCount)} />
+                    <MetricCard label="Commitments" value={String(selectedMeeting.metrics.commitmentsCount)} />
+                    <MetricCard label="Blockers" value={String(selectedMeeting.metrics.blockersCount)} />
                     <MetricCard label="Transcript segments" value={String(selectedMeeting.metrics.transcriptSegmentsCount)} />
                     <MetricCard label="Memory matches" value={String(selectedMeeting.metrics.memoryMatchesCount)} />
                   </div>
@@ -626,7 +639,7 @@ export function MeetingDashboard() {
                     {recentChunks.length === 0 ? (
                       <EmptyState
                         title="No capture chunks yet"
-                        body="Chunk metadata will appear here as the MediaRecorder emits time-based segments."
+                        body="Chunk lifecycle and processing status will appear here as the MediaRecorder emits time-based segments."
                       />
                     ) : (
                       recentChunks.map((chunk) => (
@@ -643,7 +656,80 @@ export function MeetingDashboard() {
               )}
             </Card>
 
-            <Card title="Lifecycle timeline" eyebrow="Deterministic events">
+            <Card title="Transcript feed" eyebrow="Live processing">
+              {selectedMeeting ? (
+                <div className="space-y-3">
+                  {recentTranscriptSegments.length === 0 ? (
+                    <EmptyState
+                      title="No transcript segments yet"
+                      body="Start browser capture and let a chunk register to see live transcript evidence."
+                    />
+                  ) : (
+                    recentTranscriptSegments.map((segment) => (
+                      <TranscriptCard key={segment.id} segment={segment} />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No transcript target"
+                  body="Choose a meeting to inspect transcript segments as they arrive."
+                />
+              )}
+            </Card>
+
+            <Card title="Reasoning outputs" eyebrow="Agent-facing signals">
+              {selectedMeeting ? (
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <SignalColumn
+                    title="Decisions"
+                    emptyTitle="No decisions yet"
+                    emptyBody="Reasoning decisions will show up after chunk processing runs."
+                  >
+                    {recentDecisions.map((decision) => (
+                      <DecisionCard key={decision.id} decision={decision} />
+                    ))}
+                  </SignalColumn>
+
+                  <SignalColumn
+                    title="Commitments"
+                    emptyTitle="No commitments yet"
+                    emptyBody="Commitments with owners and due hints will appear here."
+                  >
+                    {recentCommitments.map((commitment) => (
+                      <CommitmentCard key={commitment.id} commitment={commitment} />
+                    ))}
+                  </SignalColumn>
+
+                  <SignalColumn
+                    title="Blockers"
+                    emptyTitle="No blockers yet"
+                    emptyBody="Blockers will be highlighted once the processing loop detects them."
+                  >
+                    {recentBlockers.map((blocker) => (
+                      <BlockerCard key={blocker.id} blocker={blocker} />
+                    ))}
+                  </SignalColumn>
+
+                  <SignalColumn
+                    title="Memory matches"
+                    emptyTitle="No memory matches yet"
+                    emptyBody="Elastic-backed historical matches will show here once signals are produced."
+                  >
+                    {recentMemoryMatches.map((memoryMatch) => (
+                      <MemoryMatchCard key={memoryMatch.id} memoryMatch={memoryMatch} />
+                    ))}
+                  </SignalColumn>
+                </div>
+              ) : (
+                <EmptyState
+                  title="No reasoning target"
+                  body="Choose a meeting to inspect live reasoning outputs."
+                />
+              )}
+            </Card>
+
+            <Card title="Lifecycle timeline" eyebrow="Deterministic plus derived events">
               {selectedMeeting ? (
                 <div className="space-y-4">
                   {selectedMeeting.latestEvents.map((event) => (
@@ -699,9 +785,10 @@ export function MeetingDashboard() {
         <footer className="rounded-[1.5rem] border border-slate-900/10 bg-[#f0eadc] px-5 py-4 text-sm leading-6 text-slate-700">
           <p className="font-medium text-slate-900">Current implementation note</p>
           <p>
-            This slice adds real browser capture session registration and chunk
-            metadata tracking. Blob upload to cloud storage, transcript
-            extraction, and Google Agent Builder orchestration are still upcoming.
+            This slice adds mock chunk processing behind the real browser capture
+            path, so transcript segments and reasoning signals now render live.
+            Cloud storage uploads and managed Google Agent Builder runtime
+            orchestration are still upcoming.
           </p>
           <p className="mt-2">
             Official track options: {partnerTracks.map((track) => track.label).join(", ")}.
@@ -853,14 +940,113 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
           <p className="mt-2 text-sm leading-6 text-slate-600">
             {formatBytes(chunk.byteSize)} captured over {formatDuration(chunk.durationMs)}.
           </p>
+          <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
+            {chunk.transcriptSegmentCount} transcript segments · {chunk.signalCount} derived signals
+          </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            {chunk.processingStatus}
+          </span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
             {chunk.mimeType}
           </span>
           <span className="text-xs text-slate-500">{formatTimestamp(chunk.recordedAt)}</span>
         </div>
       </div>
+    </article>
+  );
+}
+
+function TranscriptCard({ segment }: { segment: TranscriptSegment }) {
+  return (
+    <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{segment.speakerLabel}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{segment.text}</p>
+        </div>
+        <span className="whitespace-nowrap text-xs text-slate-500">
+          {formatTimestamp(segment.startedAt)}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function SignalColumn({
+  title,
+  emptyTitle,
+  emptyBody,
+  children,
+}: {
+  title: string;
+  emptyTitle: string;
+  emptyBody: string;
+  children: React.ReactNode;
+}) {
+  const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+
+  return (
+    <section className="rounded-[1.25rem] border border-slate-900/10 bg-white p-4">
+      <p className="text-sm font-semibold text-slate-900">{title}</p>
+      <div className="mt-3 space-y-3">
+        {items.length > 0 ? items : <EmptyState title={emptyTitle} body={emptyBody} />}
+      </div>
+    </section>
+  );
+}
+
+function DecisionCard({ decision }: { decision: DecisionRecord }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-900">{decision.title}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{decision.rationale}</p>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        {decision.speakerLabel} · {formatTimestamp(decision.recordedAt)}
+      </p>
+    </article>
+  );
+}
+
+function CommitmentCard({ commitment }: { commitment: CommitmentRecord }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-900">{commitment.ownerLabel}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{commitment.action}</p>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        Due {commitment.dueHint} · {formatTimestamp(commitment.recordedAt)}
+      </p>
+    </article>
+  );
+}
+
+function BlockerCard({ blocker }: { blocker: BlockerRecord }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{blocker.summary}</p>
+        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-amber-800">
+          {blocker.severity}
+        </span>
+      </div>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        Owner {blocker.ownerLabel} · {formatTimestamp(blocker.recordedAt)}
+      </p>
+    </article>
+  );
+}
+
+function MemoryMatchCard({ memoryMatch }: { memoryMatch: MemoryMatch }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-900">{memoryMatch.summary}</p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">
+        Source meeting: {memoryMatch.sourceMeetingTitle}
+      </p>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        {memoryMatch.strength} · {formatTimestamp(memoryMatch.recordedAt)}
+      </p>
     </article>
   );
 }
