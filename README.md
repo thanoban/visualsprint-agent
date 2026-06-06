@@ -7,8 +7,8 @@ VisualSprint is a production-oriented multi-agent meeting intelligence platform 
 This repository is now in the early implementation stage.
 
 - The repository now contains foundational product code for the web shell, shared contracts, and FastAPI control plane.
-- The current implementation supports meeting session creation, local lifecycle transitions, and dashboard-to-API integration.
-- Live browser capture, chunk uploads, transcript generation, Elastic-backed memory retrieval, and full agent execution are still upcoming slices.
+- The current implementation supports meeting session creation, local lifecycle transitions, browser capture session registration, chunk metadata tracking, and dashboard-to-API integration.
+- Blob upload to object storage, transcript generation, Elastic-backed memory retrieval, and full Google Agent Builder orchestration are still upcoming slices.
 
 ## What VisualSprint Does
 

@@ -1,21 +1,28 @@
 "use client";
 
 import {
+  captureStages,
   dashboardModules,
   partnerTracks,
   sourceConnectors,
+  type CaptureChunkSummary,
+  type CaptureSessionSummary,
   type CreateMeetingRequest,
   type MeetingDetail,
   type MeetingSummary,
+  type RegisterCaptureChunkRequest,
 } from "@visualsprint/contracts";
-import { startTransition, useEffect, useState, useSyncExternalStore } from "react";
+import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+  completeCaptureSession,
   createMeeting,
   endMeeting,
   getApiBaseUrl,
   getMeeting,
   listMeetings,
+  registerCaptureChunk,
+  startCaptureSession,
   startMeeting,
 } from "../lib/api";
 
@@ -32,18 +39,44 @@ type CaptureSupport = {
   mediaRecorder: boolean;
 };
 
+type CapturePhase = "idle" | "requesting" | "recording" | "stopping";
+
+type CaptureResources = {
+  stream: MediaStream;
+  cleanup: () => void;
+  hasDisplayVideo: boolean;
+  hasDisplayAudio: boolean;
+  hasMicrophoneAudio: boolean;
+};
+
 export function MeetingDashboard() {
   const [draft, setDraft] = useState<CreateMeetingRequest>(initialDraft);
   const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null);
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [capturePhase, setCapturePhase] = useState<CapturePhase>("idle");
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
     () => false,
   );
-  
+
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const cleanupCaptureRef = useRef<(() => void) | null>(null);
+  const chunkSequenceRef = useRef(0);
+  const chunkStartedAtRef = useRef<number>(0);
+  const chunkRequestQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const stopPromiseRef = useRef<Promise<void> | null>(null);
+  const stopResolverRef = useRef<(() => void) | null>(null);
+
+  function applyMeeting(meeting: MeetingDetail) {
+    startTransition(() => {
+      setSelectedMeeting(meeting);
+      setMeetings((current) => upsertMeetingSummary(current, toMeetingSummary(meeting)));
+    });
+  }
+
   async function refreshMeetings() {
     const response = await listMeetings();
     startTransition(() => {
@@ -54,9 +87,7 @@ export function MeetingDashboard() {
 
   async function refreshMeeting(meetingId: string) {
     const response = await getMeeting(meetingId);
-    startTransition(() => {
-      setSelectedMeeting(response.meeting);
-    });
+    applyMeeting(response.meeting);
     return response.meeting;
   }
 
@@ -64,14 +95,25 @@ export function MeetingDashboard() {
     void (async () => {
       setError(null);
       try {
-        const meetingList = await refreshMeetings();
+        const meetingResponse = await listMeetings();
+        startTransition(() => {
+          setMeetings(meetingResponse.meetings);
+        });
+        const meetingList = meetingResponse.meetings;
         if (meetingList.length > 0) {
-          await refreshMeeting(meetingList[0].id);
+          const detailResponse = await getMeeting(meetingList[0].id);
+          applyMeeting(detailResponse.meeting);
         }
       } catch (loadError) {
         setError(getErrorMessage(loadError));
       }
     })();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cleanupCaptureRef.current?.();
+    };
   }, []);
 
   const captureSupport: CaptureSupport | null =
@@ -92,13 +134,8 @@ export function MeetingDashboard() {
 
     try {
       const response = await createMeeting(draft);
-      const meetingList = await refreshMeetings();
-      startTransition(() => {
-        setSelectedMeeting(response.meeting);
-      });
-      if (!meetingList.some((meeting) => meeting.id === response.meeting.id)) {
-        await refreshMeetings();
-      }
+      applyMeeting(response.meeting);
+      await refreshMeetings();
     } catch (submitError) {
       setError(getErrorMessage(submitError));
     } finally {
@@ -124,14 +161,16 @@ export function MeetingDashboard() {
     setError(null);
 
     try {
+      if (action === "end" && capturePhase === "recording") {
+        await stopBrowserCapture();
+      }
+
       const response =
         action === "start"
           ? await startMeeting(selectedMeeting.id)
           : await endMeeting(selectedMeeting.id);
 
-      startTransition(() => {
-        setSelectedMeeting(response.meeting);
-      });
+      applyMeeting(response.meeting);
       await refreshMeetings();
     } catch (actionError) {
       setError(getErrorMessage(actionError));
@@ -140,6 +179,134 @@ export function MeetingDashboard() {
     }
   }
 
+  async function beginBrowserCapture() {
+    if (!selectedMeeting) {
+      return;
+    }
+    if (selectedMeeting.sourceConnector !== "browser_live_capture") {
+      setError("Browser capture is only available for meetings using the browser_live_capture connector.");
+      return;
+    }
+    if (selectedMeeting.status !== "live") {
+      setError("Start the meeting session before beginning browser capture.");
+      return;
+    }
+    if (!captureSupport?.displayCapture || !captureSupport.mediaRecorder) {
+      setError("This browser environment does not support live browser capture.");
+      return;
+    }
+
+    setCapturePhase("requesting");
+    setError(null);
+
+    let resources: CaptureResources | null = null;
+
+    try {
+      resources = await buildCaptureResources();
+      const preferredMimeType = resolveRecorderMimeType();
+      const response = await startCaptureSession(selectedMeeting.id, {
+        recorderMimeType: preferredMimeType,
+        hasDisplayVideo: resources.hasDisplayVideo,
+        hasDisplayAudio: resources.hasDisplayAudio,
+        hasMicrophoneAudio: resources.hasMicrophoneAudio,
+      });
+
+      const recorder =
+        preferredMimeType.length > 0
+          ? new MediaRecorder(resources.stream, { mimeType: preferredMimeType })
+          : new MediaRecorder(resources.stream);
+
+      recorderRef.current = recorder;
+      cleanupCaptureRef.current = resources.cleanup;
+      chunkSequenceRef.current = 0;
+      chunkStartedAtRef.current = Date.now();
+      stopPromiseRef.current = null;
+      stopResolverRef.current = null;
+
+      recorder.ondataavailable = (event) => {
+        if (!selectedMeeting || event.data.size === 0) {
+          return;
+        }
+
+        const now = Date.now();
+        const payload: RegisterCaptureChunkRequest = {
+          sequence: ++chunkSequenceRef.current,
+          durationMs: Math.max(now - chunkStartedAtRef.current, 250),
+          byteSize: event.data.size,
+          mimeType: event.data.type || preferredMimeType || "video/webm",
+        };
+        chunkStartedAtRef.current = now;
+
+        chunkRequestQueueRef.current = chunkRequestQueueRef.current.then(async () => {
+          const chunkResponse = await registerCaptureChunk(selectedMeeting.id, payload);
+          applyMeeting(chunkResponse.meeting);
+        }).catch((chunkError) => {
+          setError(getErrorMessage(chunkError));
+        });
+      };
+
+      recorder.onstop = () => {
+        void finalizeCaptureSession(selectedMeeting.id);
+      };
+
+      recorder.start(4000);
+      applyMeeting(response.meeting);
+      setCapturePhase("recording");
+    } catch (captureError) {
+      resources?.cleanup();
+      cleanupCaptureRef.current = null;
+      recorderRef.current = null;
+      setCapturePhase("idle");
+      setError(getErrorMessage(captureError));
+    }
+  }
+
+  async function stopBrowserCapture() {
+    if (!selectedMeeting) {
+      return;
+    }
+    if (capturePhase !== "recording" || !recorderRef.current) {
+      return;
+    }
+
+    setCapturePhase("stopping");
+
+    if (!stopPromiseRef.current) {
+      stopPromiseRef.current = new Promise<void>((resolve) => {
+        stopResolverRef.current = resolve;
+      });
+    }
+
+    recorderRef.current.stop();
+    await stopPromiseRef.current;
+  }
+
+  async function finalizeCaptureSession(meetingId: string) {
+    try {
+      await chunkRequestQueueRef.current;
+      const response = await completeCaptureSession(meetingId);
+      applyMeeting(response.meeting);
+    } catch (captureError) {
+      setError(getErrorMessage(captureError));
+    } finally {
+      cleanupCaptureRef.current?.();
+      cleanupCaptureRef.current = null;
+      recorderRef.current = null;
+      setCapturePhase("idle");
+      stopResolverRef.current?.();
+      stopResolverRef.current = null;
+      stopPromiseRef.current = null;
+    }
+  }
+
+  const canStartCapture =
+    selectedMeeting?.status === "live" &&
+    selectedMeeting.sourceConnector === "browser_live_capture" &&
+    capturePhase === "idle";
+
+  const recentChunks = selectedMeeting?.recentCaptureChunks ?? [];
+  const activeCaptureSession = selectedMeeting?.activeCaptureSession;
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.18),_transparent_28%),linear-gradient(180deg,#09121b_0%,#0a1521_30%,#f4efe2_30%,#f7f4ec_100%)] text-slate-100">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8 sm:px-10 lg:px-12">
@@ -147,16 +314,17 @@ export function MeetingDashboard() {
           <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl space-y-4">
               <p className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-emerald-100">
-                Phase 2 meeting lifecycle
+                Phase 3 capture bootstrap
               </p>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Create the meeting session before the agents can reason.
+                  Register the browser capture stream before chunking and agents begin.
                 </h1>
                 <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                  This slice wires the product shell to the deterministic control
-                  plane: meeting setup, session state, connector choice, and
-                  browser capture readiness now exist as real application flows.
+                  This slice adds real browser capture session bootstrapping, chunk
+                  metadata registration, and ingestion-state tracking so the
+                  deterministic control plane can observe capture progress before
+                  storage and AI processing are added.
                 </p>
               </div>
             </div>
@@ -164,14 +332,8 @@ export function MeetingDashboard() {
             <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-5 text-sm text-slate-200 sm:grid-cols-2 lg:min-w-[24rem]">
               <Metric label="Selected track" value="Elastic" />
               <Metric label="API base URL" value={getApiBaseUrl()} />
-              <Metric
-                label="Meetings in memory"
-                value={String(meetings.length)}
-              />
-              <Metric
-                label="Selected status"
-                value={selectedMeeting?.status ?? "No meeting yet"}
-              />
+              <Metric label="Meetings in memory" value={String(meetings.length)} />
+              <Metric label="Capture phase" value={capturePhase} />
             </div>
           </div>
         </header>
@@ -275,24 +437,29 @@ export function MeetingDashboard() {
 
             <Card title="Browser capture readiness" eyebrow="Connector check">
               <div className="grid gap-3 sm:grid-cols-3">
-                <SupportBadge
-                  label="MediaDevices"
-                  ok={captureSupport?.mediaDevices ?? false}
-                />
-                <SupportBadge
-                  label="getDisplayMedia"
-                  ok={captureSupport?.displayCapture ?? false}
-                />
-                <SupportBadge
-                  label="MediaRecorder"
-                  ok={captureSupport?.mediaRecorder ?? false}
-                />
+                <SupportBadge label="MediaDevices" ok={captureSupport?.mediaDevices ?? false} />
+                <SupportBadge label="getDisplayMedia" ok={captureSupport?.displayCapture ?? false} />
+                <SupportBadge label="MediaRecorder" ok={captureSupport?.mediaRecorder ?? false} />
               </div>
               <p className="mt-4 text-sm leading-6 text-slate-600">
-                This does not start capture yet. It confirms whether the current
-                browser environment is capable of supporting the planned live
-                browser connector.
+                This now feeds directly into the browser capture controls below.
+                The UI only enables live capture when the connector and meeting
+                lifecycle state both allow it.
               </p>
+            </Card>
+
+            <Card title="Capture rollout" eyebrow="Development path">
+              <div className="space-y-3">
+                {captureStages.map((stage) => (
+                  <article
+                    key={stage.id}
+                    className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4"
+                  >
+                    <p className="text-sm font-semibold text-slate-900">{stage.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{stage.description}</p>
+                  </article>
+                ))}
+              </div>
             </Card>
 
             <Card title="Meeting queue" eyebrow="Local development state">
@@ -321,9 +488,7 @@ export function MeetingDashboard() {
                           <p className="text-sm font-semibold">{meeting.title}</p>
                           <p
                             className={`mt-1 text-xs ${
-                              selectedMeeting?.id === meeting.id
-                                ? "text-slate-300"
-                                : "text-slate-500"
+                              selectedMeeting?.id === meeting.id ? "text-slate-300" : "text-slate-500"
                             }`}
                           >
                             {meeting.sourceConnector} · {meeting.participantCount} participants
@@ -344,9 +509,7 @@ export function MeetingDashboard() {
                 <div className="space-y-6">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div className="space-y-2">
-                      <h2 className="text-2xl font-semibold text-white">
-                        {selectedMeeting.title}
-                      </h2>
+                      <h2 className="text-2xl font-semibold text-white">{selectedMeeting.title}</h2>
                       <p className="text-sm leading-6 text-slate-300">
                         {selectedMeeting.notes || "No operator notes were added for this meeting."}
                       </p>
@@ -354,31 +517,15 @@ export function MeetingDashboard() {
                     <StatusPill status={selectedMeeting.status} />
                   </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                    <MetricCard
-                      label="Participants"
-                      value={String(selectedMeeting.participantCount)}
-                    />
-                    <MetricCard
-                      label="Connector"
-                      value={selectedMeeting.sourceConnector}
-                    />
-                    <MetricCard
-                      label="Track"
-                      value={selectedMeeting.primaryTrack}
-                    />
-                    <MetricCard
-                      label="Capture events"
-                      value={String(selectedMeeting.metrics.captureEventsCount)}
-                    />
-                    <MetricCard
-                      label="Transcript segments"
-                      value={String(selectedMeeting.metrics.transcriptSegmentsCount)}
-                    />
-                    <MetricCard
-                      label="Memory matches"
-                      value={String(selectedMeeting.metrics.memoryMatchesCount)}
-                    />
+                  <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard label="Participants" value={String(selectedMeeting.participantCount)} />
+                    <MetricCard label="Connector" value={selectedMeeting.sourceConnector} />
+                    <MetricCard label="Track" value={selectedMeeting.primaryTrack} />
+                    <MetricCard label="Capture events" value={String(selectedMeeting.metrics.captureEventsCount)} />
+                    <MetricCard label="Capture chunks" value={String(selectedMeeting.metrics.captureChunksCount)} />
+                    <MetricCard label="Captured bytes" value={formatBytes(selectedMeeting.metrics.capturedBytes)} />
+                    <MetricCard label="Transcript segments" value={String(selectedMeeting.metrics.transcriptSegmentsCount)} />
+                    <MetricCard label="Memory matches" value={String(selectedMeeting.metrics.memoryMatchesCount)} />
                   </div>
 
                   <div className="flex flex-wrap gap-3">
@@ -390,9 +537,7 @@ export function MeetingDashboard() {
                       }}
                       type="button"
                     >
-                      {selectedMeeting.status === "draft"
-                        ? "Start meeting"
-                        : "Meeting started"}
+                      {selectedMeeting.status === "draft" ? "Start meeting" : "Meeting started"}
                     </button>
                     <button
                       className={secondaryDarkButtonClassName}
@@ -402,9 +547,7 @@ export function MeetingDashboard() {
                       }}
                       type="button"
                     >
-                      {selectedMeeting.status === "ended"
-                        ? "Meeting ended"
-                        : "End meeting"}
+                      {selectedMeeting.status === "ended" ? "Meeting ended" : "End meeting"}
                     </button>
                   </div>
                 </div>
@@ -413,6 +556,89 @@ export function MeetingDashboard() {
                   bodyClassName="text-slate-300"
                   title="No meeting selected"
                   body="Create or choose a meeting to inspect the live session state."
+                />
+              )}
+            </Card>
+
+            <Card title="Browser capture session" eyebrow="Chunk registration">
+              {selectedMeeting ? (
+                <div className="space-y-5">
+                  <div className="rounded-[1.25rem] border border-slate-900/10 bg-white p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">
+                          {activeCaptureSession
+                            ? "Capture session is registered"
+                            : "No capture session registered"}
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {activeCaptureSession
+                            ? `Recorder ${activeCaptureSession.recorderMimeType} is ${activeCaptureSession.status}.`
+                            : "Start the meeting, then begin browser capture to register a live session and start emitting chunk metadata."}
+                        </p>
+                      </div>
+                      <CaptureStatusPill
+                        status={activeCaptureSession?.status ?? "idle"}
+                        phase={capturePhase}
+                      />
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3">
+                      <button
+                        className={primaryLightButtonClassName}
+                        disabled={!canStartCapture}
+                        onClick={() => {
+                          void beginBrowserCapture();
+                        }}
+                        type="button"
+                      >
+                        {capturePhase === "requesting" ? "Requesting permission..." : "Begin browser capture"}
+                      </button>
+                      <button
+                        className={secondaryLightButtonClassName}
+                        disabled={capturePhase !== "recording"}
+                        onClick={() => {
+                          void stopBrowserCapture();
+                        }}
+                        type="button"
+                      >
+                        {capturePhase === "stopping" ? "Stopping..." : "Stop capture"}
+                      </button>
+                    </div>
+
+                    {activeCaptureSession ? (
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <InfoTile label="Chunk count" value={String(activeCaptureSession.chunkCount)} />
+                        <InfoTile label="Total bytes" value={formatBytes(activeCaptureSession.totalBytes)} />
+                        <InfoTile
+                          label="Display audio"
+                          value={activeCaptureSession.hasDisplayAudio ? "Yes" : "No"}
+                        />
+                        <InfoTile
+                          label="Microphone"
+                          value={activeCaptureSession.hasMicrophoneAudio ? "Yes" : "No"}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="space-y-3">
+                    {recentChunks.length === 0 ? (
+                      <EmptyState
+                        title="No capture chunks yet"
+                        body="Chunk metadata will appear here as the MediaRecorder emits time-based segments."
+                      />
+                    ) : (
+                      recentChunks.map((chunk) => (
+                        <CaptureChunkCard key={chunk.id} chunk={chunk} />
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  title="No active capture target"
+                  body="Choose a meeting to inspect or begin browser capture."
                 />
               )}
             </Card>
@@ -427,20 +653,14 @@ export function MeetingDashboard() {
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {event.title}
-                          </p>
-                          <p className="mt-2 text-sm leading-6 text-slate-600">
-                            {event.detail}
-                          </p>
+                          <p className="text-sm font-semibold text-slate-900">{event.title}</p>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{event.detail}</p>
                         </div>
                         <div className="flex flex-col items-start gap-2 sm:items-end">
                           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
                             {event.kind}
                           </span>
-                          <span className="text-xs text-slate-500">
-                            {formatTimestamp(event.at)}
-                          </span>
+                          <span className="text-xs text-slate-500">{formatTimestamp(event.at)}</span>
                         </div>
                       </div>
                     </article>
@@ -461,12 +681,8 @@ export function MeetingDashboard() {
                     key={module.id}
                     className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4"
                   >
-                    <p className="text-sm font-semibold text-slate-900">
-                      {module.label}
-                    </p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {module.description}
-                    </p>
+                    <p className="text-sm font-semibold text-slate-900">{module.label}</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{module.description}</p>
                   </article>
                 ))}
               </div>
@@ -483,9 +699,9 @@ export function MeetingDashboard() {
         <footer className="rounded-[1.5rem] border border-slate-900/10 bg-[#f0eadc] px-5 py-4 text-sm leading-6 text-slate-700">
           <p className="font-medium text-slate-900">Current implementation note</p>
           <p>
-            This slice implements real meeting lifecycle state and dashboard/API
-            integration. Agent execution, live chunk uploads, transcript
-            generation, and Elastic memory queries are still upcoming slices.
+            This slice adds real browser capture session registration and chunk
+            metadata tracking. Blob upload to cloud storage, transcript
+            extraction, and Google Agent Builder orchestration are still upcoming.
           </p>
           <p className="mt-2">
             Official track options: {partnerTracks.map((track) => track.label).join(", ")}.
@@ -557,14 +773,7 @@ function SupportBadge({ label, ok }: { label: string; ok: boolean }) {
 }
 
 function StatusPill({ status }: { status: MeetingDetail["status"] }) {
-  const styles =
-    status === "live"
-      ? "bg-emerald-500/15 text-emerald-100 border-emerald-400/30"
-      : status === "ended"
-        ? "bg-slate-200 text-slate-700 border-slate-300"
-        : "bg-amber-400/15 text-amber-100 border-amber-300/30";
-
-  const lightStyles =
+  const variant =
     status === "live"
       ? "bg-emerald-100 text-emerald-800 border-emerald-200"
       : status === "ended"
@@ -572,12 +781,38 @@ function StatusPill({ status }: { status: MeetingDetail["status"] }) {
         : "bg-amber-100 text-amber-800 border-amber-200";
 
   return (
-    <span
-      className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${
-        status === "draft" || status === "ended" ? lightStyles : styles
-      }`}
-    >
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${variant}`}>
       {status}
+    </span>
+  );
+}
+
+function CaptureStatusPill({
+  status,
+  phase,
+}: {
+  status: CaptureSessionSummary["status"] | "idle";
+  phase: CapturePhase;
+}) {
+  const label =
+    phase === "requesting"
+      ? "requesting"
+      : phase === "stopping"
+        ? "stopping"
+        : status;
+
+  const variant =
+    label === "recording"
+      ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+      : label === "completed"
+        ? "bg-slate-200 text-slate-700 border-slate-300"
+        : label === "requesting" || label === "stopping"
+          ? "bg-sky-100 text-sky-800 border-sky-200"
+          : "bg-amber-100 text-amber-800 border-amber-200";
+
+  return (
+    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${variant}`}>
+      {label}
     </span>
   );
 }
@@ -597,6 +832,36 @@ function MetricCard({ label, value }: { label: string; value: string }) {
       <p className="text-xs uppercase tracking-[0.18em] text-slate-400">{label}</p>
       <p className="mt-2 text-lg font-semibold text-white">{value}</p>
     </div>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-[1rem] border border-slate-900/10 bg-slate-50 px-4 py-3">
+      <p className="text-xs uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-900">{value}</p>
+    </div>
+  );
+}
+
+function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
+  return (
+    <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">Chunk {chunk.sequence}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            {formatBytes(chunk.byteSize)} captured over {formatDuration(chunk.durationMs)}.
+          </p>
+        </div>
+        <div className="flex flex-col items-start gap-2 sm:items-end">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            {chunk.mimeType}
+          </span>
+          <span className="text-xs text-slate-500">{formatTimestamp(chunk.recordedAt)}</span>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -632,8 +897,134 @@ function formatTimestamp(value: string) {
   }).format(new Date(value));
 }
 
+function formatDuration(durationMs: number) {
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+  return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatBytes(byteSize: number) {
+  if (byteSize < 1024) {
+    return `${byteSize} B`;
+  }
+  if (byteSize < 1024 * 1024) {
+    return `${(byteSize / 1024).toFixed(1)} KB`;
+  }
+  return `${(byteSize / (1024 * 1024)).toFixed(2)} MB`;
+}
+
 function subscribeToBrowserAvailability() {
   return () => {};
+}
+
+function toMeetingSummary(meeting: MeetingDetail): MeetingSummary {
+  return {
+    id: meeting.id,
+    title: meeting.title,
+    participantCount: meeting.participantCount,
+    status: meeting.status,
+    sourceConnector: meeting.sourceConnector,
+    primaryTrack: meeting.primaryTrack,
+    createdAt: meeting.createdAt,
+    startedAt: meeting.startedAt,
+    endedAt: meeting.endedAt,
+    notes: meeting.notes,
+    metrics: meeting.metrics,
+  };
+}
+
+function upsertMeetingSummary(
+  meetings: MeetingSummary[],
+  candidate: MeetingSummary,
+) {
+  const next = meetings.filter((meeting) => meeting.id !== candidate.id);
+  next.unshift(candidate);
+  return next;
+}
+
+async function buildCaptureResources(): Promise<CaptureResources> {
+  const displayStream = await navigator.mediaDevices.getDisplayMedia({
+    video: true,
+    audio: true,
+  });
+
+  let microphoneStream: MediaStream | null = null;
+  try {
+    microphoneStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch {
+    microphoneStream = null;
+  }
+
+  const composedStream = new MediaStream();
+  const cleanupCallbacks: Array<() => void> = [];
+
+  const displayVideoTracks = displayStream.getVideoTracks();
+  const displayAudioTracks = displayStream.getAudioTracks();
+  const microphoneAudioTracks = microphoneStream?.getAudioTracks() ?? [];
+
+  displayVideoTracks.forEach((track) => composedStream.addTrack(track));
+
+  if (displayAudioTracks.length + microphoneAudioTracks.length > 1) {
+    const audioContext = new AudioContext();
+    const destination = audioContext.createMediaStreamDestination();
+    const audioStreams: MediaStream[] = [];
+
+    if (displayAudioTracks.length > 0) {
+      audioStreams.push(new MediaStream(displayAudioTracks));
+    }
+    if (microphoneAudioTracks.length > 0) {
+      audioStreams.push(new MediaStream(microphoneAudioTracks));
+    }
+
+    audioStreams.forEach((stream) => {
+      const source = audioContext.createMediaStreamSource(stream);
+      source.connect(destination);
+    });
+
+    destination.stream.getAudioTracks().forEach((track) => composedStream.addTrack(track));
+
+    cleanupCallbacks.push(() => {
+      void audioContext.close();
+    });
+  } else {
+    [...displayAudioTracks, ...microphoneAudioTracks].forEach((track) => composedStream.addTrack(track));
+  }
+
+  cleanupCallbacks.push(() => {
+    displayStream.getTracks().forEach((track) => track.stop());
+    microphoneStream?.getTracks().forEach((track) => track.stop());
+    composedStream.getTracks().forEach((track) => {
+      if (track.readyState === "live") {
+        track.stop();
+      }
+    });
+  });
+
+  return {
+    stream: composedStream,
+    cleanup: () => {
+      cleanupCallbacks.forEach((callback) => callback());
+    },
+    hasDisplayVideo: displayVideoTracks.length > 0,
+    hasDisplayAudio: displayAudioTracks.length > 0,
+    hasMicrophoneAudio: microphoneAudioTracks.length > 0,
+  };
+}
+
+function resolveRecorderMimeType() {
+  const candidates = [
+    "video/webm;codecs=vp9,opus",
+    "video/webm;codecs=vp8,opus",
+    "video/webm;codecs=h264,opus",
+    "video/webm",
+  ];
+
+  if (typeof MediaRecorder === "undefined") {
+    return "";
+  }
+
+  return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
 }
 
 const inputClassName =
@@ -642,8 +1033,14 @@ const inputClassName =
 const primaryButtonClassName =
   "rounded-full bg-emerald-300 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-60";
 
+const primaryLightButtonClassName =
+  "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60";
+
 const secondaryButtonClassName =
   "rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
 
 const secondaryDarkButtonClassName =
   "rounded-full border border-white/15 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60";
+
+const secondaryLightButtonClassName =
+  "rounded-full border border-slate-900/15 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60";

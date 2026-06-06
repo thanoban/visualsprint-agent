@@ -20,6 +20,7 @@ export type LiveEventKind =
   | "commitment"
   | "blocker"
   | "memory";
+export type CaptureSessionStatus = "idle" | "recording" | "completed";
 
 export interface PartnerTrack {
   slug: PartnerTrackSlug;
@@ -51,6 +52,31 @@ export interface MeetingMetrics {
   memoryMatchesCount: number;
   transcriptSegmentsCount: number;
   captureEventsCount: number;
+  captureChunksCount: number;
+  capturedBytes: number;
+}
+
+export interface CaptureChunkSummary {
+  id: string;
+  sequence: number;
+  recordedAt: string;
+  durationMs: number;
+  byteSize: number;
+  mimeType: string;
+}
+
+export interface CaptureSessionSummary {
+  id: string;
+  status: CaptureSessionStatus;
+  sourceConnector: SourceConnectorSlug;
+  recorderMimeType: string;
+  hasDisplayVideo: boolean;
+  hasDisplayAudio: boolean;
+  hasMicrophoneAudio: boolean;
+  startedAt: string;
+  endedAt: null | string;
+  chunkCount: number;
+  totalBytes: number;
 }
 
 export interface MeetingSummary {
@@ -77,6 +103,8 @@ export interface LiveEvent {
 
 export interface MeetingDetail extends MeetingSummary {
   latestEvents: LiveEvent[];
+  activeCaptureSession: null | CaptureSessionSummary;
+  recentCaptureChunks: CaptureChunkSummary[];
 }
 
 export interface CreateMeetingRequest {
@@ -96,6 +124,29 @@ export interface MeetingListResponse {
 
 export interface MeetingDetailResponse {
   meeting: MeetingDetail;
+}
+
+export interface StartCaptureSessionRequest {
+  recorderMimeType: string;
+  hasDisplayVideo: boolean;
+  hasDisplayAudio: boolean;
+  hasMicrophoneAudio: boolean;
+}
+
+export interface RegisterCaptureChunkRequest {
+  sequence: number;
+  durationMs: number;
+  byteSize: number;
+  mimeType: string;
+}
+
+export interface CaptureSessionResponse {
+  meeting: MeetingDetail;
+  captureSession: CaptureSessionSummary;
+}
+
+export interface RegisterCaptureChunkResponse extends CaptureSessionResponse {
+  chunk: CaptureChunkSummary;
 }
 
 export interface ServiceHealth {
@@ -214,3 +265,23 @@ export const sourceConnectors: Array<{
       "Future connector for linked docs and structured context that enriches the meeting memory layer.",
   },
 ];
+
+export const captureStages = [
+  {
+    id: "meeting",
+    label: "Meeting session",
+    description: "Create and transition the deterministic meeting lifecycle.",
+  },
+  {
+    id: "capture",
+    label: "Capture bootstrap",
+    description:
+      "Obtain browser permission, start the recorder, and register the capture session with the control plane.",
+  },
+  {
+    id: "chunking",
+    label: "Chunk registration",
+    description:
+      "Emit time-based chunks and keep chunk metadata visible before storage and agent processing are added.",
+  },
+] as const;

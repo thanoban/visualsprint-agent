@@ -1,8 +1,12 @@
 import type {
+  CaptureSessionResponse,
   CreateMeetingRequest,
   CreateMeetingResponse,
   MeetingDetailResponse,
   MeetingListResponse,
+  RegisterCaptureChunkRequest,
+  RegisterCaptureChunkResponse,
+  StartCaptureSessionRequest,
 } from "@visualsprint/contracts";
 
 const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -54,4 +58,39 @@ export function endMeeting(meetingId: string) {
   return request<MeetingDetailResponse>(`/api/meetings/${meetingId}/end`, {
     method: "POST",
   });
+}
+
+export function startCaptureSession(
+  meetingId: string,
+  payload: StartCaptureSessionRequest,
+) {
+  return request<CaptureSessionResponse>(
+    `/api/meetings/${meetingId}/capture-sessions/start`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function registerCaptureChunk(
+  meetingId: string,
+  payload: RegisterCaptureChunkRequest,
+) {
+  return request<RegisterCaptureChunkResponse>(
+    `/api/meetings/${meetingId}/capture-sessions/chunk`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function completeCaptureSession(meetingId: string) {
+  return request<CaptureSessionResponse>(
+    `/api/meetings/${meetingId}/capture-sessions/complete`,
+    {
+      method: "POST",
+    },
+  );
 }
