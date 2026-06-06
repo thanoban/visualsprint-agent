@@ -15,6 +15,9 @@ SourceConnectorSlug = Literal[
     "document_link",
 ]
 CaptureSessionStatus = Literal["idle", "recording", "completed"]
+ChunkProcessingStatus = Literal["registered", "processing", "processed"]
+BlockerSeverity = Literal["low", "medium", "high"]
+MemoryMatchStrength = Literal["related", "recurring", "critical"]
 LiveEventKind = Literal[
     "system",
     "capture",
@@ -44,6 +47,9 @@ class CaptureChunkSummary(BaseModel):
     durationMs: int = Field(ge=250)
     byteSize: int = Field(ge=0)
     mimeType: str = Field(min_length=3, max_length=120)
+    processingStatus: ChunkProcessingStatus
+    transcriptSegmentCount: int = 0
+    signalCount: int = 0
 
 
 class CaptureSessionSummary(BaseModel):
@@ -68,6 +74,46 @@ class LiveEvent(BaseModel):
     detail: str
 
 
+class TranscriptSegment(BaseModel):
+    id: str
+    speakerLabel: str = Field(min_length=2, max_length=60)
+    startedAt: datetime
+    endedAt: datetime
+    text: str = Field(min_length=8, max_length=500)
+
+
+class DecisionRecord(BaseModel):
+    id: str
+    title: str = Field(min_length=4, max_length=180)
+    rationale: str = Field(min_length=8, max_length=500)
+    speakerLabel: str = Field(min_length=2, max_length=60)
+    recordedAt: datetime
+
+
+class CommitmentRecord(BaseModel):
+    id: str
+    ownerLabel: str = Field(min_length=2, max_length=60)
+    action: str = Field(min_length=6, max_length=220)
+    dueHint: str = Field(min_length=2, max_length=60)
+    recordedAt: datetime
+
+
+class BlockerRecord(BaseModel):
+    id: str
+    summary: str = Field(min_length=6, max_length=220)
+    severity: BlockerSeverity
+    ownerLabel: str = Field(min_length=2, max_length=60)
+    recordedAt: datetime
+
+
+class MemoryMatch(BaseModel):
+    id: str
+    summary: str = Field(min_length=6, max_length=240)
+    sourceMeetingTitle: str = Field(min_length=3, max_length=120)
+    strength: MemoryMatchStrength
+    recordedAt: datetime
+
+
 class MeetingSummary(BaseModel):
     id: str
     title: str = Field(min_length=3, max_length=120)
@@ -86,6 +132,11 @@ class MeetingDetail(MeetingSummary):
     latestEvents: list[LiveEvent] = Field(default_factory=list)
     activeCaptureSession: CaptureSessionSummary | None = None
     recentCaptureChunks: list[CaptureChunkSummary] = Field(default_factory=list)
+    recentTranscriptSegments: list[TranscriptSegment] = Field(default_factory=list)
+    recentDecisions: list[DecisionRecord] = Field(default_factory=list)
+    recentCommitments: list[CommitmentRecord] = Field(default_factory=list)
+    recentBlockers: list[BlockerRecord] = Field(default_factory=list)
+    recentMemoryMatches: list[MemoryMatch] = Field(default_factory=list)
 
 
 class CreateMeetingRequest(BaseModel):
