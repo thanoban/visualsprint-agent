@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from visualsprint_api.config import settings
 from visualsprint_api.routes.health import router as health_router
 from visualsprint_api.routes.meta import router as meta_router
+from visualsprint_api.routes.meetings import router as meetings_router
 
 
 app = FastAPI(
@@ -27,6 +28,7 @@ if settings.allowed_origins:
 
 app.include_router(health_router, prefix="/api")
 app.include_router(meta_router, prefix="/api")
+app.include_router(meetings_router, prefix="/api")
 
 
 @app.get("/")

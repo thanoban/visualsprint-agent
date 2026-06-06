@@ -7,6 +7,19 @@ export type PartnerTrackSlug =
   | "dynatrace";
 
 export type PlatformCapabilityType = "deterministic" | "intelligence" | "platform";
+export type MeetingStatus = "draft" | "live" | "ended";
+export type SourceConnectorSlug =
+  | "browser_live_capture"
+  | "recording_upload"
+  | "document_link";
+export type LiveEventKind =
+  | "system"
+  | "capture"
+  | "transcript"
+  | "decision"
+  | "commitment"
+  | "blocker"
+  | "memory";
 
 export interface PartnerTrack {
   slug: PartnerTrackSlug;
@@ -29,6 +42,60 @@ export interface DashboardModule {
 export interface FoundationalService {
   name: string;
   responsibility: string;
+}
+
+export interface MeetingMetrics {
+  decisionsCount: number;
+  commitmentsCount: number;
+  blockersCount: number;
+  memoryMatchesCount: number;
+  transcriptSegmentsCount: number;
+  captureEventsCount: number;
+}
+
+export interface MeetingSummary {
+  id: string;
+  title: string;
+  participantCount: number;
+  status: MeetingStatus;
+  sourceConnector: SourceConnectorSlug;
+  primaryTrack: PartnerTrackSlug;
+  createdAt: string;
+  startedAt: null | string;
+  endedAt: null | string;
+  notes: string;
+  metrics: MeetingMetrics;
+}
+
+export interface LiveEvent {
+  id: string;
+  kind: LiveEventKind;
+  at: string;
+  title: string;
+  detail: string;
+}
+
+export interface MeetingDetail extends MeetingSummary {
+  latestEvents: LiveEvent[];
+}
+
+export interface CreateMeetingRequest {
+  title: string;
+  participantCount: number;
+  sourceConnector: SourceConnectorSlug;
+  notes: string;
+}
+
+export interface CreateMeetingResponse {
+  meeting: MeetingDetail;
+}
+
+export interface MeetingListResponse {
+  meetings: MeetingSummary[];
+}
+
+export interface MeetingDetailResponse {
+  meeting: MeetingDetail;
 }
 
 export interface ServiceHealth {
@@ -120,5 +187,30 @@ export const foundationalServices: FoundationalService[] = [
     name: "Contracts package",
     responsibility:
       "Centralizes the language shared by the UI, APIs, and future services before implementation branches out.",
+  },
+];
+
+export const sourceConnectors: Array<{
+  slug: SourceConnectorSlug;
+  label: string;
+  description: string;
+}> = [
+  {
+    slug: "browser_live_capture",
+    label: "Browser live capture",
+    description:
+      "The first production connector for screen share, microphone, and live meeting session intake.",
+  },
+  {
+    slug: "recording_upload",
+    label: "Recording upload",
+    description:
+      "Future connector for recorded meeting files that should reuse the same downstream pipeline.",
+  },
+  {
+    slug: "document_link",
+    label: "Document link",
+    description:
+      "Future connector for linked docs and structured context that enriches the meeting memory layer.",
   },
 ];

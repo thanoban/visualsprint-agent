@@ -27,7 +27,13 @@ class Settings:
         "dynatrace",
     )
     allowed_origins: tuple[str, ...] = field(
-        default_factory=lambda: tuple(_split_csv(os.getenv("VISUALSPRINT_ALLOWED_ORIGINS")))
+        default_factory=lambda: tuple(
+            _split_csv(os.getenv("VISUALSPRINT_ALLOWED_ORIGINS"))
+            or [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
+        )
     )
 
 
