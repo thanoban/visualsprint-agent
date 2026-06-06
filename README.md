@@ -87,6 +87,111 @@ Planned usage in this project:
 
 In other words, Google Agent Builder is planned as the official orchestration and managed agent surface, while FastAPI services remain the supporting deterministic platform around it.
 
+### What Lives In Google Agent Builder Versus Our Repo
+
+VisualSprint is **not** a portal-only project and it is **not** an API-only project. It is a hybrid build.
+
+What we will configure in Google Agent Builder:
+
+- the main managed VisualSprint agent
+- the subagent flow and orchestration logic
+- Gemini model selection for each agent step
+- instructions, guardrails, and output behavior
+- managed tool connections
+- agent preview, iteration, and deployment setup
+
+What we will build in our own repository:
+
+- the browser capture experience in `apps/web`
+- the FastAPI control plane and tool endpoints in `services/api`
+- future ingestion and media services in `services/ingest` and `services/media`
+- Elastic indexing support and historical memory preparation
+- state persistence, uploads, retries, and dashboard delivery
+- domain contracts, report shaping, and product UI
+
+This split matters because the hackathon requires a functional agent powered by Gemini and Google Cloud Agent Builder, but the product itself still needs real capture, storage, APIs, and frontend surfaces outside the portal.
+
+### VisualSprint Agent Builder Setup Plan
+
+The recommended implementation path for this project is:
+
+1. **Create the Google Cloud environment**
+   - Create or select the Google Cloud project.
+   - Enable the Google services required for Gemini Enterprise and the managed agent workflow.
+   - Set up billing or hackathon credits before building further.
+2. **Create the Gemini Enterprise app**
+   - Open Gemini Enterprise in Google Cloud.
+   - Create the app that will host the VisualSprint managed agents.
+   - Treat this app as the top-level agent container for the project.
+3. **Open Agent Designer and use the flow builder**
+   - Start in the low-code builder instead of a prompt-only draft.
+   - Use the flow builder because VisualSprint needs a multi-step, multi-agent flow rather than a single conversational prompt.
+4. **Create the main VisualSprint orchestrator agent**
+   - Name the main agent and describe it as the meeting-intelligence coordinator.
+   - Select the Gemini model for orchestration and reasoning.
+   - Add detailed instructions about chunk-based meeting processing, structured outputs, and tool-calling rules.
+5. **Add the specialist subagents**
+   - Transcript Agent for transcript interpretation and speaker-aware reasoning.
+   - Vision Agent for screen-evidence reasoning.
+   - Reasoning Agent for decisions, commitments, blockers, and open questions.
+   - Memory Agent for Elastic lookups before final outputs are finalized.
+   - Summary Agent for final report generation after the meeting ends.
+6. **Connect Elastic MCP**
+   - Use the Elastic partner tooling so the Memory Agent can search historical meeting intelligence.
+   - Scope queries to the current tenant or workspace boundary from the start.
+   - Use memory retrieval before marking a blocker or commitment as new or resolved.
+7. **Connect our custom tool endpoints**
+   - Expose FastAPI endpoints for deterministic actions the managed agent should call.
+   - Examples: register agent outputs, fetch meeting state, finalize reports, and request current chunk context.
+   - Keep uploads, retries, persistence, and queue handling outside the agent itself.
+8. **Test in Agent Designer Preview**
+   - Validate whether the agent flow is choosing the correct tools.
+   - Check that outputs are structured and stable enough for dashboard use.
+   - Refine prompts and tool descriptions until the flow is predictable.
+9. **Deploy and share the managed agent**
+   - Create the agent in Gemini Enterprise once the draft flow is stable.
+   - Share or register the agent inside the Gemini Enterprise app as needed for the final hackathon experience.
+10. **Connect the managed agent to the product UI**
+    - Keep the dashboard in our Next.js app.
+    - Let the web app and backend drive meeting creation, live capture, and data display while the managed agent provides intelligence outputs.
+
+### Agent Builder Implementation Steps For VisualSprint
+
+When we start the actual managed-agent phase, the expected sequence inside Google Agent Builder is:
+
+1. Open the Gemini Enterprise app.
+2. Click `Create agent`.
+3. Choose `Proceed to builder`.
+4. Add the main agent node:
+   - `Name`: `VisualSprint Orchestrator`
+   - `Description`: coordinates meeting chunk reasoning and structured output generation
+   - `Instructions`: explain chunk-by-chunk analysis, required JSON-like structured outputs, and tool-calling rules
+5. Add subagents:
+   - `Transcript Agent`
+   - `Vision Agent`
+   - `Reasoning Agent`
+   - `Memory Agent`
+   - `Summary Agent`
+6. Add tools and data connections:
+   - Elastic MCP tools for historical search
+   - our backend endpoints for deterministic product actions
+7. Preview the agent flow with sample meeting inputs.
+8. Refine instructions until the outputs are reliable.
+9. Create the agent and keep iterating as the product backend matures.
+
+### Why We Are Not Building Only In The Portal
+
+Using only the portal would leave major product responsibilities uncovered:
+
+- browser media capture
+- chunk upload handling
+- durable database writes
+- storage lifecycle management
+- live dashboard transport
+- product authentication and tenancy boundaries
+
+So the portal is where we define and manage the **agent workflow**, while the repository is where we build the **actual software platform** around that workflow.
+
 ## Why We Chose The Elastic Track
 
 Elastic is the selected partner track for this repository.
@@ -295,6 +400,38 @@ This repo now contains early implementation work, and the intended delivery path
 6. **Hardening and expansion**
    - multi-tenant controls, observability, connector growth, enterprise readiness
 
+## Managed Agent Delivery Steps
+
+The build sequence for the remaining hackathon-aligned work is:
+
+1. Finish deterministic ingestion boundaries
+   - formal chunk state transitions
+   - persisted chunk identifiers
+   - upload-ready lifecycle contracts
+2. Replace mock processing with real services
+   - audio transcription pipeline
+   - frame extraction pipeline
+   - structured intermediate records
+3. Stand up Elastic-backed historical memory
+   - index past meeting outputs
+   - define the retrieval contract the Memory Agent will use
+4. Build the managed agent flow in Google Agent Builder
+   - create the app
+   - create the orchestrator and subagents
+   - wire Elastic MCP and backend tools
+5. Connect agent outputs back to the dashboard
+   - live decisions
+   - commitments
+   - blockers
+   - memory matches
+   - final report view
+6. Prepare the hackathon submission package
+   - hosted demo
+   - public repo
+   - demo video
+   - Elastic track selection
+   - final Devpost entry
+
 ## Open Questions
 
 - Should VisualSprint remain fully open-source under Apache-2.0, or should the public repo stay open while future proprietary production modules live in separate private repositories?
@@ -304,7 +441,7 @@ This repo now contains early implementation work, and the intended delivery path
 - Build a functional agent powered by Gemini and Google Cloud Agent Builder
 - Integrate a partner MCP server
 - Demonstrate reasoning, planning, and action beyond simple chat
-- Choose one official partner category from the six listed in the portal
+- Choose one official partner category from the current portal tracks
 - Select the Elastic partner track
 - Use Google Cloud plus the products relevant to the chosen partner track
 - Publish a public repository with a visible open-source license
@@ -312,6 +449,12 @@ This repo now contains early implementation work, and the intended delivery path
 - Complete the Devpost submission fields
 - Record and submit an approximately 3-minute demo video
 - Finalize all required materials before **June 11, 2026 at 2:00 PM PDT**
+
+Current portal note as of **June 7, 2026**:
+
+- the public resources and project gallery pages show six partner categories: Arize, Elastic, Fivetran, GitLab, MongoDB, and Dynatrace
+- the rules page excerpt still lists five named partner tracks in its submission section
+- VisualSprint is intentionally documented and built for the **Elastic** track
 
 ## Official Sources
 
