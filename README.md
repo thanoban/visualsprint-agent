@@ -33,6 +33,19 @@ VisualSprint is intentionally designed around the current hackathon rules and su
 
 Based on the official hackathon materials, the challenge requires teams to build a functional agent powered by Gemini and Google Cloud Agent Builder, integrate a partner MCP server, and solve a real-world challenge with reasoning, planning, and action rather than simple chat behavior. The submission also requires a hosted project URL, a public open-source repository with a visible license, a selected partner track, a completed Devpost submission, and an approximately 3-minute demo video.
 
+The current official partner-track categories listed in the rules and resources are:
+
+- Arize
+- Elastic
+- Fivetran
+- GitLab
+- MongoDB
+- Dynatrace
+
+VisualSprint is being planned for the **Elastic** category.
+
+The rules also state that the project should be built using Google Cloud and the specific partner products relevant to the chosen track. For VisualSprint, that means the core agent experience should be built on Google Cloud with Google Agent Builder, while the cross-meeting memory layer should use Elastic products for the Elastic track.
+
 VisualSprint fits that structure well because:
 
 - it is agent-first rather than chatbot-first
@@ -58,6 +71,22 @@ For VisualSprint, Google Agent Builder is the right choice because it gives us:
 - alignment with Gemini for reasoning and multimodal processing
 - a path toward enterprise-grade scaling, governance, and managed agent operations
 
+### How VisualSprint Will Use Google Agent Builder
+
+Based on the official hackathon resources, Google Agent Builder is the low-code managed path for building agents with orchestration, grounding, and enterprise data connectivity. VisualSprint will use it as the managed agent layer rather than treating it as a side tool.
+
+Planned usage in this project:
+
+- define the managed meeting-intelligence agent experience in Google Agent Builder
+- use Gemini as the reasoning model behind the managed agent workflows
+- connect the Elastic MCP server to the agent so historical memory tools are available inside the agent workflow
+- use Agent Builder extensions and tool connections where the managed agent needs access to external APIs or controlled actions
+- keep deterministic Python services outside the managed agent for capture intake, chunking, media preparation, signed uploads, retries, and state transitions
+- use Cloud Run or Agent Runtime for custom Python services and tool backends that support the managed agent layer
+- deploy the user-facing agent experience through Google Cloud deployment surfaces rather than relying on a local-only orchestration model
+
+In other words, Google Agent Builder is planned as the official orchestration and managed agent surface, while FastAPI services remain the supporting deterministic platform around it.
+
 ## Why We Chose The Elastic Track
 
 Elastic is the selected partner track for this repository.
@@ -71,6 +100,16 @@ That is where Elastic fits naturally:
 - current meeting outputs gain institutional context instead of remaining isolated artifacts
 
 This makes the product meaningfully different from transcript-first tools. Elastic is not a forced integration here; it is part of the product’s core value proposition.
+
+The other current hackathon categories remain relevant reference options, but they are not the selected direction for this repo:
+
+- Arize for evaluation and observability
+- Fivetran for data movement and connected pipelines
+- GitLab for secure DevSecOps and Duo Agent Platform workflows
+- MongoDB for operational data and application persistence
+- Dynatrace for runtime observability and production monitoring
+
+Those are valid categories in the portal, but VisualSprint’s strongest fit is still Elastic because recurring meeting memory is central to the product itself.
 
 ## Production Architecture
 
@@ -265,7 +304,9 @@ This repo does not yet contain implementation code, but the intended delivery pa
 - Build a functional agent powered by Gemini and Google Cloud Agent Builder
 - Integrate a partner MCP server
 - Demonstrate reasoning, planning, and action beyond simple chat
+- Choose one official partner category from the six listed in the portal
 - Select the Elastic partner track
+- Use Google Cloud plus the products relevant to the chosen partner track
 - Publish a public repository with a visible open-source license
 - Host a working project URL for the demo
 - Complete the Devpost submission fields
@@ -275,9 +316,13 @@ This repo does not yet contain implementation code, but the intended delivery pa
 ## Official Sources
 
 - [Google Cloud Rapid Agent Hackathon overview](https://rapid-agent.devpost.com/)
+- [Google Cloud Rapid Agent Hackathon resources](https://rapid-agent.devpost.com/resources)
 - [Google Cloud Rapid Agent Hackathon rules](https://rapid-agent.devpost.com/rules)
 - [Hackathon partner update](https://rapid-agent.devpost.com/updates/43941-the-challenge-is-live-meet-your-partners)
 - [Elastic track resources](https://rapid-agent.devpost.com/details/elastic-resources)
+- [Google Agent Builder guide](https://cloud.google.com/products/agent-builder)
+- [Building and managing extensions](https://cloud.google.com/vertex-ai/docs/generative-ai/extensions/overview)
+- [Agent Runtime overview](https://cloud.google.com/vertex-ai/docs/generative-ai/reasoning-engine/overview)
 - [AI Agents for Gemini Enterprise](https://cloud.google.com/gemini-enterprise/agents)
 - [Gemini Enterprise agents overview](https://docs.cloud.google.com/gemini/enterprise/docs/agents-overview)
 - [Elastic Agent Builder MCP server docs](https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/mcp-server/)
