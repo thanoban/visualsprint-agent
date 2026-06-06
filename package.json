@@ -1,0 +1,19 @@
+{
+  "name": "visualsprint-agent",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace @visualsprint/web",
+    "build:web": "npm run build --workspace @visualsprint/web",
+    "lint:web": "npm run lint --workspace @visualsprint/web",
+    "typecheck:web": "npm run typecheck --workspace @visualsprint/web",
+    "check:contracts": "npm run typecheck --workspace @visualsprint/contracts",
+    "dev:api": "python -m uvicorn visualsprint_api.main:app --app-dir services/api/src --reload --host 127.0.0.1 --port 8000",
+    "check:api": "python -m compileall services/api/src",
+    "verify": "npm run lint:web && npm run typecheck:web && npm run check:contracts && npm run check:api"
+  }
+}
