@@ -87,6 +87,16 @@ export interface DownstreamServiceStatus {
   note: string;
 }
 
+export interface ElasticIntegrationStatus {
+  provider: "elastic";
+  writebackConfigured: boolean;
+  elasticsearchUrlConfigured: boolean;
+  apiKeySecretConfigured: boolean;
+  mcpServerConfigured: boolean;
+  outcomesIndex: null | string;
+  note: string;
+}
+
 export interface PlatformMetaResponse {
   service: string;
   environment: string;
@@ -99,6 +109,7 @@ export interface PlatformMetaResponse {
     memoryLayer: string;
   };
   modules: string[];
+  memoryIntegration: ElasticIntegrationStatus;
   downstreamServices: DownstreamServiceStatus[];
 }
 

@@ -644,7 +644,25 @@ export function MeetingDashboard() {
 
             <Card title="Platform topology" eyebrow="Service boundaries">
               {platformMeta ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <InfoTile label="Memory layer" value={platformMeta.memoryIntegration.provider} />
+                    <InfoTile
+                      label="Elastic writeback"
+                      value={
+                        platformMeta.memoryIntegration.writebackConfigured
+                          ? "configured"
+                          : "not configured"
+                      }
+                    />
+                    <InfoTile
+                      label="Outcome index"
+                      value={platformMeta.memoryIntegration.outcomesIndex ?? "not set"}
+                    />
+                  </div>
+                  <p className="text-sm leading-6 text-slate-600">
+                    {platformMeta.memoryIntegration.note}
+                  </p>
                   {platformMeta.downstreamServices.map((service) => (
                     <DownstreamServiceCard key={service.kind} service={service} />
                   ))}
@@ -652,7 +670,7 @@ export function MeetingDashboard() {
               ) : (
                 <EmptyState
                   title="No platform status yet"
-                  body="The dashboard will show control-plane, ingest, and media service status once metadata loads."
+                  body="The dashboard will show downstream services and Elastic readiness once metadata loads."
                 />
               )}
             </Card>
