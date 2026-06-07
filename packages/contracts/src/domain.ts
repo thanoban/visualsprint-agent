@@ -314,6 +314,21 @@ export interface MeetingStreamEvent {
   meeting: MeetingDetail;
 }
 
+export interface FinalReport {
+  meetingId: string;
+  generatedAt: string;
+  executiveSummary: string;
+  decisions: DecisionRecord[];
+  commitments: CommitmentRecord[];
+  blockers: BlockerRecord[];
+  openQuestions: OpenQuestionRecord[];
+  memoryHighlights: MemoryMatch[];
+}
+
+export interface FinalReportResponse {
+  report: FinalReport;
+}
+
 export interface ServiceHealth {
   service: string;
   status: "ok";

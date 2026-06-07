@@ -11,6 +11,7 @@ from fastapi.responses import StreamingResponse
 from visualsprint_api.models import (
     CreateMeetingRequest,
     CreateMeetingResponse,
+    FinalReportResponse,
     MeetingStreamEvent,
     MeetingStateResponse,
     MeetingDetailResponse,
@@ -45,6 +46,22 @@ def get_meeting_state(meeting_id: str) -> MeetingStateResponse:
     if meeting_state is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
     return MeetingStateResponse(meetingState=meeting_state)
+
+
+@router.get("/{meeting_id}/final-report", response_model=FinalReportResponse)
+def get_final_report(meeting_id: str) -> FinalReportResponse:
+    report = repository.get_final_report(meeting_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Final report not found")
+    return FinalReportResponse(report=report)
+
+
+@router.post("/{meeting_id}/final-report", response_model=FinalReportResponse)
+def finalize_report(meeting_id: str) -> FinalReportResponse:
+    report = repository.finalize_report(meeting_id)
+    if report is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
+    return FinalReportResponse(report=report)
 
 
 @router.get("/{meeting_id}/events")
