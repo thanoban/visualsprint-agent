@@ -1373,6 +1373,7 @@ function DecisionCard({ decision }: { decision: DecisionRecord }) {
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
       <p className="text-sm font-semibold text-slate-900">{decision.title}</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{decision.rationale}</p>
+      <EvidenceList evidence={decision.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
         {decision.speakerLabel} · {formatTimestamp(decision.recordedAt)}
       </p>
@@ -1385,6 +1386,7 @@ function CommitmentCard({ commitment }: { commitment: CommitmentRecord }) {
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
       <p className="text-sm font-semibold text-slate-900">{commitment.ownerLabel}</p>
       <p className="mt-2 text-sm leading-6 text-slate-600">{commitment.action}</p>
+      <EvidenceList evidence={commitment.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
         Due {commitment.dueHint} · {formatTimestamp(commitment.recordedAt)}
       </p>
@@ -1401,6 +1403,7 @@ function BlockerCard({ blocker }: { blocker: BlockerRecord }) {
           {blocker.severity}
         </span>
       </div>
+      <EvidenceList evidence={blocker.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
         Owner {blocker.ownerLabel} · {formatTimestamp(blocker.recordedAt)}
       </p>
@@ -1488,10 +1491,34 @@ function SummaryHighlightCard({
   );
 }
 
+function EvidenceList({
+  evidence,
+}: {
+  evidence: DecisionRecord["evidence"];
+}) {
+  if (evidence.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="mt-3 space-y-2">
+      {evidence.map((reference) => (
+        <p
+          key={`${reference.clientChunkId}-${reference.transcriptRef ?? "none"}-${reference.frameRef ?? "none"}-${reference.tStartMs}`}
+          className="rounded-xl bg-slate-100 px-3 py-2 text-xs leading-5 text-slate-600"
+        >
+          {formatEvidenceReference(reference)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
 function OpenQuestionCard({ openQuestion }: { openQuestion: OpenQuestionRecord }) {
   return (
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
       <p className="text-sm font-semibold text-slate-900">{openQuestion.question}</p>
+      <EvidenceList evidence={openQuestion.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
         {openQuestion.speakerLabel} · {formatTimestamp(openQuestion.recordedAt)}
       </p>
@@ -1536,6 +1563,13 @@ function formatDuration(durationMs: number) {
     return `${durationMs} ms`;
   }
   return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatEvidenceReference(reference: DecisionRecord["evidence"][number]) {
+  const rangeLabel = `${formatFrameTimestamp(reference.tStartMs)}-${formatFrameTimestamp(reference.tEndMs)}`;
+  const transcriptLabel = reference.transcriptRef ? `transcript ${reference.transcriptRef}` : "no transcript ref";
+  const frameLabel = reference.frameRef ? `frame ${reference.frameRef}` : "no frame ref";
+  return `${reference.clientChunkId} · ${rangeLabel} · ${transcriptLabel} · ${frameLabel} · ${reference.note}`;
 }
 
 function formatFrameTimestamp(value: number) {

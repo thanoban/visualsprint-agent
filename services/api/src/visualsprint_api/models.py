@@ -125,12 +125,23 @@ class ScreenEvent(BaseModel):
     recordedAt: datetime
 
 
+class EvidenceReference(BaseModel):
+    chunkId: str = Field(min_length=4, max_length=120)
+    clientChunkId: str = Field(min_length=8, max_length=120)
+    tStartMs: int = Field(ge=0)
+    tEndMs: int = Field(ge=0)
+    transcriptRef: str | None = Field(default=None, min_length=4, max_length=120)
+    frameRef: str | None = Field(default=None, min_length=4, max_length=120)
+    note: str = Field(min_length=6, max_length=220)
+
+
 class DecisionRecord(BaseModel):
     id: str
     title: str = Field(min_length=4, max_length=180)
     rationale: str = Field(min_length=8, max_length=500)
     speakerLabel: str = Field(min_length=2, max_length=60)
     recordedAt: datetime
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
 
 class CommitmentRecord(BaseModel):
@@ -139,6 +150,7 @@ class CommitmentRecord(BaseModel):
     action: str = Field(min_length=6, max_length=220)
     dueHint: str = Field(min_length=2, max_length=60)
     recordedAt: datetime
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
 
 class BlockerRecord(BaseModel):
@@ -147,6 +159,7 @@ class BlockerRecord(BaseModel):
     severity: BlockerSeverity
     ownerLabel: str = Field(min_length=2, max_length=60)
     recordedAt: datetime
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
 
 class MemoryMatch(BaseModel):
@@ -166,6 +179,7 @@ class OpenQuestionRecord(BaseModel):
     question: str = Field(min_length=8, max_length=240)
     speakerLabel: str = Field(min_length=2, max_length=60)
     recordedAt: datetime
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
 
 class MeetingSummary(BaseModel):
