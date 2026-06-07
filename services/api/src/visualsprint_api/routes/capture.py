@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from visualsprint_api.models import (
+    ChunkContextResponse,
     CompleteCaptureChunkUploadRequest,
     CompleteCaptureChunkUploadResponse,
     CaptureSessionResponse,
@@ -93,6 +94,29 @@ def register_capture_chunk(
         meeting=meeting,
         captureSession=capture_session,
         chunk=chunk,
+    )
+
+
+@router.get("/chunks/{client_chunk_id}/context", response_model=ChunkContextResponse)
+def get_chunk_context(meeting_id: str, client_chunk_id: str) -> ChunkContextResponse:
+    meeting_state = repository.get_meeting_state(meeting_id)
+    if meeting_state is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meeting or capture session not found",
+        )
+
+    chunk_context = repository.get_chunk_context(meeting_id, client_chunk_id)
+    if chunk_context is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Chunk context not found",
+        )
+
+    return ChunkContextResponse(
+        meetingId=meeting_id,
+        meetingState=meeting_state,
+        chunkContext=chunk_context,
     )
 
 
