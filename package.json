@@ -13,8 +13,12 @@
     "typecheck:web": "npm run typecheck --workspace @visualsprint/web",
     "check:contracts": "npm run typecheck --workspace @visualsprint/contracts",
     "dev:api": "python -m uvicorn visualsprint_api.main:app --app-dir services/api/src --reload --host 127.0.0.1 --port 8000",
+    "dev:ingest": "python -m uvicorn visualsprint_ingest.main:app --app-dir services/ingest/src --reload --host 127.0.0.1 --port 8100",
+    "dev:media": "python -m uvicorn visualsprint_media.main:app --app-dir services/media/src --reload --host 127.0.0.1 --port 8200",
     "check:api": "python -m compileall services/api/src",
-    "test:api": "python -m pytest services/api/tests -q",
-    "verify": "npm run lint:web && npm run typecheck:web && npm run check:contracts && npm run check:api && npm run test:api"
+    "check:ingest": "python -m compileall services/ingest/src",
+    "check:media": "python -m compileall services/media/src",
+    "test:services": "python -m pytest services/api/tests services/ingest/tests services/media/tests -q",
+    "verify": "npm run lint:web && npm run typecheck:web && npm run check:contracts && npm run check:api && npm run check:ingest && npm run check:media && npm run test:services"
   }
 }
