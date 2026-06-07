@@ -77,6 +77,16 @@ class DownstreamServiceStatus(BaseModel):
     note: str = Field(min_length=4, max_length=240)
 
 
+class ElasticIntegrationStatus(BaseModel):
+    provider: Literal["elastic"] = "elastic"
+    writebackConfigured: bool
+    elasticsearchUrlConfigured: bool
+    apiKeySecretConfigured: bool
+    mcpServerConfigured: bool
+    outcomesIndex: str | None = Field(default=None, min_length=1, max_length=180)
+    note: str = Field(min_length=4, max_length=240)
+
+
 class PlatformMetaResponse(BaseModel):
     service: str
     environment: str
@@ -84,6 +94,7 @@ class PlatformMetaResponse(BaseModel):
     supportedTracks: list[str]
     architecture: dict[str, str]
     modules: list[str]
+    memoryIntegration: ElasticIntegrationStatus
     downstreamServices: list[DownstreamServiceStatus] = Field(default_factory=list)
 
 

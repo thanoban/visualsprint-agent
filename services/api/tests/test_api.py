@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+from visualsprint_api.config import build_settings
+
 
 def _create_live_browser_meeting(client: TestClient) -> str:
     create_response = client.post(
@@ -433,13 +435,17 @@ def test_chunk_registration_can_use_ingest_upload_reservation(client: TestClient
 def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch):
     fallback_meta_response = client.get("/api/meta")
     assert fallback_meta_response.status_code == 200
-    fallback_services = fallback_meta_response.json()["downstreamServices"]
+    fallback_payload = fallback_meta_response.json()
+    fallback_services = fallback_payload["downstreamServices"]
     agents_status = next(service for service in fallback_services if service["kind"] == "agents")
     ingest_status = next(service for service in fallback_services if service["kind"] == "ingest")
     media_status = next(service for service in fallback_services if service["kind"] == "media")
     assert agents_status["status"] == "not_configured"
     assert ingest_status["status"] == "not_configured"
     assert media_status["status"] == "not_configured"
+    assert fallback_payload["memoryIntegration"]["provider"] == "elastic"
+    assert fallback_payload["memoryIntegration"]["writebackConfigured"] is False
+    assert fallback_payload["memoryIntegration"]["mcpServerConfigured"] is False
 
     from visualsprint_api.models import DownstreamServiceStatus
 
@@ -499,10 +505,12 @@ def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch)
 
     patched_meta_response = client.get("/api/meta")
     assert patched_meta_response.status_code == 200
-    patched_services = patched_meta_response.json()["downstreamServices"]
+    patched_payload = patched_meta_response.json()
+    patched_services = patched_payload["downstreamServices"]
     assert next(service for service in patched_services if service["kind"] == "agents")["status"] == "ok"
     assert next(service for service in patched_services if service["kind"] == "ingest")["status"] == "ok"
     assert next(service for service in patched_services if service["kind"] == "media")["status"] == "unreachable"
+    assert patched_payload["memoryIntegration"]["provider"] == "elastic"
 
 
 def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, monkeypatch):
@@ -581,3 +589,26 @@ def test_finalize_report_can_use_agents_summary_service(client: TestClient, monk
     assert finalize_response.status_code == 200
     assert finalize_response.json()["report"]["executiveSummary"] == "Agents service generated this final summary."
     assert finalize_response.json()["report"]["summarySource"] == "downstream_service"
+
+
+def test_build_settings_supports_elastic_configuration():
+    settings = build_settings(
+        {
+            "VISUALSPRINT_ENV": "production",
+            "VISUALSPRINT_TRACK": "elastic",
+            "VISUALSPRINT_AGENTS_SERVICE_URL": "https://agents.example",
+            "VISUALSPRINT_INGEST_SERVICE_URL": "https://ingest.example",
+            "VISUALSPRINT_MEDIA_SERVICE_URL": "https://media.example",
+            "ELASTICSEARCH_URL": "https://elastic.example",
+            "ELASTICSEARCH_API_KEY_SECRET": "projects/demo/secrets/elastic-api-key",
+            "ELASTIC_INDEX_OUTCOMES": "visualsprint-outcomes",
+            "ELASTIC_MCP_SERVER_URL": "https://elastic.example/mcp",
+        }
+    )
+
+    assert settings.environment == "production"
+    assert settings.elasticsearch_url_configured is True
+    assert settings.elasticsearch_api_key_configured is True
+    assert settings.elastic_mcp_server_configured is True
+    assert settings.elastic_writeback_configured is True
+    assert settings.elastic_index_outcomes == "visualsprint-outcomes"

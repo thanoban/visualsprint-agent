@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import os
+from typing import Mapping
 
 
 def _split_csv(value: str | None) -> list[str]:
@@ -12,24 +13,25 @@ def _split_csv(value: str | None) -> list[str]:
     return [item.strip() for item in value.split(",") if item.strip()]
 
 
+def _get(environ: Mapping[str, str], key: str) -> str | None:
+    value = environ.get(key)
+    return value.strip() if value and value.strip() else None
+
+
 @dataclass(frozen=True)
 class Settings:
     service_name: str = "visualsprint-api"
-    environment: str = field(default_factory=lambda: os.getenv("VISUALSPRINT_ENV", "development"))
+    environment: str = "development"
     version: str = "0.1.0"
-    selected_track: str = field(default_factory=lambda: os.getenv("VISUALSPRINT_TRACK", "elastic"))
-    agents_service_url: str | None = field(
-        default_factory=lambda: os.getenv("VISUALSPRINT_AGENTS_SERVICE_URL") or None
-    )
-    ingest_service_url: str | None = field(
-        default_factory=lambda: os.getenv("VISUALSPRINT_INGEST_SERVICE_URL") or None
-    )
-    media_service_url: str | None = field(
-        default_factory=lambda: os.getenv("VISUALSPRINT_MEDIA_SERVICE_URL") or None
-    )
-    service_request_timeout_seconds: float = field(
-        default_factory=lambda: float(os.getenv("VISUALSPRINT_SERVICE_TIMEOUT_SECONDS", "0.5"))
-    )
+    selected_track: str = "elastic"
+    agents_service_url: str | None = None
+    ingest_service_url: str | None = None
+    media_service_url: str | None = None
+    elasticsearch_url: str | None = None
+    elasticsearch_api_key_secret: str | None = None
+    elastic_index_outcomes: str | None = None
+    elastic_mcp_server_url: str | None = None
+    service_request_timeout_seconds: float = 0.5
     supported_tracks: tuple[str, ...] = (
         "arize",
         "elastic",
@@ -38,15 +40,72 @@ class Settings:
         "mongodb",
         "dynatrace",
     )
-    allowed_origins: tuple[str, ...] = field(
-        default_factory=lambda: tuple(
-            _split_csv(os.getenv("VISUALSPRINT_ALLOWED_ORIGINS"))
+    allowed_origins: tuple[str, ...] = (
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    )
+
+    @property
+    def elasticsearch_url_configured(self) -> bool:
+        return self.elasticsearch_url is not None
+
+    @property
+    def elasticsearch_api_key_configured(self) -> bool:
+        return self.elasticsearch_api_key_secret is not None
+
+    @property
+    def elastic_mcp_server_configured(self) -> bool:
+        return self.elastic_mcp_server_url is not None
+
+    @property
+    def elastic_writeback_configured(self) -> bool:
+        return bool(
+            self.elasticsearch_url
+            and self.elasticsearch_api_key_secret
+            and self.elastic_index_outcomes
+        )
+
+    @property
+    def elastic_integration_note(self) -> str:
+        if self.elastic_writeback_configured and self.elastic_mcp_server_configured:
+            return (
+                "Elastic write-back and MCP endpoint configuration are present. The next "
+                "slice can replace in-memory memory stubs with real Elastic integrations."
+            )
+        if self.elastic_writeback_configured:
+            return (
+                "Elastic write-back configuration is present, but MCP connectivity is not "
+                "configured yet. Historical retrieval still falls back locally."
+            )
+        return (
+            "Elastic is still running in planning mode. Outcome indexing and MCP-backed "
+            "historical retrieval are not configured yet."
+        )
+
+
+def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
+    source = os.environ if environ is None else environ
+    return Settings(
+        environment=source.get("VISUALSPRINT_ENV", "development"),
+        selected_track=source.get("VISUALSPRINT_TRACK", "elastic"),
+        agents_service_url=_get(source, "VISUALSPRINT_AGENTS_SERVICE_URL"),
+        ingest_service_url=_get(source, "VISUALSPRINT_INGEST_SERVICE_URL"),
+        media_service_url=_get(source, "VISUALSPRINT_MEDIA_SERVICE_URL"),
+        elasticsearch_url=_get(source, "ELASTICSEARCH_URL"),
+        elasticsearch_api_key_secret=_get(source, "ELASTICSEARCH_API_KEY_SECRET"),
+        elastic_index_outcomes=_get(source, "ELASTIC_INDEX_OUTCOMES"),
+        elastic_mcp_server_url=_get(source, "ELASTIC_MCP_SERVER_URL"),
+        service_request_timeout_seconds=float(
+            source.get("VISUALSPRINT_SERVICE_TIMEOUT_SECONDS", "0.5")
+        ),
+        allowed_origins=tuple(
+            _split_csv(source.get("VISUALSPRINT_ALLOWED_ORIGINS"))
             or [
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
             ]
-        )
+        ),
     )
 
 
-settings = Settings()
+settings = build_settings()
