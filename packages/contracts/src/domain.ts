@@ -323,6 +323,34 @@ export interface ChunkInsightResponse {
   insight: ChunkInsight;
 }
 
+export interface SummaryPacketHighlight {
+  title: string;
+  detail: string;
+  kind: LiveEventKind;
+  recordedAt: string;
+}
+
+export interface MeetingSummaryPacket {
+  meetingId: string;
+  meetingTitle: string;
+  meetingStatus: MeetingStatus;
+  draftExecutiveSummary: string;
+  reportChecklist: string[];
+  timelineHighlights: SummaryPacketHighlight[];
+  meetingState: MeetingStateSnapshot;
+  decisions: DecisionRecord[];
+  commitments: CommitmentRecord[];
+  blockers: BlockerRecord[];
+  openQuestions: OpenQuestionRecord[];
+  memoryHighlights: MemoryMatch[];
+  transcriptEvidence: TranscriptSegment[];
+  visualEvidence: ScreenEvent[];
+}
+
+export interface MeetingSummaryPacketResponse {
+  summaryPacket: MeetingSummaryPacket;
+}
+
 export interface SearchPriorOutcomesRequest {
   recordType: ReasoningRecordType;
   summary: string;

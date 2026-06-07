@@ -15,6 +15,7 @@ import {
   type FinalReport,
   type MemoryMatch,
   type MeetingDetail,
+  type MeetingSummaryPacket,
   type MeetingSummary,
   type OpenQuestionRecord,
   type RegisterCaptureChunkRequest,
@@ -31,6 +32,7 @@ import {
   getChunkInsight,
   getFinalReport,
   getMeetingEventsUrl,
+  getSummaryPacket,
   endMeeting,
   getApiBaseUrl,
   getMeeting,
@@ -75,6 +77,7 @@ export function MeetingDashboard() {
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const [finalReport, setFinalReport] = useState<FinalReport | null>(null);
   const [chunkInsight, setChunkInsight] = useState<ChunkInsight | null>(null);
+  const [summaryPacket, setSummaryPacket] = useState<MeetingSummaryPacket | null>(null);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -186,6 +189,36 @@ export function MeetingDashboard() {
   }, [
     selectedMeeting?.id,
     selectedMeeting?.recentCaptureChunks,
+  ]);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id) {
+      startTransition(() => {
+        setSummaryPacket(null);
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const summaryResponse = await getSummaryPacket(selectedMeeting.id);
+        startTransition(() => {
+          setSummaryPacket(summaryResponse.summaryPacket);
+        });
+      } catch {
+        startTransition(() => {
+          setSummaryPacket(null);
+        });
+      }
+    })();
+  }, [
+    selectedMeeting?.id,
+    selectedMeeting?.latestEvents,
+    selectedMeeting?.metrics.decisionsCount,
+    selectedMeeting?.metrics.commitmentsCount,
+    selectedMeeting?.metrics.blockersCount,
+    selectedMeeting?.metrics.openQuestionsCount,
+    selectedMeeting?.metrics.memoryMatchesCount,
   ]);
 
   useEffect(() => {
@@ -946,6 +979,59 @@ export function MeetingDashboard() {
               )}
             </Card>
 
+            <Card title="Summary packet" eyebrow="Summary agent input">
+              {selectedMeeting ? (
+                summaryPacket ? (
+                  <div className="space-y-5">
+                    <div className="rounded-[1.25rem] border border-slate-900/10 bg-white p-4">
+                      <p className="text-sm font-semibold text-slate-900">Draft executive summary</p>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">
+                        {summaryPacket.draftExecutiveSummary}
+                      </p>
+                      <p className="mt-3 text-xs text-slate-500">
+                        {summaryPacket.meetingStatus} · summary packet preview for the future Summary Agent
+                      </p>
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-2">
+                      <SignalColumn
+                        title="Report checklist"
+                        emptyTitle="No checklist yet"
+                        emptyBody="Summary guidance will appear here as the packet assembles."
+                      >
+                        {summaryPacket.reportChecklist.map((item) => (
+                          <BulletSignalCard key={item} body={item} />
+                        ))}
+                      </SignalColumn>
+
+                      <SignalColumn
+                        title="Timeline highlights"
+                        emptyTitle="No timeline highlights"
+                        emptyBody="Recent events will be promoted here for the final report narrative."
+                      >
+                        {summaryPacket.timelineHighlights.map((highlight) => (
+                          <SummaryHighlightCard
+                            key={`${highlight.kind}-${highlight.recordedAt}-${highlight.title}`}
+                            highlight={highlight}
+                          />
+                        ))}
+                      </SignalColumn>
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No summary packet yet"
+                    body="The deterministic summary-agent input will appear here once meeting state is available."
+                  />
+                )
+              ) : (
+                <EmptyState
+                  title="No summary target"
+                  body="Choose a meeting to inspect the summary packet preview."
+                />
+              )}
+            </Card>
+
             <Card title="Final report" eyebrow="Hero deliverable">
               {selectedMeeting?.status === "ended" && finalReport?.meetingId === selectedMeeting.id ? (
                 <div className="space-y-5">
@@ -1379,6 +1465,25 @@ function MemoryQueryCard({ query }: { query: ChunkInsight["memoryQueries"][numbe
         </span>
       </div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{query.detail}</p>
+    </article>
+  );
+}
+
+function SummaryHighlightCard({
+  highlight,
+}: {
+  highlight: MeetingSummaryPacket["timelineHighlights"][number];
+}) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{highlight.title}</p>
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+          {highlight.kind}
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{highlight.detail}</p>
+      <p className="mt-3 text-xs text-slate-500">{formatTimestamp(highlight.recordedAt)}</p>
     </article>
   );
 }

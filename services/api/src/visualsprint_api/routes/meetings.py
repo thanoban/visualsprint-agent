@@ -12,6 +12,7 @@ from visualsprint_api.models import (
     CreateMeetingRequest,
     CreateMeetingResponse,
     FinalReportResponse,
+    MeetingSummaryPacketResponse,
     MeetingStreamEvent,
     MeetingStateResponse,
     MeetingDetailResponse,
@@ -54,6 +55,14 @@ def get_final_report(meeting_id: str) -> FinalReportResponse:
     if report is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Final report not found")
     return FinalReportResponse(report=report)
+
+
+@router.get("/{meeting_id}/summary-packet", response_model=MeetingSummaryPacketResponse)
+def get_summary_packet(meeting_id: str) -> MeetingSummaryPacketResponse:
+    summary_packet = repository.get_summary_packet(meeting_id)
+    if summary_packet is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
+    return MeetingSummaryPacketResponse(summaryPacket=summary_packet)
 
 
 @router.post("/{meeting_id}/final-report", response_model=FinalReportResponse)
