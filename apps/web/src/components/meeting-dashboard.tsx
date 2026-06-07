@@ -1122,8 +1122,12 @@ function MemoryMatchCard({ memoryMatch }: { memoryMatch: MemoryMatch }) {
       <p className="mt-2 text-sm leading-6 text-slate-600">
         Source meeting: {memoryMatch.sourceMeetingTitle}
       </p>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{memoryMatch.snippet}</p>
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
-        {memoryMatch.strength} · {formatTimestamp(memoryMatch.recordedAt)}
+        {memoryMatch.relation} · {memoryMatch.strength} · score {memoryMatch.score.toFixed(2)}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        {memoryMatch.sourceMeetingId} · {formatTimestamp(memoryMatch.recordedAt)}
       </p>
     </article>
   );

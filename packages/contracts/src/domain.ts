@@ -31,6 +31,16 @@ export type CaptureChunkLifecycleStatus =
 export type CaptureChunkUploadStatus = "pending" | "ready" | "uploaded";
 export type BlockerSeverity = "low" | "medium" | "high";
 export type MemoryMatchStrength = "related" | "recurring" | "critical";
+export type MemoryMatchRelation =
+  | "new"
+  | "recurring"
+  | "reopened"
+  | "resolved_previously";
+export type ReasoningRecordType =
+  | "decision"
+  | "commitment"
+  | "blocker"
+  | "open_question";
 export type ScreenEventKind =
   | "code_editor"
   | "terminal"
@@ -180,9 +190,13 @@ export interface BlockerRecord {
 
 export interface MemoryMatch {
   id: string;
+  sourceMeetingId: string;
   summary: string;
   sourceMeetingTitle: string;
   strength: MemoryMatchStrength;
+  relation: MemoryMatchRelation;
+  score: number;
+  snippet: string;
   recordedAt: string;
 }
 
@@ -282,6 +296,16 @@ export interface ChunkContextResponse {
   meetingId: string;
   meetingState: MeetingStateSnapshot;
   chunkContext: ChunkContext;
+}
+
+export interface SearchPriorOutcomesRequest {
+  recordType: ReasoningRecordType;
+  summary: string;
+  detail: string;
+}
+
+export interface SearchPriorOutcomesResponse {
+  matches: MemoryMatch[];
 }
 
 export interface ServiceHealth {

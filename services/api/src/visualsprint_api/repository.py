@@ -22,6 +22,7 @@ from visualsprint_api.models import (
     MeetingStateSnapshot,
     OpenQuestionRecord,
     RegisterCaptureChunkRequest,
+    SearchPriorOutcomesRequest,
     StartCaptureSessionRequest,
     LiveEvent,
     MemoryMatch,
@@ -75,19 +76,31 @@ BLOCKER_TEMPLATES = (
 
 MEMORY_TEMPLATES = (
     (
+        "mtg_hist_auth_01",
         "A similar auth blocker was raised two weeks ago and was marked unresolved.",
         "Sprint 21 release review",
         "recurring",
+        "recurring",
+        0.93,
+        "Auth configuration drift blocked the release candidate during sprint 21.",
     ),
     (
+        "mtg_hist_migration_01",
         "The same migration issue appeared in a prior staging rehearsal and required a scoped rerun.",
         "Infra readiness sync",
         "related",
+        "resolved_previously",
+        0.82,
+        "Migration validation failed during staging and was fixed with a scoped rerun.",
     ),
     (
+        "mtg_hist_alerts_01",
         "Alert ownership drift was previously discussed during the last incident follow-up.",
         "Post-incident action review",
         "critical",
+        "reopened",
+        0.89,
+        "Ownership ambiguity resurfaced after the prior incident review closed.",
     ),
 )
 
@@ -210,6 +223,61 @@ class MeetingStore:
                 return None
             chunk_context = self._chunk_context_by_client_id.get((meeting_id, client_chunk_id))
             return None if chunk_context is None else chunk_context.model_copy(deep=True)
+
+    def search_prior_outcomes(
+        self,
+        meeting_id: str,
+        payload: SearchPriorOutcomesRequest,
+    ) -> list[MemoryMatch] | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+
+            normalized_text = f"{payload.summary} {payload.detail}".lower()
+            matches: list[MemoryMatch] = []
+
+            for (
+                source_meeting_id,
+                summary,
+                source_meeting_title,
+                strength,
+                relation,
+                score,
+                snippet,
+            ) in MEMORY_TEMPLATES:
+                keywords = _keywords_for_memory_template(source_meeting_id)
+                if any(keyword in normalized_text for keyword in keywords):
+                    matches.append(
+                        MemoryMatch(
+                            id=f"mem_{uuid4().hex[:12]}",
+                            sourceMeetingId=source_meeting_id,
+                            summary=summary,
+                            sourceMeetingTitle=source_meeting_title,
+                            strength=strength,
+                            relation=relation,
+                            score=score,
+                            snippet=snippet,
+                            recordedAt=_utc_now(),
+                        )
+                    )
+
+            if len(matches) == 0:
+                matches.append(
+                    MemoryMatch(
+                        id=f"mem_{uuid4().hex[:12]}",
+                        sourceMeetingId=f"{meeting_id}_new_signal",
+                        summary="No strong historical match was found for this candidate outcome.",
+                        sourceMeetingTitle=meeting.title,
+                        strength="related",
+                        relation="new",
+                        score=0.12,
+                        snippet="The current development memory layer did not return a strong historical precedent.",
+                        recordedAt=_utc_now(),
+                    )
+                )
+
+            return [match.model_copy(deep=True) for match in matches[:3]]
 
     def end_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -619,12 +687,24 @@ class MeetingStore:
             )
             signal_count += 1
 
-        memory_summary, source_meeting_title, strength = MEMORY_TEMPLATES[template_index]
+        (
+            source_meeting_id,
+            memory_summary,
+            source_meeting_title,
+            strength,
+            relation,
+            score,
+            snippet,
+        ) = MEMORY_TEMPLATES[template_index]
         memory_match = MemoryMatch(
             id=f"mem_{uuid4().hex[:12]}",
+            sourceMeetingId=source_meeting_id,
             summary=memory_summary,
             sourceMeetingTitle=source_meeting_title,
             strength=strength,
+            relation=relation,
+            score=score,
+            snippet=snippet,
             recordedAt=final_end,
         )
         meeting.recentMemoryMatches.insert(0, memory_match)
@@ -699,3 +779,11 @@ class MeetingStore:
 
 
 repository = MeetingStore()
+
+
+def _keywords_for_memory_template(source_meeting_id: str) -> tuple[str, ...]:
+    if "auth" in source_meeting_id:
+        return ("auth", "configuration", "release")
+    if "migration" in source_meeting_id:
+        return ("migration", "staging", "rerun")
+    return ("alert", "ownership", "handoff", "incident")

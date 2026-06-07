@@ -26,6 +26,8 @@ CaptureChunkLifecycleStatus = Literal[
 CaptureChunkUploadStatus = Literal["pending", "ready", "uploaded"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
+MemoryMatchRelation = Literal["new", "recurring", "reopened", "resolved_previously"]
+ReasoningRecordType = Literal["decision", "commitment", "blocker", "open_question"]
 ScreenEventKind = Literal[
     "code_editor",
     "terminal",
@@ -149,9 +151,13 @@ class BlockerRecord(BaseModel):
 
 class MemoryMatch(BaseModel):
     id: str
+    sourceMeetingId: str = Field(min_length=4, max_length=120)
     summary: str = Field(min_length=6, max_length=240)
     sourceMeetingTitle: str = Field(min_length=3, max_length=120)
     strength: MemoryMatchStrength
+    relation: MemoryMatchRelation
+    score: float = Field(ge=0.0, le=1.0)
+    snippet: str = Field(min_length=6, max_length=320)
     recordedAt: datetime
 
 
@@ -265,3 +271,13 @@ class ChunkContextResponse(BaseModel):
     meetingId: str
     meetingState: MeetingStateSnapshot
     chunkContext: ChunkContext
+
+
+class SearchPriorOutcomesRequest(BaseModel):
+    recordType: ReasoningRecordType
+    summary: str = Field(min_length=6, max_length=240)
+    detail: str = Field(min_length=6, max_length=500)
+
+
+class SearchPriorOutcomesResponse(BaseModel):
+    matches: list[MemoryMatch]
