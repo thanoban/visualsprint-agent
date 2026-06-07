@@ -13,6 +13,9 @@ BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
 MemoryMatchRelation = Literal["new", "recurring", "reopened", "resolved_previously"]
 ReasoningRecordType = Literal["decision", "commitment", "blocker", "open_question"]
+InvocationAgentKind = Literal["reasoning", "summary"]
+InvocationExecutionMode = Literal["mock", "bridge", "bridge_fallback"]
+InvocationStatus = Literal["success", "fallback", "error"]
 
 
 class ChunkInsightFocus(BaseModel):
@@ -154,3 +157,27 @@ class ServiceHealth(BaseModel):
     allowedOriginsConfigured: int
     missingConfiguration: list[str] = Field(default_factory=list)
     note: str
+
+
+class InvocationAuditEntry(BaseModel):
+    invokedAt: datetime
+    agentKind: InvocationAgentKind
+    executionMode: InvocationExecutionMode
+    status: InvocationStatus
+    targetAgentId: str | None = None
+    requestKey: str
+    detail: str
+
+
+class InvocationAuditSummary(BaseModel):
+    total: int = 0
+    reasoningRuns: int = 0
+    summaryRuns: int = 0
+    bridgeRuns: int = 0
+    bridgeFallbackRuns: int = 0
+    mockRuns: int = 0
+
+
+class InvocationAuditResponse(BaseModel):
+    summary: InvocationAuditSummary
+    invocations: list[InvocationAuditEntry] = Field(default_factory=list)
