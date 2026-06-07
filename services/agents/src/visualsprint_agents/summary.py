@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 from visualsprint_agents.agent_runtime import invoke_summary_agent
 from visualsprint_agents.config import settings
+from visualsprint_agents.invocation_audit import audit_store
 from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
 
@@ -15,8 +16,32 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
     if settings.cloud_adapter_ready:
         cloud_response = invoke_summary_agent(payload)
         if cloud_response is not None:
+            audit_store.record(
+                agent_kind="summary",
+                execution_mode="bridge",
+                status="success",
+                target_agent_id=settings.summary_agent_id,
+                request_key=payload.meetingId,
+                detail="Configured bridge produced the summary response.",
+            )
             return cloud_response
+        audit_store.record(
+            agent_kind="summary",
+            execution_mode="bridge_fallback",
+            status="fallback",
+            target_agent_id=settings.summary_agent_id,
+            request_key=payload.meetingId,
+            detail="Configured bridge was unavailable, so deterministic summary fallback was used.",
+        )
         return _run_configured_summary_agent_stub(payload)
+    audit_store.record(
+        agent_kind="summary",
+        execution_mode="mock",
+        status="success",
+        target_agent_id=None,
+        request_key=payload.meetingId,
+        detail="Deterministic mock summary path handled the request.",
+    )
     return _run_mock_summary_agent(payload)
 
 

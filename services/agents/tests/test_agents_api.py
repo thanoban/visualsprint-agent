@@ -90,6 +90,16 @@ def test_agents_health_reasoning_and_summary():
         assert summary_payload["meetingId"] == "mtg_agents_001"
         assert "durable outcomes" in summary_payload["executiveSummary"]
 
+        audit_response = client.get("/api/audit/invocations")
+        assert audit_response.status_code == 200
+        audit_payload = audit_response.json()
+        assert audit_payload["summary"]["total"] == 2
+        assert audit_payload["summary"]["mockRuns"] == 2
+        assert audit_payload["summary"]["bridgeRuns"] == 0
+        assert audit_payload["summary"]["bridgeFallbackRuns"] == 0
+        assert audit_payload["invocations"][0]["agentKind"] == "summary"
+        assert audit_payload["invocations"][1]["agentKind"] == "reasoning"
+
 
 def test_build_settings_supports_configured_cloud_mode():
     settings = build_settings(
@@ -227,6 +237,14 @@ def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monke
     )
     assert summary_response.executiveSummary == "Bridge response summary."
 
+    with TestClient(app) as client:
+        audit_response = client.get("/api/audit/invocations")
+        audit_payload = audit_response.json()
+        assert audit_payload["summary"]["bridgeRuns"] == 2
+        assert audit_payload["summary"]["mockRuns"] == 0
+        assert audit_payload["summary"]["bridgeFallbackRuns"] == 0
+        assert all(item["executionMode"] == "bridge" for item in audit_payload["invocations"])
+
 
 def test_configured_cloud_falls_back_when_bridge_returns_none(monkeypatch):
     bridge_settings = build_settings(
@@ -273,6 +291,17 @@ def test_configured_cloud_falls_back_when_bridge_returns_none(monkeypatch):
         )
     )
     assert "Fallback summary path." in summary_response.executiveSummary
+
+    with TestClient(app) as client:
+        audit_response = client.get("/api/audit/invocations")
+        audit_payload = audit_response.json()
+        assert audit_payload["summary"]["bridgeFallbackRuns"] == 2
+        assert audit_payload["summary"]["mockRuns"] == 0
+        assert audit_payload["summary"]["bridgeRuns"] == 0
+        assert all(
+            item["executionMode"] == "bridge_fallback"
+            for item in audit_payload["invocations"]
+        )
 
 
 def test_agent_eval_fixtures_load_and_cover_reasoning_and_summary():

@@ -5,9 +5,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from visualsprint_agents.config import settings
+from visualsprint_agents.invocation_audit import audit_store
 from visualsprint_agents.models import (
     ChunkInsightRequest,
     FinalReportDraft,
+    InvocationAuditEntry,
+    InvocationAuditResponse,
+    InvocationAuditSummary,
     ReasoningRunResponse,
     ServiceHealth,
     SummaryPacketRequest,
@@ -43,6 +47,36 @@ def get_health() -> ServiceHealth:
         allowedOriginsConfigured=len(settings.allowed_origins),
         missingConfiguration=list(settings.missing_cloud_configuration),
         note=settings.health_note,
+    )
+
+
+@app.get("/api/audit/invocations", response_model=InvocationAuditResponse)
+def get_invocation_audit() -> InvocationAuditResponse:
+    records = audit_store.snapshot()
+    summary = InvocationAuditSummary(
+        total=len(records),
+        reasoningRuns=sum(1 for record in records if record.agent_kind == "reasoning"),
+        summaryRuns=sum(1 for record in records if record.agent_kind == "summary"),
+        bridgeRuns=sum(1 for record in records if record.execution_mode == "bridge"),
+        bridgeFallbackRuns=sum(
+            1 for record in records if record.execution_mode == "bridge_fallback"
+        ),
+        mockRuns=sum(1 for record in records if record.execution_mode == "mock"),
+    )
+    return InvocationAuditResponse(
+        summary=summary,
+        invocations=[
+            InvocationAuditEntry(
+                invokedAt=record.invoked_at,
+                agentKind=record.agent_kind,
+                executionMode=record.execution_mode,
+                status=record.status,
+                targetAgentId=record.target_agent_id,
+                requestKey=record.request_key,
+                detail=record.detail,
+            )
+            for record in records
+        ],
     )
 
 
