@@ -302,3 +302,50 @@ class FinalReport(BaseModel):
 
 class FinalReportResponse(BaseModel):
     report: FinalReport
+
+
+class AgentDecisionInput(BaseModel):
+    title: str = Field(min_length=4, max_length=180)
+    rationale: str = Field(min_length=8, max_length=500)
+    speakerLabel: str = Field(min_length=2, max_length=60)
+
+
+class AgentCommitmentInput(BaseModel):
+    ownerLabel: str = Field(min_length=2, max_length=60)
+    action: str = Field(min_length=6, max_length=220)
+    dueHint: str = Field(min_length=2, max_length=60)
+
+
+class AgentBlockerInput(BaseModel):
+    summary: str = Field(min_length=6, max_length=220)
+    severity: BlockerSeverity
+    ownerLabel: str = Field(min_length=2, max_length=60)
+
+
+class AgentOpenQuestionInput(BaseModel):
+    question: str = Field(min_length=8, max_length=240)
+    speakerLabel: str = Field(min_length=2, max_length=60)
+
+
+class AgentMemoryMatchInput(BaseModel):
+    sourceMeetingId: str = Field(min_length=4, max_length=120)
+    summary: str = Field(min_length=6, max_length=240)
+    sourceMeetingTitle: str = Field(min_length=3, max_length=120)
+    strength: MemoryMatchStrength
+    relation: MemoryMatchRelation
+    score: float = Field(ge=0.0, le=1.0)
+    snippet: str = Field(min_length=6, max_length=320)
+
+
+class RegisterAgentOutputsRequest(BaseModel):
+    clientChunkId: str = Field(min_length=8, max_length=120)
+    decisions: list[AgentDecisionInput] = Field(default_factory=list)
+    commitments: list[AgentCommitmentInput] = Field(default_factory=list)
+    blockers: list[AgentBlockerInput] = Field(default_factory=list)
+    openQuestions: list[AgentOpenQuestionInput] = Field(default_factory=list)
+    memoryMatches: list[AgentMemoryMatchInput] = Field(default_factory=list)
+
+
+class RegisterAgentOutputsResponse(BaseModel):
+    meeting: MeetingDetail
+    meetingState: MeetingStateSnapshot

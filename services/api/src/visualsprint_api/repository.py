@@ -10,6 +10,11 @@ from uuid import uuid4
 from visualsprint_api.config import settings
 from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
+    AgentBlockerInput,
+    AgentCommitmentInput,
+    AgentDecisionInput,
+    AgentMemoryMatchInput,
+    AgentOpenQuestionInput,
     BlockerRecord,
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
@@ -23,6 +28,7 @@ from visualsprint_api.models import (
     MeetingStateSnapshot,
     OpenQuestionRecord,
     RegisterCaptureChunkRequest,
+    RegisterAgentOutputsRequest,
     SearchPriorOutcomesRequest,
     StartCaptureSessionRequest,
     LiveEvent,
@@ -219,7 +225,6 @@ class MeetingStore:
                         ),
                     ),
                 )
-                self._final_reports[meeting_id] = self._build_final_report(meeting)
                 self._mark_meeting_updated(meeting.id)
             return meeting.model_copy(deep=True)
 
@@ -305,6 +310,56 @@ class MeetingStore:
                 )
 
             return [match.model_copy(deep=True) for match in matches[:3]]
+
+    def register_outputs(
+        self,
+        meeting_id: str,
+        payload: RegisterAgentOutputsRequest,
+    ) -> tuple[MeetingDetail, MeetingStateSnapshot] | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+
+            chunk_context = self._chunk_context_by_client_id.get((meeting_id, payload.clientChunkId))
+            if chunk_context is None:
+                raise MeetingInvariantError("Chunk context was not found for output registration")
+
+            recorded_at = chunk_context.chunk.recordedAt
+            source_chunk = chunk_context.chunk
+
+            self._persist_decisions(meeting, payload.decisions, recorded_at)
+            self._persist_commitments(meeting, payload.commitments, recorded_at)
+            self._persist_blockers(meeting, payload.blockers, recorded_at)
+            self._persist_open_questions(meeting, payload.openQuestions, recorded_at)
+            self._persist_memory_matches(meeting, payload.memoryMatches, recorded_at)
+
+            source_chunk.signalCount += (
+                len(payload.decisions)
+                + len(payload.commitments)
+                + len(payload.blockers)
+                + len(payload.openQuestions)
+                + len(payload.memoryMatches)
+            )
+            meeting.latestEvents.insert(
+                0,
+                LiveEvent(
+                    id=f"evt_{uuid4().hex[:12]}",
+                    kind="decision",
+                    at=recorded_at,
+                    title="Agent outputs registered",
+                    detail=(
+                        f"Persisted outputs for {payload.clientChunkId}: "
+                        f"{len(payload.decisions)} decisions, "
+                        f"{len(payload.commitments)} commitments, "
+                        f"{len(payload.blockers)} blockers, "
+                        f"{len(payload.openQuestions)} open questions."
+                    ),
+                ),
+            )
+            meeting.latestEvents = meeting.latestEvents[:12]
+            self._mark_meeting_updated(meeting_id)
+            return meeting.model_copy(deep=True), self._build_meeting_state(meeting)
 
     def end_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -652,7 +707,7 @@ class MeetingStore:
             id=f"dec_{uuid4().hex[:12]}",
             title=decision_title,
             rationale=decision_rationale,
-            speakerLabel=speaker_two,
+            speakerLabel=transcript_segments[-1].speakerLabel,
             recordedAt=final_end,
         )
         meeting.recentDecisions.insert(0, decision)
@@ -845,6 +900,99 @@ class MeetingStore:
                 for memory_match in meeting.recentMemoryMatches
             ],
         )
+
+    def _persist_decisions(
+        self,
+        meeting: MeetingDetail,
+        decisions: list[AgentDecisionInput],
+        recorded_at: datetime,
+    ) -> None:
+        for draft in decisions:
+            decision = DecisionRecord(
+                id=f"dec_{uuid4().hex[:12]}",
+                title=draft.title,
+                rationale=draft.rationale,
+                speakerLabel=draft.speakerLabel,
+                recordedAt=recorded_at,
+            )
+            meeting.recentDecisions.insert(0, decision)
+            meeting.metrics.decisionsCount += 1
+        meeting.recentDecisions = meeting.recentDecisions[:6]
+
+    def _persist_commitments(
+        self,
+        meeting: MeetingDetail,
+        commitments: list[AgentCommitmentInput],
+        recorded_at: datetime,
+    ) -> None:
+        for draft in commitments:
+            commitment = CommitmentRecord(
+                id=f"cmt_{uuid4().hex[:12]}",
+                ownerLabel=draft.ownerLabel,
+                action=draft.action,
+                dueHint=draft.dueHint,
+                recordedAt=recorded_at,
+            )
+            meeting.recentCommitments.insert(0, commitment)
+            meeting.metrics.commitmentsCount += 1
+        meeting.recentCommitments = meeting.recentCommitments[:6]
+
+    def _persist_blockers(
+        self,
+        meeting: MeetingDetail,
+        blockers: list[AgentBlockerInput],
+        recorded_at: datetime,
+    ) -> None:
+        for draft in blockers:
+            blocker = BlockerRecord(
+                id=f"blk_{uuid4().hex[:12]}",
+                summary=draft.summary,
+                severity=draft.severity,
+                ownerLabel=draft.ownerLabel,
+                recordedAt=recorded_at,
+            )
+            meeting.recentBlockers.insert(0, blocker)
+            meeting.metrics.blockersCount += 1
+        meeting.recentBlockers = meeting.recentBlockers[:6]
+
+    def _persist_open_questions(
+        self,
+        meeting: MeetingDetail,
+        open_questions: list[AgentOpenQuestionInput],
+        recorded_at: datetime,
+    ) -> None:
+        for draft in open_questions:
+            open_question = OpenQuestionRecord(
+                id=f"oqn_{uuid4().hex[:12]}",
+                question=draft.question,
+                speakerLabel=draft.speakerLabel,
+                recordedAt=recorded_at,
+            )
+            meeting.recentOpenQuestions.insert(0, open_question)
+            meeting.metrics.openQuestionsCount += 1
+        meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
+
+    def _persist_memory_matches(
+        self,
+        meeting: MeetingDetail,
+        memory_matches: list[AgentMemoryMatchInput],
+        recorded_at: datetime,
+    ) -> None:
+        for draft in memory_matches:
+            memory_match = MemoryMatch(
+                id=f"mem_{uuid4().hex[:12]}",
+                sourceMeetingId=draft.sourceMeetingId,
+                summary=draft.summary,
+                sourceMeetingTitle=draft.sourceMeetingTitle,
+                strength=draft.strength,
+                relation=draft.relation,
+                score=draft.score,
+                snippet=draft.snippet,
+                recordedAt=recorded_at,
+            )
+            meeting.recentMemoryMatches.insert(0, memory_match)
+            meeting.metrics.memoryMatchesCount += 1
+        meeting.recentMemoryMatches = meeting.recentMemoryMatches[:6]
 
 
 repository = MeetingStore()

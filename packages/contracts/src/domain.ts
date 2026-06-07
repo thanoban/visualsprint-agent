@@ -329,6 +329,53 @@ export interface FinalReportResponse {
   report: FinalReport;
 }
 
+export interface AgentDecisionInput {
+  title: string;
+  rationale: string;
+  speakerLabel: string;
+}
+
+export interface AgentCommitmentInput {
+  ownerLabel: string;
+  action: string;
+  dueHint: string;
+}
+
+export interface AgentBlockerInput {
+  summary: string;
+  severity: BlockerSeverity;
+  ownerLabel: string;
+}
+
+export interface AgentOpenQuestionInput {
+  question: string;
+  speakerLabel: string;
+}
+
+export interface AgentMemoryMatchInput {
+  sourceMeetingId: string;
+  summary: string;
+  sourceMeetingTitle: string;
+  strength: MemoryMatchStrength;
+  relation: MemoryMatchRelation;
+  score: number;
+  snippet: string;
+}
+
+export interface RegisterAgentOutputsRequest {
+  clientChunkId: string;
+  decisions: AgentDecisionInput[];
+  commitments: AgentCommitmentInput[];
+  blockers: AgentBlockerInput[];
+  openQuestions: AgentOpenQuestionInput[];
+  memoryMatches: AgentMemoryMatchInput[];
+}
+
+export interface RegisterAgentOutputsResponse {
+  meeting: MeetingDetail;
+  meetingState: MeetingStateSnapshot;
+}
+
 export interface ServiceHealth {
   service: string;
   status: "ok";

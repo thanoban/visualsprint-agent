@@ -8,6 +8,8 @@ import type {
   MeetingStreamEvent,
   MeetingDetailResponse,
   MeetingListResponse,
+  RegisterAgentOutputsRequest,
+  RegisterAgentOutputsResponse,
   RegisterCaptureChunkRequest,
   RegisterCaptureChunkResponse,
   StartCaptureSessionRequest,
@@ -75,6 +77,16 @@ export function getFinalReport(meetingId: string) {
 export function finalizeReport(meetingId: string) {
   return request<FinalReportResponse>(`/api/meetings/${meetingId}/final-report`, {
     method: "POST",
+  });
+}
+
+export function registerAgentOutputs(
+  meetingId: string,
+  payload: RegisterAgentOutputsRequest,
+) {
+  return request<RegisterAgentOutputsResponse>(`/api/meetings/${meetingId}/outputs/register`, {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 
