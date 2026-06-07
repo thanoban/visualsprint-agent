@@ -699,7 +699,52 @@ class MeetingStore:
                 )
 
             self._mark_chunk_uploaded(meeting, chunk)
-            self._apply_mock_processing(meeting, chunk)
+            self._prepare_chunk_processing(meeting, chunk)
+            meeting.latestEvents = meeting.latestEvents[:12]
+            self._mark_meeting_updated(meeting.id)
+
+            return (
+                meeting.model_copy(deep=True),
+                meeting.activeCaptureSession.model_copy(deep=True),
+                chunk.model_copy(deep=True),
+            )
+
+    def run_chunk_reasoning(
+        self,
+        meeting_id: str,
+        client_chunk_id: str,
+    ) -> tuple[MeetingDetail, CaptureSessionSummary, CaptureChunkSummary] | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None or meeting.activeCaptureSession is None:
+                return None
+
+            chunk_key = (meeting_id, client_chunk_id)
+            chunk = self._chunks_by_client_id.get(chunk_key)
+            if chunk is None:
+                raise MeetingInvariantError("Chunk reasoning target was not found")
+            if chunk.processingStatus == "processed":
+                return (
+                    meeting.model_copy(deep=True),
+                    meeting.activeCaptureSession.model_copy(deep=True),
+                    chunk.model_copy(deep=True),
+                )
+            if chunk.uploadStatus != "uploaded":
+                raise MeetingInvariantError(
+                    "Chunk reasoning requires an uploaded chunk"
+                )
+            if chunk.processingStatus != "processing":
+                raise MeetingInvariantError(
+                    "Chunk reasoning requires assembled transcript and media context"
+                )
+
+            chunk_context = self._chunk_context_by_client_id.get(chunk_key)
+            if chunk_context is None:
+                raise MeetingInvariantError(
+                    "Chunk reasoning requires assembled transcript and media context"
+                )
+
+            self._finalize_chunk_reasoning(meeting, chunk, chunk_context)
             meeting.latestEvents = meeting.latestEvents[:12]
             self._mark_meeting_updated(meeting.id)
 
@@ -784,13 +829,12 @@ class MeetingStore:
             ),
         )
 
-    def _apply_mock_processing(
+    def _prepare_chunk_processing(
         self,
         meeting: MeetingDetail,
         chunk: CaptureChunkSummary,
-    ) -> None:
+    ) -> ChunkContext:
         recorded_at = chunk.recordedAt
-        template_index = (chunk.sequence - 1) % len(DECISION_TEMPLATES)
         transcript_segments, transcript_source = process_transcript_chunk_with_source(chunk)
         frame_count, screen_events, media_source = process_media_chunk_with_source(chunk)
         final_end = transcript_segments[-1].endedAt
@@ -836,7 +880,37 @@ class MeetingStore:
                 ),
             ),
         )
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=final_end,
+                title=f"Chunk {chunk.sequence} ready for reasoning",
+                detail=(
+                    "Deterministic transcript and media processing completed. "
+                    "The reasoning step can now run independently."
+                ),
+            ),
+        )
+        chunk_context = ChunkContext(
+            chunk=chunk.model_copy(deep=True),
+            transcriptSegments=[segment.model_copy(deep=True) for segment in transcript_segments],
+            screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
+        )
+        self._chunk_context_by_client_id[(meeting.id, chunk.clientChunkId)] = chunk_context
+        return chunk_context
 
+    def _finalize_chunk_reasoning(
+        self,
+        meeting: MeetingDetail,
+        chunk: CaptureChunkSummary,
+        chunk_context: ChunkContext,
+    ) -> None:
+        template_index = (chunk.sequence - 1) % len(DECISION_TEMPLATES)
+        transcript_segments = chunk_context.transcriptSegments
+        screen_events = chunk_context.screenEvents
+        final_end = transcript_segments[-1].endedAt
         evidence_refs = self._build_evidence_references(
             chunk,
             transcript_segments,

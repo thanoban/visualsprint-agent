@@ -56,6 +56,44 @@ def _process_chunk(client: TestClient, meeting_id: str, client_chunk_id: str) ->
         json={"clientChunkId": client_chunk_id},
     )
     assert upload_response.status_code == 200
+    reasoning_response = client.post(
+        f"/api/meetings/{meeting_id}/capture-sessions/chunks/{client_chunk_id}/reasoning/run"
+    )
+    assert reasoning_response.status_code == 200
+
+
+def test_upload_completion_only_assembles_chunk_context(client: TestClient):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-0901", sequence=1)
+    assert register_response.status_code == 200
+
+    upload_response = client.post(
+        f"/api/meetings/{meeting_id}/capture-sessions/chunk/upload-complete",
+        json={"clientChunkId": "client-chunk-0901"},
+    )
+    assert upload_response.status_code == 200
+    upload_payload = upload_response.json()
+    assert upload_payload["chunk"]["processingStatus"] == "processing"
+    assert upload_payload["chunk"]["lifecycleStatus"] == "processing"
+    assert upload_payload["chunk"]["signalCount"] == 0
+
+    context_response = client.get(
+        f"/api/meetings/{meeting_id}/capture-sessions/chunks/client-chunk-0901/context"
+    )
+    assert context_response.status_code == 200
+    context_payload = context_response.json()["chunkContext"]
+    assert len(context_payload["transcriptSegments"]) == 2
+    assert len(context_payload["screenEvents"]) >= 1
+    assert context_payload["chunk"]["processingStatus"] == "processing"
+
+    reasoning_response = client.post(
+        f"/api/meetings/{meeting_id}/capture-sessions/chunks/client-chunk-0901/reasoning/run"
+    )
+    assert reasoning_response.status_code == 200
+    reasoning_payload = reasoning_response.json()
+    assert reasoning_payload["chunk"]["processingStatus"] == "processed"
+    assert reasoning_payload["chunk"]["signalCount"] >= 1
 
 
 def test_capture_chunk_registration_is_idempotent_and_sequence_safe(client: TestClient):

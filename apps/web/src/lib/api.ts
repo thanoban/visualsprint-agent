@@ -153,6 +153,15 @@ export function completeCaptureChunkUpload(
   );
 }
 
+export function runCaptureChunkReasoning(meetingId: string, clientChunkId: string) {
+  return request<CompleteCaptureChunkUploadResponse>(
+    `/api/meetings/${meetingId}/capture-sessions/chunks/${clientChunkId}/reasoning/run`,
+    {
+      method: "POST",
+    },
+  );
+}
+
 export function completeCaptureSession(meetingId: string) {
   return request<CaptureSessionResponse>(
     `/api/meetings/${meetingId}/capture-sessions/complete`,

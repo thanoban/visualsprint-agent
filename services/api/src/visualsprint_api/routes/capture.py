@@ -152,6 +152,41 @@ def complete_capture_chunk_upload(
     )
 
 
+@router.post(
+    "/chunks/{client_chunk_id}/reasoning/run",
+    response_model=CompleteCaptureChunkUploadResponse,
+)
+def run_chunk_reasoning(
+    meeting_id: str,
+    client_chunk_id: str,
+) -> CompleteCaptureChunkUploadResponse:
+    meeting = repository.get_meeting(meeting_id)
+    if meeting is None or meeting.activeCaptureSession is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meeting or capture session not found",
+        )
+
+    try:
+        result = repository.run_chunk_reasoning(meeting_id, client_chunk_id)
+    except MeetingInvariantError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meeting or capture session not found",
+        )
+    meeting, capture_session, chunk = result
+    return CompleteCaptureChunkUploadResponse(
+        meeting=meeting,
+        captureSession=capture_session,
+        chunk=chunk,
+    )
+
+
 @router.post("/complete", response_model=CaptureSessionResponse)
 def complete_capture_session(meeting_id: str) -> CaptureSessionResponse:
     meeting = repository.get_meeting(meeting_id)
