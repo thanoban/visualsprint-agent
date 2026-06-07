@@ -298,6 +298,34 @@ class ChunkInsightResponse(BaseModel):
     insight: ChunkInsight
 
 
+class SummaryPacketHighlight(BaseModel):
+    title: str = Field(min_length=4, max_length=180)
+    detail: str = Field(min_length=6, max_length=320)
+    kind: LiveEventKind
+    recordedAt: datetime
+
+
+class MeetingSummaryPacket(BaseModel):
+    meetingId: str
+    meetingTitle: str = Field(min_length=3, max_length=120)
+    meetingStatus: MeetingStatus
+    draftExecutiveSummary: str = Field(min_length=12, max_length=600)
+    reportChecklist: list[str] = Field(default_factory=list, max_length=8)
+    timelineHighlights: list[SummaryPacketHighlight] = Field(default_factory=list, max_length=8)
+    meetingState: MeetingStateSnapshot
+    decisions: list[DecisionRecord] = Field(default_factory=list)
+    commitments: list[CommitmentRecord] = Field(default_factory=list)
+    blockers: list[BlockerRecord] = Field(default_factory=list)
+    openQuestions: list[OpenQuestionRecord] = Field(default_factory=list)
+    memoryHighlights: list[MemoryMatch] = Field(default_factory=list)
+    transcriptEvidence: list[TranscriptSegment] = Field(default_factory=list)
+    visualEvidence: list[ScreenEvent] = Field(default_factory=list)
+
+
+class MeetingSummaryPacketResponse(BaseModel):
+    summaryPacket: MeetingSummaryPacket
+
+
 class SearchPriorOutcomesRequest(BaseModel):
     recordType: ReasoningRecordType
     summary: str = Field(min_length=6, max_length=240)
@@ -310,6 +338,8 @@ class SearchPriorOutcomesResponse(BaseModel):
 
 ChunkInsight.model_rebuild()
 ChunkInsightResponse.model_rebuild()
+MeetingSummaryPacket.model_rebuild()
+MeetingSummaryPacketResponse.model_rebuild()
 
 
 class MeetingStreamEvent(BaseModel):

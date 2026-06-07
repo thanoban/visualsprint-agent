@@ -28,6 +28,7 @@ from visualsprint_api.models import (
     DecisionRecord,
     FinalReport,
     MeetingStateSnapshot,
+    MeetingSummaryPacket,
     OpenQuestionRecord,
     RegisterCaptureChunkRequest,
     RegisterAgentOutputsRequest,
@@ -39,6 +40,7 @@ from visualsprint_api.models import (
     MeetingMetrics,
     MeetingSummary,
 )
+from visualsprint_api.summary_pipeline import build_meeting_summary_packet
 from visualsprint_api.transcript_pipeline import build_transcript_segments
 
 
@@ -203,6 +205,16 @@ class MeetingStore:
         with self._lock:
             report = self._final_reports.get(meeting_id)
             return None if report is None else report.model_copy(deep=True)
+
+    def get_summary_packet(self, meeting_id: str) -> MeetingSummaryPacket | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            return build_meeting_summary_packet(
+                meeting=meeting.model_copy(deep=True),
+                meeting_state=self._build_meeting_state(meeting),
+            )
 
     def start_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
