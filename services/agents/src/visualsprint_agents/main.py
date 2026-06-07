@@ -30,12 +30,18 @@ def get_health() -> ServiceHealth:
         version=settings.version,
         track=settings.selected_track,
         mode=settings.agent_mode,
+        deploymentTarget=settings.deployment_target,
+        deploymentReady=settings.deployment_ready,
         reasoningAgentConfigured=settings.reasoning_agent_configured,
         summaryAgentConfigured=settings.summary_agent_configured,
         reasoningEndpointConfigured=settings.reasoning_endpoint_configured,
         summaryEndpointConfigured=settings.summary_endpoint_configured,
         bridgeAuthConfigured=settings.bridge_auth_configured,
+        secretManagerConfigured=settings.secret_manager_configured,
+        cloudRunServiceConfigured=settings.cloud_run_service_configured,
         elasticMcpConfigured=settings.elastic_mcp_configured,
+        allowedOriginsConfigured=len(settings.allowed_origins),
+        missingConfiguration=list(settings.missing_cloud_configuration),
         note=settings.health_note,
     )
 

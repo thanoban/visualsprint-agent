@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import os
 from typing import Literal, Mapping
 
 
 AgentAdapterMode = Literal["mock", "configured_cloud"]
+DeploymentTarget = Literal["local_dev", "cloud_run"]
 
 
 def _get(environ: Mapping[str, str], key: str) -> str | None:
@@ -22,6 +23,24 @@ def _resolve_agent_mode(environ: Mapping[str, str]) -> AgentAdapterMode:
     return "mock"
 
 
+def _resolve_deployment_target(environ: Mapping[str, str]) -> DeploymentTarget:
+    raw_value = environ.get("VISUALSPRINT_DEPLOYMENT_TARGET", "").strip().lower()
+    if raw_value == "cloud_run":
+        return "cloud_run"
+    return "local_dev"
+
+
+def _resolve_allowed_origins(environ: Mapping[str, str]) -> tuple[str, ...]:
+    raw_value = environ.get("VISUALSPRINT_ALLOWED_ORIGINS", "")
+    if not raw_value.strip():
+        return tuple()
+    return tuple(
+        origin.strip()
+        for origin in raw_value.split(",")
+        if origin.strip()
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     service_name: str = "visualsprint-agents"
@@ -29,6 +48,7 @@ class Settings:
     environment: str = "development"
     selected_track: str = "elastic"
     agent_mode: AgentAdapterMode = "mock"
+    deployment_target: DeploymentTarget = "local_dev"
     google_cloud_project_id: str | None = None
     google_cloud_location: str | None = None
     agent_application_id: str | None = None
@@ -37,10 +57,13 @@ class Settings:
     reasoning_agent_endpoint_url: str | None = None
     summary_agent_endpoint_url: str | None = None
     agent_bridge_bearer_token: str | None = None
+    agent_bridge_bearer_token_secret_name: str | None = None
     agent_request_timeout_seconds: float = 2.0
     elastic_mcp_endpoint: str | None = None
     elastic_api_key_secret_name: str | None = None
     service_account_email: str | None = None
+    cloud_run_service_url: str | None = None
+    allowed_origins: tuple[str, ...] = ()
 
     @property
     def reasoning_agent_configured(self) -> bool:
@@ -60,7 +83,18 @@ class Settings:
 
     @property
     def bridge_auth_configured(self) -> bool:
-        return self.agent_bridge_bearer_token is not None
+        return bool(
+            self.agent_bridge_bearer_token is not None
+            or self.agent_bridge_bearer_token_secret_name is not None
+        )
+
+    @property
+    def secret_manager_configured(self) -> bool:
+        return self.agent_bridge_bearer_token_secret_name is not None
+
+    @property
+    def cloud_run_service_configured(self) -> bool:
+        return self.cloud_run_service_url is not None
 
     @property
     def elastic_mcp_configured(self) -> bool:
@@ -77,11 +111,49 @@ class Settings:
         )
 
     @property
+    def missing_cloud_configuration(self) -> tuple[str, ...]:
+        missing: list[str] = []
+        if self.agent_mode != "configured_cloud":
+            return tuple(missing)
+        if not self.google_cloud_project_id:
+            missing.append("VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID")
+        if not self.reasoning_agent_id:
+            missing.append("VISUALSPRINT_REASONING_AGENT_ID")
+        if not self.summary_agent_id:
+            missing.append("VISUALSPRINT_SUMMARY_AGENT_ID")
+        if not self.reasoning_agent_endpoint_url:
+            missing.append("VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL")
+        if not self.summary_agent_endpoint_url:
+            missing.append("VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL")
+        if self.deployment_target == "cloud_run":
+            if not self.cloud_run_service_url:
+                missing.append("VISUALSPRINT_CLOUD_RUN_SERVICE_URL")
+            if not self.service_account_email:
+                missing.append("VISUALSPRINT_SERVICE_ACCOUNT_EMAIL")
+            if not self.bridge_auth_configured:
+                missing.append(
+                    "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN or "
+                    "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME"
+                )
+        return tuple(missing)
+
+    @property
+    def deployment_ready(self) -> bool:
+        if self.deployment_target == "local_dev":
+            return True
+        return self.agent_mode == "configured_cloud" and not self.missing_cloud_configuration
+
+    @property
     def health_note(self) -> str:
         if self.agent_mode == "mock":
             return (
                 "The agents service is running in deterministic mock mode while the real "
                 "Google Cloud Agent Builder adapter is still being wired."
+            )
+        if self.deployment_target == "cloud_run" and self.deployment_ready:
+            return (
+                "Cloud Run deployment-facing configuration is present. The service is "
+                "ready to attempt bridge-based agent invocations with secret-backed auth."
             )
         if self.cloud_adapter_ready:
             return (
@@ -100,6 +172,7 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         environment=source.get("VISUALSPRINT_ENV", "development"),
         selected_track=source.get("VISUALSPRINT_TRACK", "elastic"),
         agent_mode=_resolve_agent_mode(source),
+        deployment_target=_resolve_deployment_target(source),
         google_cloud_project_id=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID"),
         google_cloud_location=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_LOCATION"),
         agent_application_id=_get(source, "VISUALSPRINT_AGENT_APPLICATION_ID"),
@@ -108,12 +181,18 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         reasoning_agent_endpoint_url=_get(source, "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL"),
         summary_agent_endpoint_url=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL"),
         agent_bridge_bearer_token=_get(source, "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN"),
+        agent_bridge_bearer_token_secret_name=_get(
+            source,
+            "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME",
+        ),
         agent_request_timeout_seconds=float(
             source.get("VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS", "2.0")
         ),
         elastic_mcp_endpoint=_get(source, "VISUALSPRINT_ELASTIC_MCP_ENDPOINT"),
         elastic_api_key_secret_name=_get(source, "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME"),
         service_account_email=_get(source, "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL"),
+        cloud_run_service_url=_get(source, "VISUALSPRINT_CLOUD_RUN_SERVICE_URL"),
+        allowed_origins=_resolve_allowed_origins(source),
     )
 
 
