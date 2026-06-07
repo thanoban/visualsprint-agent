@@ -10,7 +10,7 @@ from visualsprint_api.models import (
     RegisterCaptureChunkResponse,
     StartCaptureSessionRequest,
 )
-from visualsprint_api.repository import repository
+from visualsprint_api.repository import MeetingInvariantError, repository
 
 router = APIRouter(
     prefix="/meetings/{meeting_id}/capture-sessions",
@@ -74,7 +74,13 @@ def register_capture_chunk(
             detail="Capture chunks can only be registered while the session is recording",
         )
 
-    result = repository.register_capture_chunk(meeting_id, payload)
+    try:
+        result = repository.register_capture_chunk(meeting_id, payload)
+    except MeetingInvariantError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
     if result is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

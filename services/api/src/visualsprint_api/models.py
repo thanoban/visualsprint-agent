@@ -16,6 +16,14 @@ SourceConnectorSlug = Literal[
 ]
 CaptureSessionStatus = Literal["idle", "recording", "completed"]
 ChunkProcessingStatus = Literal["registered", "processing", "processed"]
+CaptureChunkLifecycleStatus = Literal[
+    "registered",
+    "upload_ready",
+    "uploaded",
+    "processing",
+    "processed",
+]
+CaptureChunkUploadStatus = Literal["pending", "ready", "uploaded"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
 LiveEventKind = Literal[
@@ -40,13 +48,26 @@ class MeetingMetrics(BaseModel):
     capturedBytes: int = 0
 
 
+class CaptureChunkUploadTarget(BaseModel):
+    method: Literal["PUT"] = "PUT"
+    objectPath: str = Field(min_length=8, max_length=240)
+    signedUrl: str | None = None
+    requiredHeaders: dict[str, str] = Field(default_factory=dict)
+    expiresAt: datetime | None = None
+
+
 class CaptureChunkSummary(BaseModel):
     id: str
+    clientChunkId: str = Field(min_length=8, max_length=120)
     sequence: int = Field(ge=1)
     recordedAt: datetime
     durationMs: int = Field(ge=250)
     byteSize: int = Field(ge=0)
     mimeType: str = Field(min_length=3, max_length=120)
+    lifecycleStatus: CaptureChunkLifecycleStatus
+    uploadStatus: CaptureChunkUploadStatus
+    storageObjectPath: str = Field(min_length=8, max_length=240)
+    uploadTarget: CaptureChunkUploadTarget
     processingStatus: ChunkProcessingStatus
     transcriptSegmentCount: int = 0
     signalCount: int = 0
@@ -147,13 +168,14 @@ class CreateMeetingRequest(BaseModel):
 
 
 class StartCaptureSessionRequest(BaseModel):
-    recorderMimeType: str = Field(min_length=3, max_length=120)
+    recorderMimeType: str | None = Field(default=None, min_length=3, max_length=120)
     hasDisplayVideo: bool = True
     hasDisplayAudio: bool = False
     hasMicrophoneAudio: bool = False
 
 
 class RegisterCaptureChunkRequest(BaseModel):
+    clientChunkId: str = Field(min_length=8, max_length=120)
     sequence: int = Field(ge=1)
     durationMs: int = Field(ge=250, le=120_000)
     byteSize: int = Field(ge=0)

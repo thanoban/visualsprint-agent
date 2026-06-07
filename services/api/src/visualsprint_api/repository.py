@@ -11,6 +11,7 @@ from visualsprint_api.config import settings
 from visualsprint_api.models import (
     BlockerRecord,
     CaptureChunkSummary,
+    CaptureChunkUploadTarget,
     CaptureSessionSummary,
     CommitmentRecord,
     CreateMeetingRequest,
@@ -28,6 +29,16 @@ from visualsprint_api.models import (
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class MeetingInvariantError(ValueError):
+    """Raised when a meeting or capture mutation violates lifecycle rules."""
+
+
+def _normalize_recorder_mime_type(value: str | None) -> str:
+    if value is None or not value.strip():
+        return "browser-default"
+    return value.strip()
 
 
 SPEAKER_ROTATION = ("Avery", "Jordan", "Mina", "Theo", "Samir", "Priya")
@@ -97,6 +108,9 @@ class MeetingStore:
     """Thread-safe in-memory meeting store for early development."""
 
     _meetings: dict[str, MeetingDetail] = field(default_factory=dict)
+    _chunks_by_client_id: dict[tuple[str, str], CaptureChunkSummary] = field(
+        default_factory=dict
+    )
     _lock: Lock = field(default_factory=Lock)
 
     def list_meetings(self) -> list[MeetingSummary]:
@@ -226,7 +240,7 @@ class MeetingStore:
                 id=f"cap_{uuid4().hex[:12]}",
                 status="recording",
                 sourceConnector="browser_live_capture",
-                recorderMimeType=payload.recorderMimeType,
+                recorderMimeType=_normalize_recorder_mime_type(payload.recorderMimeType),
                 hasDisplayVideo=payload.hasDisplayVideo,
                 hasDisplayAudio=payload.hasDisplayAudio,
                 hasMicrophoneAudio=payload.hasMicrophoneAudio,
@@ -263,19 +277,57 @@ class MeetingStore:
             meeting = self._meetings.get(meeting_id)
             if meeting is None or meeting.activeCaptureSession is None:
                 return None
+            if meeting.activeCaptureSession.status != "recording":
+                raise MeetingInvariantError(
+                    "Capture chunks can only be registered while the session is recording"
+                )
+
+            chunk_key = (meeting_id, payload.clientChunkId)
+            existing_chunk = self._chunks_by_client_id.get(chunk_key)
+            if existing_chunk is not None:
+                return (
+                    meeting.model_copy(deep=True),
+                    meeting.activeCaptureSession.model_copy(deep=True),
+                    existing_chunk.model_copy(deep=True),
+                )
+
+            if any(
+                chunk.sequence == payload.sequence
+                for chunk in meeting.recentCaptureChunks
+                if chunk.clientChunkId != payload.clientChunkId
+            ):
+                raise MeetingInvariantError(
+                    "Chunk sequence already exists for the active capture session"
+                )
 
             recorded_at = _utc_now()
+            storage_object_path = (
+                f"meetings/{meeting_id}/capture-sessions/"
+                f"{meeting.activeCaptureSession.id}/chunks/{payload.clientChunkId}.webm"
+            )
             chunk = CaptureChunkSummary(
                 id=f"chk_{uuid4().hex[:12]}",
+                clientChunkId=payload.clientChunkId,
                 sequence=payload.sequence,
                 recordedAt=recorded_at,
                 durationMs=payload.durationMs,
                 byteSize=payload.byteSize,
                 mimeType=payload.mimeType,
+                lifecycleStatus="registered",
+                uploadStatus="pending",
+                storageObjectPath=storage_object_path,
+                uploadTarget=CaptureChunkUploadTarget(
+                    objectPath=storage_object_path,
+                    requiredHeaders={
+                        "Content-Type": payload.mimeType,
+                        "X-VisualSprint-Chunk-Id": payload.clientChunkId,
+                    },
+                ),
                 processingStatus="registered",
                 transcriptSegmentCount=0,
                 signalCount=0,
             )
+            self._chunks_by_client_id[chunk_key] = chunk
 
             meeting.activeCaptureSession.chunkCount += 1
             meeting.activeCaptureSession.totalBytes += payload.byteSize
@@ -292,7 +344,8 @@ class MeetingStore:
                     title=f"Chunk {payload.sequence} registered",
                     detail=(
                         f"Registered {payload.byteSize} bytes of capture data "
-                        f"for {payload.durationMs} ms."
+                        f"for {payload.durationMs} ms using client chunk id "
+                        f"{payload.clientChunkId}."
                     ),
                 ),
             )
@@ -369,6 +422,37 @@ class MeetingStore:
             list(reversed(transcript_segments)) + meeting.recentTranscriptSegments
         )[:10]
         meeting.metrics.transcriptSegmentsCount += len(transcript_segments)
+        chunk.lifecycleStatus = "upload_ready"
+        chunk.uploadStatus = "ready"
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=recorded_at,
+                title=f"Chunk {chunk.sequence} upload contract prepared",
+                detail=(
+                    f"Storage key {chunk.storageObjectPath} is reserved for the "
+                    "future signed-upload path."
+                ),
+            ),
+        )
+        chunk.lifecycleStatus = "uploaded"
+        chunk.uploadStatus = "uploaded"
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=recorded_at,
+                title=f"Chunk {chunk.sequence} upload acknowledged",
+                detail=(
+                    "The local development pipeline marks the upload stage complete "
+                    "before mock processing continues."
+                ),
+            ),
+        )
+        chunk.lifecycleStatus = "processing"
         chunk.processingStatus = "processing"
         chunk.transcriptSegmentCount = len(transcript_segments)
         meeting.latestEvents.insert(
@@ -480,6 +564,7 @@ class MeetingStore:
         )
         signal_count += 1
 
+        chunk.lifecycleStatus = "processed"
         chunk.processingStatus = "processed"
         chunk.signalCount = signal_count
 
