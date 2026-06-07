@@ -26,12 +26,18 @@ def test_agents_health_reasoning_and_summary():
         health_payload = health_response.json()
         assert health_payload["service"] == "visualsprint-agents"
         assert health_payload["mode"] == "mock"
+        assert health_payload["deploymentTarget"] == "local_dev"
+        assert health_payload["deploymentReady"] is True
         assert health_payload["reasoningAgentConfigured"] is False
         assert health_payload["summaryAgentConfigured"] is False
         assert health_payload["reasoningEndpointConfigured"] is False
         assert health_payload["summaryEndpointConfigured"] is False
         assert health_payload["bridgeAuthConfigured"] is False
+        assert health_payload["secretManagerConfigured"] is False
+        assert health_payload["cloudRunServiceConfigured"] is False
         assert health_payload["elasticMcpConfigured"] is False
+        assert health_payload["allowedOriginsConfigured"] == 0
+        assert health_payload["missingConfiguration"] == []
 
         reasoning_response = client.post(
             "/api/reasoning/chunks/run",
@@ -91,6 +97,7 @@ def test_build_settings_supports_configured_cloud_mode():
             "VISUALSPRINT_ENV": "production",
             "VISUALSPRINT_TRACK": "elastic",
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
+            "VISUALSPRINT_DEPLOYMENT_TARGET": "cloud_run",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
             "VISUALSPRINT_GOOGLE_CLOUD_LOCATION": "us-central1",
             "VISUALSPRINT_AGENT_APPLICATION_ID": "agents-app",
@@ -98,22 +105,52 @@ def test_build_settings_supports_configured_cloud_mode():
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
-            "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN": "secret-token",
+            "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME": "agents-bridge-token",
             "VISUALSPRINT_ELASTIC_MCP_ENDPOINT": "https://elastic.example/mcp",
             "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME": "elastic-api-key",
             "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL": "svc@demo-project.iam.gserviceaccount.com",
+            "VISUALSPRINT_CLOUD_RUN_SERVICE_URL": "https://visualsprint-agents-abc.a.run.app",
+            "VISUALSPRINT_ALLOWED_ORIGINS": "https://app.visualsprint.dev, https://staging.visualsprint.dev",
         }
     )
 
     assert settings.environment == "production"
     assert settings.agent_mode == "configured_cloud"
+    assert settings.deployment_target == "cloud_run"
     assert settings.reasoning_agent_configured is True
     assert settings.summary_agent_configured is True
     assert settings.reasoning_endpoint_configured is True
     assert settings.summary_endpoint_configured is True
     assert settings.bridge_auth_configured is True
+    assert settings.secret_manager_configured is True
+    assert settings.cloud_run_service_configured is True
     assert settings.elastic_mcp_configured is True
     assert settings.cloud_adapter_ready is True
+    assert settings.deployment_ready is True
+    assert settings.allowed_origins == (
+        "https://app.visualsprint.dev",
+        "https://staging.visualsprint.dev",
+    )
+    assert settings.missing_cloud_configuration == ()
+
+
+def test_build_settings_reports_missing_cloud_run_requirements():
+    settings = build_settings(
+        {
+            "VISUALSPRINT_AGENT_MODE": "configured_cloud",
+            "VISUALSPRINT_DEPLOYMENT_TARGET": "cloud_run",
+            "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
+        }
+    )
+
+    assert settings.deployment_target == "cloud_run"
+    assert settings.deployment_ready is False
+    assert "VISUALSPRINT_SUMMARY_AGENT_ID" in settings.missing_cloud_configuration
+    assert "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
+    assert "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
+    assert "VISUALSPRINT_CLOUD_RUN_SERVICE_URL" in settings.missing_cloud_configuration
+    assert "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL" in settings.missing_cloud_configuration
 
 
 def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monkeypatch):

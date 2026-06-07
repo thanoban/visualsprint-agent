@@ -1,0 +1,51 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: visualsprint-agents
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      serviceAccountName: VISUALSPRINT_SERVICE_ACCOUNT_NAME
+      containers:
+        - image: REGION-docker.pkg.dev/PROJECT_ID/visualsprint/agents:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: VISUALSPRINT_ENV
+              value: production
+            - name: VISUALSPRINT_TRACK
+              value: elastic
+            - name: VISUALSPRINT_AGENT_MODE
+              value: configured_cloud
+            - name: VISUALSPRINT_DEPLOYMENT_TARGET
+              value: cloud_run
+            - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID
+              value: PROJECT_ID
+            - name: VISUALSPRINT_GOOGLE_CLOUD_LOCATION
+              value: us-central1
+            - name: VISUALSPRINT_AGENT_APPLICATION_ID
+              value: VISUALSPRINT_AGENT_APP_ID
+            - name: VISUALSPRINT_REASONING_AGENT_ID
+              value: VISUALSPRINT_REASONING_AGENT_ID
+            - name: VISUALSPRINT_SUMMARY_AGENT_ID
+              value: VISUALSPRINT_SUMMARY_AGENT_ID
+            - name: VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL
+              value: https://reasoning-bridge.example/run
+            - name: VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL
+              value: https://summary-bridge.example/run
+            - name: VISUALSPRINT_CLOUD_RUN_SERVICE_URL
+              value: https://visualsprint-agents-REPLACE.a.run.app
+            - name: VISUALSPRINT_SERVICE_ACCOUNT_EMAIL
+              value: visualsprint-agents@PROJECT_ID.iam.gserviceaccount.com
+            - name: VISUALSPRINT_ALLOWED_ORIGINS
+              value: https://app.visualsprint.dev
+            - name: VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS
+              value: "4.0"
+            - name: VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME
+              value: visualsprint-agent-bridge-token

@@ -141,10 +141,16 @@ class ServiceHealth(BaseModel):
     version: str
     track: str
     mode: AgentAdapterMode
+    deploymentTarget: Literal["local_dev", "cloud_run"]
+    deploymentReady: bool
     reasoningAgentConfigured: bool
     summaryAgentConfigured: bool
     reasoningEndpointConfigured: bool
     summaryEndpointConfigured: bool
     bridgeAuthConfigured: bool
+    secretManagerConfigured: bool
+    cloudRunServiceConfigured: bool
     elasticMcpConfigured: bool
+    allowedOriginsConfigured: int
+    missingConfiguration: list[str] = Field(default_factory=list)
     note: str
