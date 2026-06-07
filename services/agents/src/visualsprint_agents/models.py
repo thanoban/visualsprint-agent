@@ -143,5 +143,8 @@ class ServiceHealth(BaseModel):
     mode: AgentAdapterMode
     reasoningAgentConfigured: bool
     summaryAgentConfigured: bool
+    reasoningEndpointConfigured: bool
+    summaryEndpointConfigured: bool
+    bridgeAuthConfigured: bool
     elasticMcpConfigured: bool
     note: str
