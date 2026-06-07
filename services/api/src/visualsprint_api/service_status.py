@@ -24,6 +24,12 @@ def get_downstream_service_statuses() -> list[DownstreamServiceStatus]:
             note="The FastAPI control plane is running in the current process.",
         ),
         _probe_service(
+            service_name="visualsprint-agents",
+            kind="agents",
+            base_url=settings.agents_service_url,
+            local_note="Reasoning and summary generation will fall back to local deterministic stubs.",
+        ),
+        _probe_service(
             service_name="visualsprint-ingest",
             kind="ingest",
             base_url=settings.ingest_service_url,

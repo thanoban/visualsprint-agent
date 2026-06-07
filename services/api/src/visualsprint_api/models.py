@@ -46,7 +46,7 @@ LiveEventKind = Literal[
     "blocker",
     "memory",
 ]
-DownstreamServiceKind = Literal["control_plane", "ingest", "media"]
+DownstreamServiceKind = Literal["control_plane", "agents", "ingest", "media"]
 DownstreamServiceConnectionStatus = Literal["ok", "unreachable", "not_configured"]
 
 

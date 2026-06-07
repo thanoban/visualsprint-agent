@@ -421,8 +421,10 @@ def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch)
     fallback_meta_response = client.get("/api/meta")
     assert fallback_meta_response.status_code == 200
     fallback_services = fallback_meta_response.json()["downstreamServices"]
+    agents_status = next(service for service in fallback_services if service["kind"] == "agents")
     ingest_status = next(service for service in fallback_services if service["kind"] == "ingest")
     media_status = next(service for service in fallback_services if service["kind"] == "media")
+    assert agents_status["status"] == "not_configured"
     assert ingest_status["status"] == "not_configured"
     assert media_status["status"] == "not_configured"
 
@@ -442,6 +444,18 @@ def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch)
                 version="0.1.0",
                 track="elastic",
                 note="Control plane is healthy.",
+            ),
+            DownstreamServiceStatus(
+                service="visualsprint-agents",
+                kind="agents",
+                configured=True,
+                reachable=True,
+                mode="remote",
+                baseUrl="http://127.0.0.1:8300",
+                status="ok",
+                version="0.1.0",
+                track="elastic",
+                note="Agents service responded successfully.",
             ),
             DownstreamServiceStatus(
                 service="visualsprint-ingest",
@@ -473,5 +487,74 @@ def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch)
     patched_meta_response = client.get("/api/meta")
     assert patched_meta_response.status_code == 200
     patched_services = patched_meta_response.json()["downstreamServices"]
+    assert next(service for service in patched_services if service["kind"] == "agents")["status"] == "ok"
     assert next(service for service in patched_services if service["kind"] == "ingest")["status"] == "ok"
     assert next(service for service in patched_services if service["kind"] == "media")["status"] == "unreachable"
+
+
+def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, monkeypatch):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-6001", sequence=1)
+    assert register_response.status_code == 200
+
+    from visualsprint_api.models import RegisterAgentOutputsRequest
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.run_chunk_reasoning",
+        lambda insight: RegisterAgentOutputsRequest(
+            clientChunkId=insight.clientChunkId,
+            decisions=[
+                {
+                    "title": "Service-generated decision",
+                    "rationale": "The agents service produced this reasoning output.",
+                    "speakerLabel": "AgentsService",
+                }
+            ],
+            commitments=[],
+            blockers=[],
+            openQuestions=[],
+            memoryMatches=[],
+            resolvedDecisionIds=[],
+            resolvedCommitmentIds=[],
+            resolvedBlockerIds=[],
+            resolvedOpenQuestionIds=[],
+        ),
+    )
+
+    _process_chunk(client, meeting_id, "client-chunk-6001")
+
+    meeting_response = client.get(f"/api/meetings/{meeting_id}")
+    assert meeting_response.status_code == 200
+    decisions = meeting_response.json()["meeting"]["recentDecisions"]
+    assert any(decision["title"] == "Service-generated decision" for decision in decisions)
+
+
+def test_finalize_report_can_use_agents_summary_service(client: TestClient, monkeypatch):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-6101", sequence=1)
+    assert register_response.status_code == 200
+    _process_chunk(client, meeting_id, "client-chunk-6101")
+    end_response = client.post(f"/api/meetings/{meeting_id}/end")
+    assert end_response.status_code == 200
+
+    from visualsprint_api.models import FinalReport
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.run_summary_agent",
+        lambda packet: FinalReport(
+            meetingId=packet.meetingId,
+            generatedAt="2026-06-07T10:00:00Z",
+            executiveSummary="Agents service generated this final summary.",
+            decisions=packet.decisions,
+            commitments=packet.commitments,
+            blockers=packet.blockers,
+            openQuestions=packet.openQuestions,
+            memoryHighlights=packet.memoryHighlights,
+        ),
+    )
+
+    finalize_response = client.post(f"/api/meetings/{meeting_id}/final-report")
+    assert finalize_response.status_code == 200
+    assert finalize_response.json()["report"]["executiveSummary"] == "Agents service generated this final summary."

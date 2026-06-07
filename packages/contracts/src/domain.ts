@@ -75,7 +75,7 @@ export interface FoundationalService {
 
 export interface DownstreamServiceStatus {
   service: string;
-  kind: "control_plane" | "ingest" | "media";
+  kind: "control_plane" | "agents" | "ingest" | "media";
   configured: boolean;
   reachable: boolean;
   mode: "local" | "remote" | "fallback";

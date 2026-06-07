@@ -46,6 +46,8 @@ from visualsprint_api.service_clients import (
     process_media_chunk,
     process_transcript_chunk,
     reserve_chunk_upload_target,
+    run_chunk_reasoning,
+    run_summary_agent,
 )
 from visualsprint_api.summary_pipeline import build_meeting_summary_packet
 
@@ -277,7 +279,11 @@ class MeetingStore:
             meeting = self._meetings.get(meeting_id)
             if meeting is None:
                 return None
-            report = self._build_final_report(meeting)
+            summary_packet = build_meeting_summary_packet(
+                meeting=meeting.model_copy(deep=True),
+                meeting_state=self._build_meeting_state(meeting),
+            )
+            report = run_summary_agent(summary_packet) or self._build_final_report(meeting)
             self._final_reports[meeting_id] = report
             self._mark_meeting_updated(meeting_id)
             return report.model_copy(deep=True)
@@ -828,6 +834,34 @@ class MeetingStore:
             transcript_segments,
             screen_events,
         )
+        chunk_insight = build_chunk_insight(
+            meeting=meeting.model_copy(deep=True),
+            meeting_state=self._build_meeting_state(meeting),
+            chunk_context=ChunkContext(
+                chunk=chunk.model_copy(deep=True),
+                transcriptSegments=[segment.model_copy(deep=True) for segment in transcript_segments],
+                screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
+            ),
+        )
+        agent_outputs = run_chunk_reasoning(chunk_insight)
+        if agent_outputs is not None:
+            signal_count = self._apply_agent_outputs_to_meeting(
+                meeting=meeting,
+                payload=agent_outputs,
+                source_chunk=chunk,
+                recorded_at=final_end,
+                evidence_refs=evidence_refs,
+            )
+            chunk.lifecycleStatus = "processed"
+            chunk.processingStatus = "processed"
+            chunk.signalCount = signal_count
+            self._chunk_context_by_client_id[(meeting.id, chunk.clientChunkId)] = ChunkContext(
+                chunk=chunk.model_copy(deep=True),
+                transcriptSegments=[segment.model_copy(deep=True) for segment in transcript_segments],
+                screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
+            )
+            return
+
         decision_title, decision_rationale = DECISION_TEMPLATES[template_index]
         decision = self._upsert_decision(
             meeting,
@@ -959,6 +993,81 @@ class MeetingStore:
             chunk=chunk.model_copy(deep=True),
             transcriptSegments=[segment.model_copy(deep=True) for segment in transcript_segments],
             screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
+        )
+
+    def _apply_agent_outputs_to_meeting(
+        self,
+        meeting: MeetingDetail,
+        payload: RegisterAgentOutputsRequest,
+        source_chunk: CaptureChunkSummary,
+        recorded_at: datetime,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        self._persist_decisions(
+            meeting,
+            payload.decisions,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        self._persist_commitments(
+            meeting,
+            payload.commitments,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        self._persist_blockers(
+            meeting,
+            payload.blockers,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        self._persist_open_questions(
+            meeting,
+            payload.openQuestions,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        resolved_count = 0
+        resolved_count += self._resolve_decisions(
+            meeting,
+            payload.resolvedDecisionIds,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        resolved_count += self._resolve_commitments(
+            meeting,
+            payload.resolvedCommitmentIds,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        resolved_count += self._resolve_blockers(
+            meeting,
+            payload.resolvedBlockerIds,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        resolved_count += self._resolve_open_questions(
+            meeting,
+            payload.resolvedOpenQuestionIds,
+            recorded_at,
+            source_chunk.clientChunkId,
+            evidence_refs,
+        )
+        self._persist_memory_matches(meeting, payload.memoryMatches, recorded_at)
+        return (
+            len(payload.decisions)
+            + len(payload.commitments)
+            + len(payload.blockers)
+            + len(payload.openQuestions)
+            + len(payload.memoryMatches)
+            + resolved_count
         )
 
     def _build_meeting_state(self, meeting: MeetingDetail) -> MeetingStateSnapshot:
