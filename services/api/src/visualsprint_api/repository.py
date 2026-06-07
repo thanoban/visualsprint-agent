@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from threading import Lock
+from typing import Callable
 from uuid import uuid4
 
 from visualsprint_api.config import settings
@@ -378,13 +379,32 @@ class MeetingStore:
                 chunk_context.screenEvents,
             )
 
-            self._persist_decisions(meeting, payload.decisions, recorded_at, evidence_refs)
-            self._persist_commitments(meeting, payload.commitments, recorded_at, evidence_refs)
-            self._persist_blockers(meeting, payload.blockers, recorded_at, evidence_refs)
+            self._persist_decisions(
+                meeting,
+                payload.decisions,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
+            self._persist_commitments(
+                meeting,
+                payload.commitments,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
+            self._persist_blockers(
+                meeting,
+                payload.blockers,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
             self._persist_open_questions(
                 meeting,
                 payload.openQuestions,
                 recorded_at,
+                source_chunk.clientChunkId,
                 evidence_refs,
             )
             self._persist_memory_matches(meeting, payload.memoryMatches, recorded_at)
@@ -763,17 +783,15 @@ class MeetingStore:
             screen_events,
         )
         decision_title, decision_rationale = DECISION_TEMPLATES[template_index]
-        decision = DecisionRecord(
-            id=f"dec_{uuid4().hex[:12]}",
+        decision = self._upsert_decision(
+            meeting,
             title=decision_title,
             rationale=decision_rationale,
-            speakerLabel=transcript_segments[-1].speakerLabel,
-            recordedAt=final_end,
-            evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+            speaker_label=transcript_segments[-1].speakerLabel,
+            recorded_at=final_end,
+            chunk_client_id=chunk.clientChunkId,
+            evidence_refs=evidence_refs,
         )
-        meeting.recentDecisions.insert(0, decision)
-        meeting.recentDecisions = meeting.recentDecisions[:6]
-        meeting.metrics.decisionsCount += 1
         meeting.latestEvents.insert(
             0,
             LiveEvent(
@@ -789,17 +807,15 @@ class MeetingStore:
 
         if chunk.sequence % 2 == 1:
             owner_label, action, due_hint = COMMITMENT_TEMPLATES[template_index]
-            commitment = CommitmentRecord(
-                id=f"cmt_{uuid4().hex[:12]}",
-                ownerLabel=owner_label,
+            commitment = self._upsert_commitment(
+                meeting,
+                owner_label=owner_label,
                 action=action,
-                dueHint=due_hint,
-                recordedAt=final_end,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                due_hint=due_hint,
+                recorded_at=final_end,
+                chunk_client_id=chunk.clientChunkId,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentCommitments.insert(0, commitment)
-            meeting.recentCommitments = meeting.recentCommitments[:6]
-            meeting.metrics.commitmentsCount += 1
             meeting.latestEvents.insert(
                 0,
                 LiveEvent(
@@ -814,17 +830,15 @@ class MeetingStore:
 
         if chunk.sequence % 3 != 0:
             blocker_summary, blocker_severity, blocker_owner = BLOCKER_TEMPLATES[template_index]
-            blocker = BlockerRecord(
-                id=f"blk_{uuid4().hex[:12]}",
+            blocker = self._upsert_blocker(
+                meeting,
                 summary=blocker_summary,
                 severity=blocker_severity,
-                ownerLabel=blocker_owner,
-                recordedAt=final_end,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                owner_label=blocker_owner,
+                recorded_at=final_end,
+                chunk_client_id=chunk.clientChunkId,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentBlockers.insert(0, blocker)
-            meeting.recentBlockers = meeting.recentBlockers[:6]
-            meeting.metrics.blockersCount += 1
             meeting.latestEvents.insert(
                 0,
                 LiveEvent(
@@ -872,16 +886,14 @@ class MeetingStore:
         )
         signal_count += 1
 
-        open_question = OpenQuestionRecord(
-            id=f"oqn_{uuid4().hex[:12]}",
+        open_question = self._upsert_open_question(
+            meeting,
             question=OPEN_QUESTION_TEMPLATES[template_index],
-            speakerLabel=transcript_segments[-1].speakerLabel,
-            recordedAt=final_end,
-            evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+            speaker_label=transcript_segments[-1].speakerLabel,
+            recorded_at=final_end,
+            chunk_client_id=chunk.clientChunkId,
+            evidence_refs=evidence_refs,
         )
-        meeting.recentOpenQuestions.insert(0, open_question)
-        meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
-        meeting.metrics.openQuestionsCount += 1
         meeting.latestEvents.insert(
             0,
             LiveEvent(
@@ -970,79 +982,258 @@ class MeetingStore:
         meeting: MeetingDetail,
         decisions: list[AgentDecisionInput],
         recorded_at: datetime,
+        chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in decisions:
-            decision = DecisionRecord(
-                id=f"dec_{uuid4().hex[:12]}",
+            self._upsert_decision(
+                meeting,
                 title=draft.title,
                 rationale=draft.rationale,
-                speakerLabel=draft.speakerLabel,
-                recordedAt=recorded_at,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                speaker_label=draft.speakerLabel,
+                recorded_at=recorded_at,
+                chunk_client_id=chunk_client_id,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentDecisions.insert(0, decision)
-            meeting.metrics.decisionsCount += 1
-        meeting.recentDecisions = meeting.recentDecisions[:6]
 
     def _persist_commitments(
         self,
         meeting: MeetingDetail,
         commitments: list[AgentCommitmentInput],
         recorded_at: datetime,
+        chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in commitments:
-            commitment = CommitmentRecord(
-                id=f"cmt_{uuid4().hex[:12]}",
-                ownerLabel=draft.ownerLabel,
+            self._upsert_commitment(
+                meeting,
+                owner_label=draft.ownerLabel,
                 action=draft.action,
-                dueHint=draft.dueHint,
-                recordedAt=recorded_at,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                due_hint=draft.dueHint,
+                recorded_at=recorded_at,
+                chunk_client_id=chunk_client_id,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentCommitments.insert(0, commitment)
-            meeting.metrics.commitmentsCount += 1
-        meeting.recentCommitments = meeting.recentCommitments[:6]
 
     def _persist_blockers(
         self,
         meeting: MeetingDetail,
         blockers: list[AgentBlockerInput],
         recorded_at: datetime,
+        chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in blockers:
-            blocker = BlockerRecord(
-                id=f"blk_{uuid4().hex[:12]}",
+            self._upsert_blocker(
+                meeting,
                 summary=draft.summary,
                 severity=draft.severity,
-                ownerLabel=draft.ownerLabel,
-                recordedAt=recorded_at,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                owner_label=draft.ownerLabel,
+                recorded_at=recorded_at,
+                chunk_client_id=chunk_client_id,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentBlockers.insert(0, blocker)
-            meeting.metrics.blockersCount += 1
-        meeting.recentBlockers = meeting.recentBlockers[:6]
 
     def _persist_open_questions(
         self,
         meeting: MeetingDetail,
         open_questions: list[AgentOpenQuestionInput],
         recorded_at: datetime,
+        chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in open_questions:
-            open_question = OpenQuestionRecord(
-                id=f"oqn_{uuid4().hex[:12]}",
+            self._upsert_open_question(
+                meeting,
                 question=draft.question,
-                speakerLabel=draft.speakerLabel,
-                recordedAt=recorded_at,
-                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
+                speaker_label=draft.speakerLabel,
+                recorded_at=recorded_at,
+                chunk_client_id=chunk_client_id,
+                evidence_refs=evidence_refs,
             )
-            meeting.recentOpenQuestions.insert(0, open_question)
-            meeting.metrics.openQuestionsCount += 1
-        meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
+
+    def _upsert_decision(
+        self,
+        meeting: MeetingDetail,
+        title: str,
+        rationale: str,
+        speaker_label: str,
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> DecisionRecord:
+        return self._upsert_reasoning_record(
+            meeting=meeting,
+            records=meeting.recentDecisions,
+            metric_attr="decisionsCount",
+            key=self._normalize_key(title),
+            make_record=lambda: DecisionRecord(
+                id=f"dec_{uuid4().hex[:12]}",
+                title=title,
+                rationale=rationale,
+                speakerLabel=speaker_label,
+                status="open",
+                firstSeenChunkId=chunk_client_id,
+                lastUpdatedChunkId=chunk_client_id,
+                recordedAt=recorded_at,
+                evidence=self._clone_evidence(evidence_refs),
+            ),
+            update_record=lambda record: record.model_copy(
+                update={
+                    "title": title,
+                    "rationale": rationale,
+                    "speakerLabel": speaker_label,
+                    "status": self._next_record_status(record.status),
+                    "lastUpdatedChunkId": chunk_client_id,
+                    "recordedAt": recorded_at,
+                    "evidence": self._clone_evidence(evidence_refs),
+                }
+            ),
+            key_getter=lambda record: self._normalize_key(record.title),
+        )
+
+    def _upsert_commitment(
+        self,
+        meeting: MeetingDetail,
+        owner_label: str,
+        action: str,
+        due_hint: str,
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> CommitmentRecord:
+        return self._upsert_reasoning_record(
+            meeting=meeting,
+            records=meeting.recentCommitments,
+            metric_attr="commitmentsCount",
+            key=self._normalize_key(owner_label, action),
+            make_record=lambda: CommitmentRecord(
+                id=f"cmt_{uuid4().hex[:12]}",
+                ownerLabel=owner_label,
+                action=action,
+                dueHint=due_hint,
+                status="open",
+                firstSeenChunkId=chunk_client_id,
+                lastUpdatedChunkId=chunk_client_id,
+                recordedAt=recorded_at,
+                evidence=self._clone_evidence(evidence_refs),
+            ),
+            update_record=lambda record: record.model_copy(
+                update={
+                    "ownerLabel": owner_label,
+                    "action": action,
+                    "dueHint": due_hint,
+                    "status": self._next_record_status(record.status),
+                    "lastUpdatedChunkId": chunk_client_id,
+                    "recordedAt": recorded_at,
+                    "evidence": self._clone_evidence(evidence_refs),
+                }
+            ),
+            key_getter=lambda record: self._normalize_key(record.ownerLabel, record.action),
+        )
+
+    def _upsert_blocker(
+        self,
+        meeting: MeetingDetail,
+        summary: str,
+        severity: str,
+        owner_label: str,
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> BlockerRecord:
+        return self._upsert_reasoning_record(
+            meeting=meeting,
+            records=meeting.recentBlockers,
+            metric_attr="blockersCount",
+            key=self._normalize_key(summary),
+            make_record=lambda: BlockerRecord(
+                id=f"blk_{uuid4().hex[:12]}",
+                summary=summary,
+                severity=severity,
+                ownerLabel=owner_label,
+                status="open",
+                firstSeenChunkId=chunk_client_id,
+                lastUpdatedChunkId=chunk_client_id,
+                recordedAt=recorded_at,
+                evidence=self._clone_evidence(evidence_refs),
+            ),
+            update_record=lambda record: record.model_copy(
+                update={
+                    "summary": summary,
+                    "severity": severity,
+                    "ownerLabel": owner_label,
+                    "status": self._next_record_status(record.status),
+                    "lastUpdatedChunkId": chunk_client_id,
+                    "recordedAt": recorded_at,
+                    "evidence": self._clone_evidence(evidence_refs),
+                }
+            ),
+            key_getter=lambda record: self._normalize_key(record.summary),
+        )
+
+    def _upsert_open_question(
+        self,
+        meeting: MeetingDetail,
+        question: str,
+        speaker_label: str,
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> OpenQuestionRecord:
+        return self._upsert_reasoning_record(
+            meeting=meeting,
+            records=meeting.recentOpenQuestions,
+            metric_attr="openQuestionsCount",
+            key=self._normalize_key(question),
+            make_record=lambda: OpenQuestionRecord(
+                id=f"oqn_{uuid4().hex[:12]}",
+                question=question,
+                speakerLabel=speaker_label,
+                status="open",
+                firstSeenChunkId=chunk_client_id,
+                lastUpdatedChunkId=chunk_client_id,
+                recordedAt=recorded_at,
+                evidence=self._clone_evidence(evidence_refs),
+            ),
+            update_record=lambda record: record.model_copy(
+                update={
+                    "question": question,
+                    "speakerLabel": speaker_label,
+                    "status": self._next_record_status(record.status),
+                    "lastUpdatedChunkId": chunk_client_id,
+                    "recordedAt": recorded_at,
+                    "evidence": self._clone_evidence(evidence_refs),
+                }
+            ),
+            key_getter=lambda record: self._normalize_key(record.question),
+        )
+
+    def _upsert_reasoning_record(
+        self,
+        meeting: MeetingDetail,
+        records: list,
+        metric_attr: str,
+        key: str,
+        make_record: Callable[[], object],
+        update_record: Callable[[object], object],
+        key_getter: Callable[[object], str],
+    ):
+        for index, record in enumerate(records):
+            if key_getter(record) != key:
+                continue
+            updated_record = update_record(record)
+            records.pop(index)
+            records.insert(0, updated_record)
+            del records[6:]
+            return updated_record
+
+        created_record = make_record()
+        records.insert(0, created_record)
+        del records[6:]
+        current_value = getattr(meeting.metrics, metric_attr)
+        setattr(meeting.metrics, metric_attr, current_value + 1)
+        return created_record
 
     def _build_evidence_references(
         self,
@@ -1105,6 +1296,22 @@ class MeetingStore:
             )
 
         return evidence_refs[:4]
+
+    def _clone_evidence(
+        self,
+        evidence_refs: list[EvidenceReference],
+    ) -> list[EvidenceReference]:
+        return [reference.model_copy(deep=True) for reference in evidence_refs]
+
+    def _next_record_status(self, current_status: str) -> str:
+        if current_status == "resolved":
+            return "reopened"
+        if current_status == "open":
+            return "updated"
+        return current_status
+
+    def _normalize_key(self, *parts: str) -> str:
+        return "||".join(part.strip().lower() for part in parts)
 
     def _persist_memory_matches(
         self,

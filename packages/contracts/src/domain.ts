@@ -36,6 +36,7 @@ export type MemoryMatchRelation =
   | "recurring"
   | "reopened"
   | "resolved_previously";
+export type ReasoningRecordStatus = "open" | "updated" | "resolved" | "reopened";
 export type ReasoningRecordType =
   | "decision"
   | "commitment"
@@ -179,6 +180,9 @@ export interface DecisionRecord {
   title: string;
   rationale: string;
   speakerLabel: string;
+  status: ReasoningRecordStatus;
+  firstSeenChunkId: string;
+  lastUpdatedChunkId: string;
   recordedAt: string;
   evidence: EvidenceReference[];
 }
@@ -188,6 +192,9 @@ export interface CommitmentRecord {
   ownerLabel: string;
   action: string;
   dueHint: string;
+  status: ReasoningRecordStatus;
+  firstSeenChunkId: string;
+  lastUpdatedChunkId: string;
   recordedAt: string;
   evidence: EvidenceReference[];
 }
@@ -197,6 +204,9 @@ export interface BlockerRecord {
   summary: string;
   severity: BlockerSeverity;
   ownerLabel: string;
+  status: ReasoningRecordStatus;
+  firstSeenChunkId: string;
+  lastUpdatedChunkId: string;
   recordedAt: string;
   evidence: EvidenceReference[];
 }
@@ -217,6 +227,9 @@ export interface OpenQuestionRecord {
   id: string;
   question: string;
   speakerLabel: string;
+  status: ReasoningRecordStatus;
+  firstSeenChunkId: string;
+  lastUpdatedChunkId: string;
   recordedAt: string;
   evidence: EvidenceReference[];
 }
