@@ -1,4 +1,6 @@
 import type {
+  CompleteCaptureChunkUploadRequest,
+  CompleteCaptureChunkUploadResponse,
   CaptureSessionResponse,
   CreateMeetingRequest,
   CreateMeetingResponse,
@@ -79,6 +81,19 @@ export function registerCaptureChunk(
 ) {
   return request<RegisterCaptureChunkResponse>(
     `/api/meetings/${meetingId}/capture-sessions/chunk`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function completeCaptureChunkUpload(
+  meetingId: string,
+  payload: CompleteCaptureChunkUploadRequest,
+) {
+  return request<CompleteCaptureChunkUploadResponse>(
+    `/api/meetings/${meetingId}/capture-sessions/chunk/upload-complete`,
     {
       method: "POST",
       body: JSON.stringify(payload),
