@@ -26,6 +26,7 @@ from visualsprint_api.models import (
     CommitmentRecord,
     CreateMeetingRequest,
     DecisionRecord,
+    EvidenceReference,
     FinalReport,
     MeetingStateSnapshot,
     MeetingSummaryPacket,
@@ -371,11 +372,21 @@ class MeetingStore:
 
             recorded_at = chunk_context.chunk.recordedAt
             source_chunk = chunk_context.chunk
+            evidence_refs = self._build_evidence_references(
+                source_chunk,
+                chunk_context.transcriptSegments,
+                chunk_context.screenEvents,
+            )
 
-            self._persist_decisions(meeting, payload.decisions, recorded_at)
-            self._persist_commitments(meeting, payload.commitments, recorded_at)
-            self._persist_blockers(meeting, payload.blockers, recorded_at)
-            self._persist_open_questions(meeting, payload.openQuestions, recorded_at)
+            self._persist_decisions(meeting, payload.decisions, recorded_at, evidence_refs)
+            self._persist_commitments(meeting, payload.commitments, recorded_at, evidence_refs)
+            self._persist_blockers(meeting, payload.blockers, recorded_at, evidence_refs)
+            self._persist_open_questions(
+                meeting,
+                payload.openQuestions,
+                recorded_at,
+                evidence_refs,
+            )
             self._persist_memory_matches(meeting, payload.memoryMatches, recorded_at)
 
             source_chunk.signalCount += (
@@ -746,6 +757,11 @@ class MeetingStore:
             ),
         )
 
+        evidence_refs = self._build_evidence_references(
+            chunk,
+            transcript_segments,
+            screen_events,
+        )
         decision_title, decision_rationale = DECISION_TEMPLATES[template_index]
         decision = DecisionRecord(
             id=f"dec_{uuid4().hex[:12]}",
@@ -753,6 +769,7 @@ class MeetingStore:
             rationale=decision_rationale,
             speakerLabel=transcript_segments[-1].speakerLabel,
             recordedAt=final_end,
+            evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
         )
         meeting.recentDecisions.insert(0, decision)
         meeting.recentDecisions = meeting.recentDecisions[:6]
@@ -778,6 +795,7 @@ class MeetingStore:
                 action=action,
                 dueHint=due_hint,
                 recordedAt=final_end,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentCommitments.insert(0, commitment)
             meeting.recentCommitments = meeting.recentCommitments[:6]
@@ -802,6 +820,7 @@ class MeetingStore:
                 severity=blocker_severity,
                 ownerLabel=blocker_owner,
                 recordedAt=final_end,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentBlockers.insert(0, blocker)
             meeting.recentBlockers = meeting.recentBlockers[:6]
@@ -858,6 +877,7 @@ class MeetingStore:
             question=OPEN_QUESTION_TEMPLATES[template_index],
             speakerLabel=transcript_segments[-1].speakerLabel,
             recordedAt=final_end,
+            evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
         )
         meeting.recentOpenQuestions.insert(0, open_question)
         meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
@@ -950,6 +970,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         decisions: list[AgentDecisionInput],
         recorded_at: datetime,
+        evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in decisions:
             decision = DecisionRecord(
@@ -958,6 +979,7 @@ class MeetingStore:
                 rationale=draft.rationale,
                 speakerLabel=draft.speakerLabel,
                 recordedAt=recorded_at,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentDecisions.insert(0, decision)
             meeting.metrics.decisionsCount += 1
@@ -968,6 +990,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         commitments: list[AgentCommitmentInput],
         recorded_at: datetime,
+        evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in commitments:
             commitment = CommitmentRecord(
@@ -976,6 +999,7 @@ class MeetingStore:
                 action=draft.action,
                 dueHint=draft.dueHint,
                 recordedAt=recorded_at,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentCommitments.insert(0, commitment)
             meeting.metrics.commitmentsCount += 1
@@ -986,6 +1010,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         blockers: list[AgentBlockerInput],
         recorded_at: datetime,
+        evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in blockers:
             blocker = BlockerRecord(
@@ -994,6 +1019,7 @@ class MeetingStore:
                 severity=draft.severity,
                 ownerLabel=draft.ownerLabel,
                 recordedAt=recorded_at,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentBlockers.insert(0, blocker)
             meeting.metrics.blockersCount += 1
@@ -1004,6 +1030,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         open_questions: list[AgentOpenQuestionInput],
         recorded_at: datetime,
+        evidence_refs: list[EvidenceReference],
     ) -> None:
         for draft in open_questions:
             open_question = OpenQuestionRecord(
@@ -1011,10 +1038,73 @@ class MeetingStore:
                 question=draft.question,
                 speakerLabel=draft.speakerLabel,
                 recordedAt=recorded_at,
+                evidence=[reference.model_copy(deep=True) for reference in evidence_refs],
             )
             meeting.recentOpenQuestions.insert(0, open_question)
             meeting.metrics.openQuestionsCount += 1
         meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
+
+    def _build_evidence_references(
+        self,
+        chunk: CaptureChunkSummary,
+        transcript_segments: list,
+        screen_events: list,
+    ) -> list[EvidenceReference]:
+        evidence_refs: list[EvidenceReference] = []
+
+        for segment in transcript_segments[:2]:
+            start_ms = max(
+                int((segment.startedAt - chunk.recordedAt).total_seconds() * 1000),
+                0,
+            )
+            end_ms = max(
+                int((segment.endedAt - chunk.recordedAt).total_seconds() * 1000),
+                start_ms,
+            )
+            evidence_refs.append(
+                EvidenceReference(
+                    chunkId=chunk.id,
+                    clientChunkId=chunk.clientChunkId,
+                    tStartMs=start_ms,
+                    tEndMs=end_ms,
+                    transcriptRef=segment.id,
+                    frameRef=None,
+                    note=f"{segment.speakerLabel}: {segment.text}",
+                )
+            )
+
+        if screen_events:
+            primary_screen_event = screen_events[0]
+            screen_end_ms = min(
+                chunk.durationMs,
+                primary_screen_event.frameTimestampMs + 1000,
+            )
+            evidence_refs.append(
+                EvidenceReference(
+                    chunkId=chunk.id,
+                    clientChunkId=chunk.clientChunkId,
+                    tStartMs=primary_screen_event.frameTimestampMs,
+                    tEndMs=max(screen_end_ms, primary_screen_event.frameTimestampMs),
+                    transcriptRef=None,
+                    frameRef=primary_screen_event.id,
+                    note=primary_screen_event.summary,
+                )
+            )
+
+        if not evidence_refs:
+            evidence_refs.append(
+                EvidenceReference(
+                    chunkId=chunk.id,
+                    clientChunkId=chunk.clientChunkId,
+                    tStartMs=0,
+                    tEndMs=chunk.durationMs,
+                    transcriptRef=None,
+                    frameRef=None,
+                    note="The capture chunk was processed without transcript or frame-level references.",
+                )
+            )
+
+        return evidence_refs[:4]
 
     def _persist_memory_matches(
         self,

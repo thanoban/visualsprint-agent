@@ -100,6 +100,7 @@ def test_processed_chunk_exposes_context_insight_and_memory_surfaces(client: Tes
     assert insight_payload["clientChunkId"] == "client-chunk-1001"
     assert len(insight_payload["focusAreas"]) >= 2
     assert len(insight_payload["memoryQueries"]) >= 1
+    assert context_payload["meetingState"]["openDecisions"][0]["evidence"][0]["clientChunkId"] == "client-chunk-1001"
 
     memory_response = client.post(
         f"/api/meetings/{meeting_id}/memory/search-prior-outcomes",
@@ -171,6 +172,8 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     assert len(summary_packet["reportChecklist"]) >= 4
     assert len(summary_packet["timelineHighlights"]) >= 1
     assert len(summary_packet["decisions"]) >= 2
+    assert len(summary_packet["decisions"][0]["evidence"]) >= 1
+    assert summary_packet["decisions"][0]["evidence"][0]["clientChunkId"] == "client-chunk-2001"
 
     end_response = client.post(f"/api/meetings/{meeting_id}/end")
     assert end_response.status_code == 200
@@ -181,6 +184,8 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     assert final_report["meetingId"] == meeting_id
     assert len(final_report["decisions"]) >= 2
     assert len(final_report["openQuestions"]) >= 1
+    assert len(final_report["decisions"][0]["evidence"]) >= 1
+    assert final_report["decisions"][0]["evidence"][0]["transcriptRef"] is not None
 
     ended_summary_response = client.get(f"/api/meetings/{meeting_id}/summary-packet")
     assert ended_summary_response.status_code == 200

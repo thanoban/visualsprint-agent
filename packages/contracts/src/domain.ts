@@ -164,12 +164,23 @@ export interface ScreenEvent {
   recordedAt: string;
 }
 
+export interface EvidenceReference {
+  chunkId: string;
+  clientChunkId: string;
+  tStartMs: number;
+  tEndMs: number;
+  transcriptRef: null | string;
+  frameRef: null | string;
+  note: string;
+}
+
 export interface DecisionRecord {
   id: string;
   title: string;
   rationale: string;
   speakerLabel: string;
   recordedAt: string;
+  evidence: EvidenceReference[];
 }
 
 export interface CommitmentRecord {
@@ -178,6 +189,7 @@ export interface CommitmentRecord {
   action: string;
   dueHint: string;
   recordedAt: string;
+  evidence: EvidenceReference[];
 }
 
 export interface BlockerRecord {
@@ -186,6 +198,7 @@ export interface BlockerRecord {
   severity: BlockerSeverity;
   ownerLabel: string;
   recordedAt: string;
+  evidence: EvidenceReference[];
 }
 
 export interface MemoryMatch {
@@ -205,6 +218,7 @@ export interface OpenQuestionRecord {
   question: string;
   speakerLabel: string;
   recordedAt: string;
+  evidence: EvidenceReference[];
 }
 
 export interface MeetingDetail extends MeetingSummary {
