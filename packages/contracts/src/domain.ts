@@ -308,6 +308,12 @@ export interface SearchPriorOutcomesResponse {
   matches: MemoryMatch[];
 }
 
+export interface MeetingStreamEvent {
+  type: "meeting.updated";
+  revision: number;
+  meeting: MeetingDetail;
+}
+
 export interface ServiceHealth {
   service: string;
   status: "ok";

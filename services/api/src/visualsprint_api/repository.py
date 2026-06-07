@@ -122,6 +122,7 @@ class MeetingStore:
     _chunk_context_by_client_id: dict[tuple[str, str], ChunkContext] = field(
         default_factory=dict
     )
+    _meeting_revisions: dict[str, int] = field(default_factory=dict)
     _lock: Lock = field(default_factory=Lock)
 
     def list_meetings(self) -> list[MeetingSummary]:
@@ -173,6 +174,7 @@ class MeetingStore:
 
         with self._lock:
             self._meetings[meeting_id] = detail
+            self._meeting_revisions[meeting_id] = 0
 
         return detail
 
@@ -180,6 +182,12 @@ class MeetingStore:
         with self._lock:
             meeting = self._meetings.get(meeting_id)
             return None if meeting is None else meeting.model_copy(deep=True)
+
+    def get_meeting_revision(self, meeting_id: str) -> int | None:
+        with self._lock:
+            if meeting_id not in self._meetings:
+                return None
+            return self._meeting_revisions.get(meeting_id, 0)
 
     def start_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -204,6 +212,7 @@ class MeetingStore:
                         ),
                     ),
                 )
+                self._mark_meeting_updated(meeting.id)
             return meeting.model_copy(deep=True)
 
     def get_meeting_state(self, meeting_id: str) -> MeetingStateSnapshot | None:
@@ -309,6 +318,7 @@ class MeetingStore:
                         ),
                     ),
                 )
+                self._mark_meeting_updated(meeting.id)
             return meeting.model_copy(deep=True)
 
     def start_capture_session(
@@ -351,6 +361,7 @@ class MeetingStore:
                     ),
                 ),
             )
+            self._mark_meeting_updated(meeting.id)
 
             return meeting.model_copy(deep=True), capture_session.model_copy(deep=True)
 
@@ -444,6 +455,7 @@ class MeetingStore:
             )
             self._mark_chunk_upload_ready(meeting, chunk)
             meeting.latestEvents = meeting.latestEvents[:12]
+            self._mark_meeting_updated(meeting.id)
 
             return (
                 meeting.model_copy(deep=True),
@@ -483,6 +495,7 @@ class MeetingStore:
             self._mark_chunk_uploaded(meeting, chunk)
             self._apply_mock_processing(meeting, chunk)
             meeting.latestEvents = meeting.latestEvents[:12]
+            self._mark_meeting_updated(meeting.id)
 
             return (
                 meeting.model_copy(deep=True),
@@ -515,6 +528,7 @@ class MeetingStore:
                     ),
                 ),
             )
+            self._mark_meeting_updated(meeting.id)
 
             return meeting.model_copy(deep=True), meeting.activeCaptureSession.model_copy(
                 deep=True
@@ -776,6 +790,9 @@ class MeetingStore:
                 for open_question in meeting.recentOpenQuestions
             ],
         )
+
+    def _mark_meeting_updated(self, meeting_id: str) -> None:
+        self._meeting_revisions[meeting_id] = self._meeting_revisions.get(meeting_id, 0) + 1
 
 
 repository = MeetingStore()

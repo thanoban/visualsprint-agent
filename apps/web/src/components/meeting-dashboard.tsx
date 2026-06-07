@@ -25,6 +25,7 @@ import {
   completeCaptureChunkUpload,
   completeCaptureSession,
   createMeeting,
+  getMeetingEventsUrl,
   endMeeting,
   getApiBaseUrl,
   getMeeting,
@@ -32,6 +33,7 @@ import {
   registerCaptureChunk,
   startCaptureSession,
   startMeeting,
+  type MeetingStreamEvent,
 } from "../lib/api";
 
 const initialDraft: CreateMeetingRequest = {
@@ -48,6 +50,7 @@ type CaptureSupport = {
 };
 
 type CapturePhase = "idle" | "requesting" | "recording" | "stopping";
+type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 
 type CaptureResources = {
   stream: MediaStream;
@@ -64,6 +67,7 @@ export function MeetingDashboard() {
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [capturePhase, setCapturePhase] = useState<CapturePhase>("idle");
+  const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -123,6 +127,37 @@ export function MeetingDashboard() {
       cleanupCaptureRef.current?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id) {
+      return;
+    }
+    if (typeof EventSource === "undefined") {
+      return;
+    }
+
+    const eventSource = new EventSource(getMeetingEventsUrl(selectedMeeting.id));
+
+    const handleMeetingUpdated = (event: MessageEvent<string>) => {
+      const payload = JSON.parse(event.data) as MeetingStreamEvent;
+      applyMeeting(payload.meeting);
+      setStreamStatus("live");
+    };
+
+    eventSource.onopen = () => {
+      setStreamStatus("live");
+    };
+    eventSource.addEventListener("meeting.updated", handleMeetingUpdated as EventListener);
+    eventSource.onerror = () => {
+      setStreamStatus("reconnecting");
+    };
+
+    return () => {
+      eventSource.removeEventListener("meeting.updated", handleMeetingUpdated as EventListener);
+      eventSource.close();
+      setStreamStatus("idle");
+    };
+  }, [selectedMeeting?.id]);
 
   const captureSupport: CaptureSupport | null =
     !isClient
@@ -357,6 +392,7 @@ export function MeetingDashboard() {
               <Metric label="API base URL" value={getApiBaseUrl()} />
               <Metric label="Meetings in memory" value={String(meetings.length)} />
               <Metric label="Capture phase" value={capturePhase} />
+              <Metric label="Stream" value={streamStatus} />
             </div>
           </div>
         </header>

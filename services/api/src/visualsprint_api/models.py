@@ -281,3 +281,9 @@ class SearchPriorOutcomesRequest(BaseModel):
 
 class SearchPriorOutcomesResponse(BaseModel):
     matches: list[MemoryMatch]
+
+
+class MeetingStreamEvent(BaseModel):
+    type: Literal["meeting.updated"] = "meeting.updated"
+    revision: int = Field(ge=0)
+    meeting: MeetingDetail
