@@ -1,0 +1,36 @@
+{
+  "fixtureId": "reasoning_resolved_commitment",
+  "kind": "reasoning",
+  "description": "A completed follow-up should still flow through the reasoning contract cleanly.",
+  "payload": {
+    "meetingId": "mtg_eval_commitment_001",
+    "meetingTitle": "Release handoff",
+    "meetingNotes": "Track completed checklist items and remaining gaps.",
+    "clientChunkId": "client-chunk-eval-commitment-001",
+    "focusSummary": "The owner confirmed the rollout checklist was published and attached to the ticket.",
+    "attentionFlags": [
+      "Resolved follow-up"
+    ],
+    "reasoningChecklist": [
+      "Preserve the durable state change",
+      "Keep evidence for the completed handoff"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "commitment",
+        "summary": "Checklist publication completed",
+        "detail": "The release checklist is now attached and available to the broader team, closing the previous handoff gap.",
+        "evidence": [
+          "Jordan: The checklist is published and linked in the ticket now."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}
