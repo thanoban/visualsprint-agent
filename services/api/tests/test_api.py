@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi.testclient import TestClient
 
 
@@ -329,3 +331,57 @@ def test_resolved_records_leave_open_state_and_can_reopen(client: TestClient):
         document for document in reopened_index_documents if document["id"] == target_decision["id"]
     )
     assert reopened_document["status"] == "reopened"
+
+
+def test_chunk_processing_can_use_service_boundary_processors(client: TestClient, monkeypatch):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-5001", sequence=2)
+    assert register_response.status_code == 200
+
+    from visualsprint_api.models import ScreenEvent, TranscriptSegment
+
+    def fake_transcript_processor(chunk):
+        return [
+            TranscriptSegment(
+                id="trn_service_001",
+                speakerLabel="ServiceAvery",
+                startedAt=chunk.recordedAt,
+                endedAt=chunk.recordedAt,
+                text="Service boundary transcript processor supplied this segment.",
+            ),
+            TranscriptSegment(
+                id="trn_service_002",
+                speakerLabel="ServiceJordan",
+                startedAt=chunk.recordedAt,
+                endedAt=chunk.recordedAt,
+                text="A second transcript segment arrived from the ingest service surface.",
+            ),
+        ]
+
+    def fake_media_processor(chunk):
+        return (
+            7,
+            [
+                ScreenEvent(
+                    id="scr_service_001",
+                    kind="terminal",
+                    summary="Service boundary media processor supplied this visual event.",
+                    frameTimestampMs=1200,
+                    recordedAt=chunk.recordedAt,
+                )
+            ],
+        )
+
+    monkeypatch.setattr("visualsprint_api.repository.process_transcript_chunk", fake_transcript_processor)
+    monkeypatch.setattr("visualsprint_api.repository.process_media_chunk", fake_media_processor)
+
+    _process_chunk(client, meeting_id, "client-chunk-5001")
+
+    context_response = client.get(
+        f"/api/meetings/{meeting_id}/capture-sessions/chunks/client-chunk-5001/context"
+    )
+    assert context_response.status_code == 200
+    payload = context_response.json()["chunkContext"]
+    assert payload["transcriptSegments"][0]["speakerLabel"] == "ServiceAvery"
+    assert payload["screenEvents"][0]["summary"] == "Service boundary media processor supplied this visual event."

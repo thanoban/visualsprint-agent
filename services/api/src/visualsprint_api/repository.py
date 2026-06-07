@@ -10,7 +10,6 @@ from uuid import uuid4
 
 from visualsprint_api.config import settings
 from visualsprint_api.insight_pipeline import build_chunk_insight
-from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
     AgentBlockerInput,
     AgentCommitmentInput,
@@ -43,8 +42,8 @@ from visualsprint_api.models import (
     MeetingMetrics,
     MeetingSummary,
 )
+from visualsprint_api.service_clients import process_media_chunk, process_transcript_chunk
 from visualsprint_api.summary_pipeline import build_meeting_summary_packet
-from visualsprint_api.transcript_pipeline import build_transcript_segments
 
 
 def _utc_now() -> datetime:
@@ -779,8 +778,8 @@ class MeetingStore:
     ) -> None:
         recorded_at = chunk.recordedAt
         template_index = (chunk.sequence - 1) % len(DECISION_TEMPLATES)
-        transcript_segments = build_transcript_segments(chunk)
-        frame_count, screen_events = build_screen_events(chunk)
+        transcript_segments = process_transcript_chunk(chunk)
+        frame_count, screen_events = process_media_chunk(chunk)
         final_end = transcript_segments[-1].endedAt
 
         meeting.recentTranscriptSegments = (
