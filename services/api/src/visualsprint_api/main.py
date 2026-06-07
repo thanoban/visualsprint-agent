@@ -11,6 +11,7 @@ from visualsprint_api.routes.health import router as health_router
 from visualsprint_api.routes.memory import router as memory_router
 from visualsprint_api.routes.meta import router as meta_router
 from visualsprint_api.routes.meetings import router as meetings_router
+from visualsprint_api.routes.outputs import router as outputs_router
 
 
 app = FastAPI(
@@ -33,6 +34,7 @@ app.include_router(meta_router, prefix="/api")
 app.include_router(meetings_router, prefix="/api")
 app.include_router(capture_router, prefix="/api")
 app.include_router(memory_router, prefix="/api")
+app.include_router(outputs_router, prefix="/api")
 
 
 @app.get("/")
