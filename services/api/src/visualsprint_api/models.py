@@ -27,6 +27,7 @@ CaptureChunkUploadStatus = Literal["pending", "ready", "uploaded"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
 MemoryMatchRelation = Literal["new", "recurring", "reopened", "resolved_previously"]
+ReasoningRecordStatus = Literal["open", "updated", "resolved", "reopened"]
 ReasoningRecordType = Literal["decision", "commitment", "blocker", "open_question"]
 ScreenEventKind = Literal[
     "code_editor",
@@ -140,6 +141,9 @@ class DecisionRecord(BaseModel):
     title: str = Field(min_length=4, max_length=180)
     rationale: str = Field(min_length=8, max_length=500)
     speakerLabel: str = Field(min_length=2, max_length=60)
+    status: ReasoningRecordStatus
+    firstSeenChunkId: str = Field(min_length=8, max_length=120)
+    lastUpdatedChunkId: str = Field(min_length=8, max_length=120)
     recordedAt: datetime
     evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
@@ -149,6 +153,9 @@ class CommitmentRecord(BaseModel):
     ownerLabel: str = Field(min_length=2, max_length=60)
     action: str = Field(min_length=6, max_length=220)
     dueHint: str = Field(min_length=2, max_length=60)
+    status: ReasoningRecordStatus
+    firstSeenChunkId: str = Field(min_length=8, max_length=120)
+    lastUpdatedChunkId: str = Field(min_length=8, max_length=120)
     recordedAt: datetime
     evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
@@ -158,6 +165,9 @@ class BlockerRecord(BaseModel):
     summary: str = Field(min_length=6, max_length=220)
     severity: BlockerSeverity
     ownerLabel: str = Field(min_length=2, max_length=60)
+    status: ReasoningRecordStatus
+    firstSeenChunkId: str = Field(min_length=8, max_length=120)
+    lastUpdatedChunkId: str = Field(min_length=8, max_length=120)
     recordedAt: datetime
     evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 
@@ -178,6 +188,9 @@ class OpenQuestionRecord(BaseModel):
     id: str
     question: str = Field(min_length=8, max_length=240)
     speakerLabel: str = Field(min_length=2, max_length=60)
+    status: ReasoningRecordStatus
+    firstSeenChunkId: str = Field(min_length=8, max_length=120)
+    lastUpdatedChunkId: str = Field(min_length=8, max_length=120)
     recordedAt: datetime
     evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
 

@@ -190,3 +190,52 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     ended_summary_response = client.get(f"/api/meetings/{meeting_id}/summary-packet")
     assert ended_summary_response.status_code == 200
     assert ended_summary_response.json()["summaryPacket"]["meetingStatus"] == "ended"
+
+
+def test_repeated_agent_outputs_update_existing_records_instead_of_duplicating(client: TestClient):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-3001", sequence=1)
+    assert register_response.status_code == 200
+    _process_chunk(client, meeting_id, "client-chunk-3001")
+
+    payload = {
+        "clientChunkId": "client-chunk-3001",
+        "decisions": [
+            {
+                "title": "Publish the rollback plan before the next deploy",
+                "rationale": "The team wants the deployment handoff documented before release work continues.",
+                "speakerLabel": "Jordan",
+            }
+        ],
+        "commitments": [],
+        "blockers": [],
+        "openQuestions": [],
+        "memoryMatches": [],
+    }
+
+    first_response = client.post(f"/api/meetings/{meeting_id}/outputs/register", json=payload)
+    assert first_response.status_code == 200
+    first_meeting = first_response.json()["meeting"]
+    first_decision = next(
+        decision
+        for decision in first_meeting["recentDecisions"]
+        if decision["title"] == "Publish the rollback plan before the next deploy"
+    )
+    first_decision_id = first_decision["id"]
+    first_decisions_count = first_meeting["metrics"]["decisionsCount"]
+    assert first_decision["status"] == "open"
+
+    second_response = client.post(f"/api/meetings/{meeting_id}/outputs/register", json=payload)
+    assert second_response.status_code == 200
+    second_meeting = second_response.json()["meeting"]
+    second_decision = next(
+        decision
+        for decision in second_meeting["recentDecisions"]
+        if decision["title"] == "Publish the rollback plan before the next deploy"
+    )
+    assert second_decision["id"] == first_decision_id
+    assert second_decision["status"] == "updated"
+    assert second_decision["firstSeenChunkId"] == "client-chunk-3001"
+    assert second_decision["lastUpdatedChunkId"] == "client-chunk-3001"
+    assert second_meeting["metrics"]["decisionsCount"] == first_decisions_count

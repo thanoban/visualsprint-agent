@@ -1371,11 +1371,17 @@ function SignalColumn({
 function DecisionCard({ decision }: { decision: DecisionRecord }) {
   return (
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-900">{decision.title}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{decision.title}</p>
+        <RecordStatusBadge status={decision.status} />
+      </div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{decision.rationale}</p>
       <EvidenceList evidence={decision.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
-        {decision.speakerLabel} · {formatTimestamp(decision.recordedAt)}
+        {decision.speakerLabel} · {decision.firstSeenChunkId} {"->"} {decision.lastUpdatedChunkId}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        {formatTimestamp(decision.recordedAt)}
       </p>
     </article>
   );
@@ -1384,11 +1390,17 @@ function DecisionCard({ decision }: { decision: DecisionRecord }) {
 function CommitmentCard({ commitment }: { commitment: CommitmentRecord }) {
   return (
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-900">{commitment.ownerLabel}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{commitment.ownerLabel}</p>
+        <RecordStatusBadge status={commitment.status} />
+      </div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{commitment.action}</p>
       <EvidenceList evidence={commitment.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
-        Due {commitment.dueHint} · {formatTimestamp(commitment.recordedAt)}
+        Due {commitment.dueHint} · {commitment.firstSeenChunkId} {"->"} {commitment.lastUpdatedChunkId}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        {formatTimestamp(commitment.recordedAt)}
       </p>
     </article>
   );
@@ -1399,13 +1411,19 @@ function BlockerCard({ blocker }: { blocker: BlockerRecord }) {
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-slate-900">{blocker.summary}</p>
-        <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-amber-800">
-          {blocker.severity}
-        </span>
+        <div className="flex gap-2">
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-amber-800">
+            {blocker.severity}
+          </span>
+          <RecordStatusBadge status={blocker.status} />
+        </div>
       </div>
       <EvidenceList evidence={blocker.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
-        Owner {blocker.ownerLabel} · {formatTimestamp(blocker.recordedAt)}
+        Owner {blocker.ownerLabel} · {blocker.firstSeenChunkId} {"->"} {blocker.lastUpdatedChunkId}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        {formatTimestamp(blocker.recordedAt)}
       </p>
     </article>
   );
@@ -1491,6 +1509,27 @@ function SummaryHighlightCard({
   );
 }
 
+function RecordStatusBadge({
+  status,
+}: {
+  status: DecisionRecord["status"];
+}) {
+  const className =
+    status === "open"
+      ? "bg-emerald-100 text-emerald-800"
+      : status === "updated"
+        ? "bg-sky-100 text-sky-800"
+        : status === "reopened"
+          ? "bg-amber-100 text-amber-800"
+          : "bg-slate-200 text-slate-700";
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${className}`}>
+      {status}
+    </span>
+  );
+}
+
 function EvidenceList({
   evidence,
 }: {
@@ -1517,10 +1556,16 @@ function EvidenceList({
 function OpenQuestionCard({ openQuestion }: { openQuestion: OpenQuestionRecord }) {
   return (
     <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
-      <p className="text-sm font-semibold text-slate-900">{openQuestion.question}</p>
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{openQuestion.question}</p>
+        <RecordStatusBadge status={openQuestion.status} />
+      </div>
       <EvidenceList evidence={openQuestion.evidence} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
-        {openQuestion.speakerLabel} · {formatTimestamp(openQuestion.recordedAt)}
+        {openQuestion.speakerLabel} · {openQuestion.firstSeenChunkId} {"->"} {openQuestion.lastUpdatedChunkId}
+      </p>
+      <p className="mt-2 text-xs text-slate-500">
+        {formatTimestamp(openQuestion.recordedAt)}
       </p>
     </article>
   );
