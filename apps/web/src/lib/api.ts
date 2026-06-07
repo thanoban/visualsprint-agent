@@ -6,6 +6,7 @@ import type {
   CreateMeetingRequest,
   CreateMeetingResponse,
   FinalReportResponse,
+  IndexedOutcomeDocumentsResponse,
   MeetingSummaryPacketResponse,
   MeetingStreamEvent,
   MeetingDetailResponse,
@@ -84,6 +85,12 @@ export function getChunkInsight(meetingId: string, clientChunkId: string) {
 
 export function getSummaryPacket(meetingId: string) {
   return request<MeetingSummaryPacketResponse>(`/api/meetings/${meetingId}/summary-packet`);
+}
+
+export function getIndexedOutcomeDocuments(meetingId: string) {
+  return request<IndexedOutcomeDocumentsResponse>(
+    `/api/meetings/${meetingId}/memory/index-documents`,
+  );
 }
 
 export function finalizeReport(meetingId: string) {

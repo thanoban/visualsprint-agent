@@ -388,6 +388,28 @@ export interface SearchPriorOutcomesResponse {
   matches: MemoryMatch[];
 }
 
+export interface IndexedOutcomeDocument {
+  id: string;
+  meetingId: string;
+  recordType: ReasoningRecordType;
+  summary: string;
+  detail: string;
+  status: ReasoningRecordStatus;
+  ownerLabel: null | string;
+  speakerLabel: null | string;
+  dueHint: null | string;
+  severity: null | BlockerSeverity;
+  firstSeenChunkId: string;
+  lastUpdatedChunkId: string;
+  createdAt: string;
+  updatedAt: string;
+  evidence: EvidenceReference[];
+}
+
+export interface IndexedOutcomeDocumentsResponse {
+  documents: IndexedOutcomeDocument[];
+}
+
 export interface MeetingStreamEvent {
   type: "meeting.updated";
   revision: number;

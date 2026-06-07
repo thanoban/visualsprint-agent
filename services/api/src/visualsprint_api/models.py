@@ -363,6 +363,28 @@ class SearchPriorOutcomesResponse(BaseModel):
     matches: list[MemoryMatch]
 
 
+class IndexedOutcomeDocument(BaseModel):
+    id: str
+    meetingId: str
+    recordType: ReasoningRecordType
+    summary: str = Field(min_length=4, max_length=240)
+    detail: str = Field(min_length=6, max_length=600)
+    status: ReasoningRecordStatus
+    ownerLabel: str | None = Field(default=None, min_length=2, max_length=60)
+    speakerLabel: str | None = Field(default=None, min_length=2, max_length=60)
+    dueHint: str | None = Field(default=None, min_length=2, max_length=60)
+    severity: BlockerSeverity | None = None
+    firstSeenChunkId: str = Field(min_length=8, max_length=120)
+    lastUpdatedChunkId: str = Field(min_length=8, max_length=120)
+    createdAt: datetime
+    updatedAt: datetime
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
+
+
+class IndexedOutcomeDocumentsResponse(BaseModel):
+    documents: list[IndexedOutcomeDocument] = Field(default_factory=list)
+
+
 ChunkInsight.model_rebuild()
 ChunkInsightResponse.model_rebuild()
 MeetingSummaryPacket.model_rebuild()

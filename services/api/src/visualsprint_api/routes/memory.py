@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from visualsprint_api.models import (
+    IndexedOutcomeDocumentsResponse,
     SearchPriorOutcomesRequest,
     SearchPriorOutcomesResponse,
 )
@@ -22,3 +23,11 @@ def search_prior_outcomes(
     if matches is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
     return SearchPriorOutcomesResponse(matches=matches)
+
+
+@router.get("/index-documents", response_model=IndexedOutcomeDocumentsResponse)
+def list_index_documents(meeting_id: str) -> IndexedOutcomeDocumentsResponse:
+    documents = repository.list_indexed_outcomes(meeting_id)
+    if documents is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
+    return IndexedOutcomeDocumentsResponse(documents=documents)

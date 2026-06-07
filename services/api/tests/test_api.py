@@ -175,6 +175,12 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     assert len(summary_packet["decisions"][0]["evidence"]) >= 1
     assert summary_packet["decisions"][0]["evidence"][0]["clientChunkId"] == "client-chunk-2001"
 
+    index_documents_response = client.get(f"/api/meetings/{meeting_id}/memory/index-documents")
+    assert index_documents_response.status_code == 200
+    index_documents = index_documents_response.json()["documents"]
+    assert len(index_documents) >= 4
+    assert any(document["recordType"] == "decision" for document in index_documents)
+
     end_response = client.post(f"/api/meetings/{meeting_id}/end")
     assert end_response.status_code == 200
 
@@ -280,6 +286,11 @@ def test_resolved_records_leave_open_state_and_can_reopen(client: TestClient):
         decision["id"] != target_decision["id"]
         for decision in resolve_response.json()["meetingState"]["openDecisions"]
     )
+    resolved_index_documents = client.get(f"/api/meetings/{meeting_id}/memory/index-documents").json()["documents"]
+    resolved_document = next(
+        document for document in resolved_index_documents if document["id"] == target_decision["id"]
+    )
+    assert resolved_document["status"] == "resolved"
 
     reopen_response = client.post(
         f"/api/meetings/{meeting_id}/outputs/register",
@@ -313,3 +324,8 @@ def test_resolved_records_leave_open_state_and_can_reopen(client: TestClient):
         decision["id"] == target_decision["id"]
         for decision in reopen_response.json()["meetingState"]["openDecisions"]
     )
+    reopened_index_documents = client.get(f"/api/meetings/{meeting_id}/memory/index-documents").json()["documents"]
+    reopened_document = next(
+        document for document in reopened_index_documents if document["id"] == target_decision["id"]
+    )
+    assert reopened_document["status"] == "reopened"

@@ -13,6 +13,7 @@ import {
   type CreateMeetingRequest,
   type DecisionRecord,
   type FinalReport,
+  type IndexedOutcomeDocument,
   type MemoryMatch,
   type MeetingDetail,
   type MeetingSummaryPacket,
@@ -31,6 +32,7 @@ import {
   finalizeReport,
   getChunkInsight,
   getFinalReport,
+  getIndexedOutcomeDocuments,
   getMeetingEventsUrl,
   getSummaryPacket,
   endMeeting,
@@ -78,6 +80,7 @@ export function MeetingDashboard() {
   const [finalReport, setFinalReport] = useState<FinalReport | null>(null);
   const [chunkInsight, setChunkInsight] = useState<ChunkInsight | null>(null);
   const [summaryPacket, setSummaryPacket] = useState<MeetingSummaryPacket | null>(null);
+  const [indexedOutcomes, setIndexedOutcomes] = useState<IndexedOutcomeDocument[]>([]);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -219,6 +222,34 @@ export function MeetingDashboard() {
     selectedMeeting?.metrics.blockersCount,
     selectedMeeting?.metrics.openQuestionsCount,
     selectedMeeting?.metrics.memoryMatchesCount,
+  ]);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id) {
+      startTransition(() => {
+        setIndexedOutcomes([]);
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await getIndexedOutcomeDocuments(selectedMeeting.id);
+        startTransition(() => {
+          setIndexedOutcomes(response.documents);
+        });
+      } catch {
+        startTransition(() => {
+          setIndexedOutcomes([]);
+        });
+      }
+    })();
+  }, [
+    selectedMeeting?.id,
+    selectedMeeting?.metrics.decisionsCount,
+    selectedMeeting?.metrics.commitmentsCount,
+    selectedMeeting?.metrics.blockersCount,
+    selectedMeeting?.metrics.openQuestionsCount,
   ]);
 
   useEffect(() => {
@@ -1032,6 +1063,25 @@ export function MeetingDashboard() {
               )}
             </Card>
 
+            <Card title="Indexed outcomes" eyebrow="Elastic write-back preview">
+              {selectedMeeting ? (
+                <SignalColumn
+                  title="Index documents"
+                  emptyTitle="No indexed outcomes yet"
+                  emptyBody="Structured outputs will project into deterministic index documents here."
+                >
+                  {indexedOutcomes.map((document) => (
+                    <IndexedOutcomeCard key={document.id} document={document} />
+                  ))}
+                </SignalColumn>
+              ) : (
+                <EmptyState
+                  title="No index target"
+                  body="Choose a meeting to inspect the future Elastic write-back projection."
+                />
+              )}
+            </Card>
+
             <Card title="Final report" eyebrow="Hero deliverable">
               {selectedMeeting?.status === "ended" && finalReport?.meetingId === selectedMeeting.id ? (
                 <div className="space-y-5">
@@ -1505,6 +1555,28 @@ function SummaryHighlightCard({
       </div>
       <p className="mt-2 text-sm leading-6 text-slate-600">{highlight.detail}</p>
       <p className="mt-3 text-xs text-slate-500">{formatTimestamp(highlight.recordedAt)}</p>
+    </article>
+  );
+}
+
+function IndexedOutcomeCard({ document }: { document: IndexedOutcomeDocument }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-sm font-semibold text-slate-900">{document.summary}</p>
+        <div className="flex gap-2">
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            {document.recordType.replace("_", " ")}
+          </span>
+          <RecordStatusBadge status={document.status} />
+        </div>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{document.detail}</p>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        {document.firstSeenChunkId} {"->"} {document.lastUpdatedChunkId}
+      </p>
+      <EvidenceList evidence={document.evidence} />
+      <p className="mt-2 text-xs text-slate-500">{formatTimestamp(document.updatedAt)}</p>
     </article>
   );
 }

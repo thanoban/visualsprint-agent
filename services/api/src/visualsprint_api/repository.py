@@ -29,6 +29,7 @@ from visualsprint_api.models import (
     DecisionRecord,
     EvidenceReference,
     FinalReport,
+    IndexedOutcomeDocument,
     MeetingStateSnapshot,
     MeetingSummaryPacket,
     OpenQuestionRecord,
@@ -137,6 +138,7 @@ class MeetingStore:
     )
     _meeting_revisions: dict[str, int] = field(default_factory=dict)
     _final_reports: dict[str, FinalReport] = field(default_factory=dict)
+    _indexed_outcomes: dict[tuple[str, str], IndexedOutcomeDocument] = field(default_factory=dict)
     _lock: Lock = field(default_factory=Lock)
 
     def reset(self) -> None:
@@ -148,6 +150,7 @@ class MeetingStore:
             self._chunk_context_by_client_id.clear()
             self._meeting_revisions.clear()
             self._final_reports.clear()
+            self._indexed_outcomes.clear()
 
     def list_meetings(self) -> list[MeetingSummary]:
         with self._lock:
@@ -227,6 +230,18 @@ class MeetingStore:
                 meeting=meeting.model_copy(deep=True),
                 meeting_state=self._build_meeting_state(meeting),
             )
+
+    def list_indexed_outcomes(self, meeting_id: str) -> list[IndexedOutcomeDocument] | None:
+        with self._lock:
+            if meeting_id not in self._meetings:
+                return None
+            documents = [
+                document.model_copy(deep=True)
+                for (document_meeting_id, _), document in self._indexed_outcomes.items()
+                if document_meeting_id == meeting_id
+            ]
+            documents.sort(key=lambda document: document.updatedAt, reverse=True)
+            return documents
 
     def start_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -1102,6 +1117,7 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> int:
         return self._resolve_reasoning_records(
+            meeting_id=meeting.id,
             records=meeting.recentDecisions,
             record_ids=decision_ids,
             recorded_at=recorded_at,
@@ -1118,6 +1134,7 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> int:
         return self._resolve_reasoning_records(
+            meeting_id=meeting.id,
             records=meeting.recentCommitments,
             record_ids=commitment_ids,
             recorded_at=recorded_at,
@@ -1134,6 +1151,7 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> int:
         return self._resolve_reasoning_records(
+            meeting_id=meeting.id,
             records=meeting.recentBlockers,
             record_ids=blocker_ids,
             recorded_at=recorded_at,
@@ -1150,6 +1168,7 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> int:
         return self._resolve_reasoning_records(
+            meeting_id=meeting.id,
             records=meeting.recentOpenQuestions,
             record_ids=open_question_ids,
             recorded_at=recorded_at,
@@ -1167,7 +1186,7 @@ class MeetingStore:
         chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> DecisionRecord:
-        return self._upsert_reasoning_record(
+        record = self._upsert_reasoning_record(
             meeting=meeting,
             records=meeting.recentDecisions,
             metric_attr="decisionsCount",
@@ -1196,6 +1215,8 @@ class MeetingStore:
             ),
             key_getter=lambda record: self._normalize_key(record.title),
         )
+        self._index_decision(meeting.id, record)
+        return record
 
     def _upsert_commitment(
         self,
@@ -1207,7 +1228,7 @@ class MeetingStore:
         chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> CommitmentRecord:
-        return self._upsert_reasoning_record(
+        record = self._upsert_reasoning_record(
             meeting=meeting,
             records=meeting.recentCommitments,
             metric_attr="commitmentsCount",
@@ -1236,6 +1257,8 @@ class MeetingStore:
             ),
             key_getter=lambda record: self._normalize_key(record.ownerLabel, record.action),
         )
+        self._index_commitment(meeting.id, record)
+        return record
 
     def _upsert_blocker(
         self,
@@ -1247,7 +1270,7 @@ class MeetingStore:
         chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> BlockerRecord:
-        return self._upsert_reasoning_record(
+        record = self._upsert_reasoning_record(
             meeting=meeting,
             records=meeting.recentBlockers,
             metric_attr="blockersCount",
@@ -1276,6 +1299,8 @@ class MeetingStore:
             ),
             key_getter=lambda record: self._normalize_key(record.summary),
         )
+        self._index_blocker(meeting.id, record)
+        return record
 
     def _upsert_open_question(
         self,
@@ -1286,7 +1311,7 @@ class MeetingStore:
         chunk_client_id: str,
         evidence_refs: list[EvidenceReference],
     ) -> OpenQuestionRecord:
-        return self._upsert_reasoning_record(
+        record = self._upsert_reasoning_record(
             meeting=meeting,
             records=meeting.recentOpenQuestions,
             metric_attr="openQuestionsCount",
@@ -1313,6 +1338,8 @@ class MeetingStore:
             ),
             key_getter=lambda record: self._normalize_key(record.question),
         )
+        self._index_open_question(meeting.id, record)
+        return record
 
     def _upsert_reasoning_record(
         self,
@@ -1342,6 +1369,7 @@ class MeetingStore:
 
     def _resolve_reasoning_records(
         self,
+        meeting_id: str,
         records: list,
         record_ids: list[str],
         recorded_at: datetime,
@@ -1363,6 +1391,7 @@ class MeetingStore:
                 )
                 records.pop(index)
                 records.insert(0, updated_record)
+                self._index_record(meeting_id, updated_record)
                 resolved_count += 1
                 break
         del records[6:]
@@ -1435,6 +1464,96 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> list[EvidenceReference]:
         return [reference.model_copy(deep=True) for reference in evidence_refs]
+
+    def _index_decision(self, meeting_id: str, record: DecisionRecord) -> None:
+        self._indexed_outcomes[(meeting_id, record.id)] = IndexedOutcomeDocument(
+            id=record.id,
+            meetingId=meeting_id,
+            recordType="decision",
+            summary=record.title,
+            detail=record.rationale,
+            status=record.status,
+            ownerLabel=None,
+            speakerLabel=record.speakerLabel,
+            dueHint=None,
+            severity=None,
+            firstSeenChunkId=record.firstSeenChunkId,
+            lastUpdatedChunkId=record.lastUpdatedChunkId,
+            createdAt=record.recordedAt,
+            updatedAt=record.recordedAt,
+            evidence=self._clone_evidence(record.evidence),
+        )
+
+    def _index_commitment(self, meeting_id: str, record: CommitmentRecord) -> None:
+        self._indexed_outcomes[(meeting_id, record.id)] = IndexedOutcomeDocument(
+            id=record.id,
+            meetingId=meeting_id,
+            recordType="commitment",
+            summary=record.action,
+            detail=f"{record.ownerLabel} committed to {record.action} with due hint {record.dueHint}.",
+            status=record.status,
+            ownerLabel=record.ownerLabel,
+            speakerLabel=None,
+            dueHint=record.dueHint,
+            severity=None,
+            firstSeenChunkId=record.firstSeenChunkId,
+            lastUpdatedChunkId=record.lastUpdatedChunkId,
+            createdAt=record.recordedAt,
+            updatedAt=record.recordedAt,
+            evidence=self._clone_evidence(record.evidence),
+        )
+
+    def _index_blocker(self, meeting_id: str, record: BlockerRecord) -> None:
+        self._indexed_outcomes[(meeting_id, record.id)] = IndexedOutcomeDocument(
+            id=record.id,
+            meetingId=meeting_id,
+            recordType="blocker",
+            summary=record.summary,
+            detail=f"Severity {record.severity}; owner {record.ownerLabel}.",
+            status=record.status,
+            ownerLabel=record.ownerLabel,
+            speakerLabel=None,
+            dueHint=None,
+            severity=record.severity,
+            firstSeenChunkId=record.firstSeenChunkId,
+            lastUpdatedChunkId=record.lastUpdatedChunkId,
+            createdAt=record.recordedAt,
+            updatedAt=record.recordedAt,
+            evidence=self._clone_evidence(record.evidence),
+        )
+
+    def _index_open_question(self, meeting_id: str, record: OpenQuestionRecord) -> None:
+        self._indexed_outcomes[(meeting_id, record.id)] = IndexedOutcomeDocument(
+            id=record.id,
+            meetingId=meeting_id,
+            recordType="open_question",
+            summary=record.question,
+            detail=f"Open question raised by {record.speakerLabel}.",
+            status=record.status,
+            ownerLabel=None,
+            speakerLabel=record.speakerLabel,
+            dueHint=None,
+            severity=None,
+            firstSeenChunkId=record.firstSeenChunkId,
+            lastUpdatedChunkId=record.lastUpdatedChunkId,
+            createdAt=record.recordedAt,
+            updatedAt=record.recordedAt,
+            evidence=self._clone_evidence(record.evidence),
+        )
+
+    def _index_record(
+        self,
+        meeting_id: str,
+        record,
+    ) -> None:
+        if isinstance(record, DecisionRecord):
+            self._index_decision(meeting_id, record)
+        elif isinstance(record, CommitmentRecord):
+            self._index_commitment(meeting_id, record)
+        elif isinstance(record, BlockerRecord):
+            self._index_blocker(meeting_id, record)
+        elif isinstance(record, OpenQuestionRecord):
+            self._index_open_question(meeting_id, record)
 
     def _next_record_status(self, current_status: str) -> str:
         if current_status == "resolved":
