@@ -42,6 +42,7 @@ import {
   getMeeting,
   listMeetings,
   registerCaptureChunk,
+  runCaptureChunkReasoning,
   startCaptureSession,
   startMeeting,
   type MeetingStreamEvent,
@@ -426,6 +427,12 @@ export function MeetingDashboard() {
             clientChunkId: payload.clientChunkId,
           });
           applyMeeting(uploadResponse.meeting);
+
+          const reasoningResponse = await runCaptureChunkReasoning(
+            selectedMeeting.id,
+            payload.clientChunkId,
+          );
+          applyMeeting(reasoningResponse.meeting);
         }).catch((chunkError) => {
           setError(getErrorMessage(chunkError));
         });
