@@ -1,0 +1,37 @@
+{
+  "fixtureId": "reasoning_noisy_chunk",
+  "kind": "reasoning",
+  "description": "A noisy chunk should still keep the response schema stable and evaluable.",
+  "payload": {
+    "meetingId": "mtg_eval_noise_001",
+    "meetingTitle": "General standup",
+    "meetingNotes": "This case stresses low-signal discussion.",
+    "clientChunkId": "client-chunk-eval-noise-001",
+    "focusSummary": "The chunk contains scattered discussion with weak durable signals.",
+    "attentionFlags": [
+      "Low confidence",
+      "Possible no-signal chunk"
+    ],
+    "reasoningChecklist": [
+      "Avoid over-claiming closure",
+      "Keep unresolved risk visible when in doubt"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "blocker",
+        "summary": "Signal quality is low",
+        "detail": "The conversation is short and indirect, so durable outputs should remain cautious and schema-valid.",
+        "evidence": [
+          "Speaker A: We might need to check that later."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}

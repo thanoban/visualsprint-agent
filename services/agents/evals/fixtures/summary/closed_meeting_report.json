@@ -1,0 +1,59 @@
+{
+  "fixtureId": "summary_closed_meeting_report",
+  "kind": "summary",
+  "description": "A closed meeting packet should produce a final report draft with the expected executive summary language.",
+  "payload": {
+    "meetingId": "mtg_eval_summary_001",
+    "meetingTitle": "Release wrap-up",
+    "meetingStatus": "ended",
+    "draftExecutiveSummary": "This meeting closed the release readiness review with concrete next steps.",
+    "decisions": [
+      {
+        "title": "Separate rollback readiness from the feature rollout",
+        "rationale": "The team wants a smaller validation surface before resuming release work.",
+        "speakerLabel": "ReasoningAgent",
+        "status": "open"
+      }
+    ],
+    "commitments": [
+      {
+        "ownerLabel": "Jordan",
+        "action": "Publish the release checklist handoff",
+        "dueHint": "Today",
+        "status": "open"
+      }
+    ],
+    "blockers": [
+      {
+        "summary": "Migration validation is still flaky in staging",
+        "severity": "medium",
+        "ownerLabel": "Mina",
+        "status": "open"
+      }
+    ],
+    "openQuestions": [
+      {
+        "question": "Who signs off on the final rollback gate?",
+        "speakerLabel": "ReasoningAgent",
+        "status": "open"
+      }
+    ],
+    "memoryHighlights": [
+      {
+        "summary": "A similar release issue appeared in a previous readiness review.",
+        "relation": "recurring",
+        "score": 0.81
+      }
+    ]
+  },
+  "expectations": {
+    "executiveSummaryIncludes": [
+      "closed the release readiness review",
+      "Historical memory matches were considered"
+    ],
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1
+  }
+}

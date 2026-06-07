@@ -1,0 +1,32 @@
+{
+  "fixtureId": "summary_live_meeting_preview",
+  "kind": "summary",
+  "description": "A live meeting packet should still return a report preview with the expected executive summary draft content.",
+  "payload": {
+    "meetingId": "mtg_eval_summary_002",
+    "meetingTitle": "Planning sync",
+    "meetingStatus": "live",
+    "draftExecutiveSummary": "This summary preview keeps live outcomes visible before the meeting ends.",
+    "decisions": [
+      {
+        "title": "Prioritize release stabilization first",
+        "rationale": "The team chose stability work over net-new feature scope.",
+        "speakerLabel": "ReasoningAgent",
+        "status": "open"
+      }
+    ],
+    "commitments": [],
+    "blockers": [],
+    "openQuestions": [],
+    "memoryHighlights": []
+  },
+  "expectations": {
+    "executiveSummaryIncludes": [
+      "summary preview keeps live outcomes visible"
+    ],
+    "minDecisions": 1,
+    "minCommitments": 0,
+    "minBlockers": 0,
+    "minOpenQuestions": 0
+  }
+}

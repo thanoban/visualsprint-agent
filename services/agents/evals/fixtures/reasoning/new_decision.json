@@ -1,0 +1,36 @@
+{
+  "fixtureId": "reasoning_new_decision",
+  "kind": "reasoning",
+  "description": "A clear alignment point should produce a durable decision payload.",
+  "payload": {
+    "meetingId": "mtg_eval_decision_001",
+    "meetingTitle": "Release readiness sync",
+    "meetingNotes": "Capture release path decisions and owner assignments.",
+    "clientChunkId": "client-chunk-eval-decision-001",
+    "focusSummary": "The team explicitly decided to separate the rollback checklist from the feature release.",
+    "attentionFlags": [
+      "Explicit alignment language detected"
+    ],
+    "reasoningChecklist": [
+      "Confirm the outcome is durable",
+      "Preserve the rationale"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "decision",
+        "summary": "Separate rollback readiness from feature deployment",
+        "detail": "The group wants a smaller release surface and a standalone rollback checklist before the feature resumes.",
+        "evidence": [
+          "Avery: Let us split rollback readiness into its own gate before we continue."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}

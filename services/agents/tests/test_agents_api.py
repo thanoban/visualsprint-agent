@@ -11,6 +11,11 @@ from visualsprint_agents.models import (
     SummaryPacketRequest,
 )
 from visualsprint_agents.config import build_settings
+from visualsprint_agents.evals import (
+    load_reasoning_eval_fixtures,
+    load_summary_eval_fixtures,
+    run_agent_eval_smoke,
+)
 from visualsprint_agents.main import app
 
 
@@ -231,3 +236,20 @@ def test_configured_cloud_falls_back_when_bridge_returns_none(monkeypatch):
         )
     )
     assert "Fallback summary path." in summary_response.executiveSummary
+
+
+def test_agent_eval_fixtures_load_and_cover_reasoning_and_summary():
+    reasoning_fixtures = load_reasoning_eval_fixtures()
+    summary_fixtures = load_summary_eval_fixtures()
+
+    assert len(reasoning_fixtures) >= 6
+    assert len(summary_fixtures) >= 2
+    assert any(fixture.fixtureId == "reasoning_new_decision" for fixture in reasoning_fixtures)
+    assert any(fixture.fixtureId == "summary_closed_meeting_report" for fixture in summary_fixtures)
+
+
+def test_agent_eval_smoke_runner_passes_fixture_set():
+    results = run_agent_eval_smoke()
+
+    assert len(results) >= 8
+    assert all(result.passed for result in results)

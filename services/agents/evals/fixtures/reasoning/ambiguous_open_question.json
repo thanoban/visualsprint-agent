@@ -1,0 +1,38 @@
+{
+  "fixtureId": "reasoning_ambiguous_open_question",
+  "kind": "reasoning",
+  "description": "Ambiguous discussion should still preserve an explicit open question for follow-up.",
+  "payload": {
+    "meetingId": "mtg_eval_ambiguity_001",
+    "meetingTitle": "Architecture review",
+    "meetingNotes": "Confirm ownership and unresolved scope edges.",
+    "clientChunkId": "client-chunk-eval-ambiguity-001",
+    "focusSummary": "The team discussed tradeoffs but did not fully close the ownership question.",
+    "attentionFlags": [
+      "Ambiguous ownership",
+      "Durable issue may still need a named next step"
+    ],
+    "reasoningChecklist": [
+      "Preserve unresolved follow-up questions",
+      "Avoid claiming closure without explicit evidence"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "open_question",
+        "summary": "Ownership for the rollout gate remains unclear",
+        "detail": "Multiple participants discussed the gate, but nobody explicitly accepted the sign-off responsibility.",
+        "evidence": [
+          "Jordan: We still need someone to own the final sign-off.",
+          "Mina: I can support it, but I am not sure it belongs to platform."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "fixtureId": "reasoning_repeated_blocker",
+  "kind": "reasoning",
+  "description": "A repeated blocker should remain visible as a durable blocker-style outcome.",
+  "payload": {
+    "meetingId": "mtg_eval_blocker_001",
+    "meetingTitle": "Migration rehearsal",
+    "meetingNotes": "Track staging blockers and repeated validation failures.",
+    "clientChunkId": "client-chunk-eval-blocker-001",
+    "focusSummary": "Migration validation failed again in staging and is blocking the rollout.",
+    "attentionFlags": [
+      "Recurring blocker",
+      "Escalation likely required"
+    ],
+    "reasoningChecklist": [
+      "Keep blocker severity visible",
+      "Preserve owner follow-up"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "blocker",
+        "summary": "Migration validation keeps failing in staging",
+        "detail": "Repeated staging failures continue to block the release candidate and require a clearly owned remediation.",
+        "evidence": [
+          "Mina: The migration check failed again on the same validation step."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "fixtureId": "reasoning_reopened_issue",
+  "kind": "reasoning",
+  "description": "A reopened operational issue should still produce a durable reasoning packet for follow-up.",
+  "payload": {
+    "meetingId": "mtg_eval_reopened_001",
+    "meetingTitle": "Operations review",
+    "meetingNotes": "Look for recurring release blockers and reopen events.",
+    "clientChunkId": "client-chunk-eval-reopened-001",
+    "focusSummary": "The same alert-routing problem has returned after the last fix.",
+    "attentionFlags": [
+      "Potential reopened issue"
+    ],
+    "reasoningChecklist": [
+      "Compare with prior incident language",
+      "Ensure the durable issue remains visible"
+    ],
+    "focusAreas": [
+      {
+        "recordType": "blocker",
+        "summary": "Alert routing ownership drift returned",
+        "detail": "The previous mitigation did not hold, and the same operational escalation path is failing again.",
+        "evidence": [
+          "Theo: The alert owner drift came back after the last handoff."
+        ]
+      }
+    ]
+  },
+  "expectations": {
+    "minDecisions": 1,
+    "minCommitments": 1,
+    "minBlockers": 1,
+    "minOpenQuestions": 1,
+    "minMemoryMatches": 1
+  }
+}
