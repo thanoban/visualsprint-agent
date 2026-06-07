@@ -32,6 +32,9 @@ def get_health() -> ServiceHealth:
         mode=settings.agent_mode,
         reasoningAgentConfigured=settings.reasoning_agent_configured,
         summaryAgentConfigured=settings.summary_agent_configured,
+        reasoningEndpointConfigured=settings.reasoning_endpoint_configured,
+        summaryEndpointConfigured=settings.summary_endpoint_configured,
+        bridgeAuthConfigured=settings.bridge_auth_configured,
         elasticMcpConfigured=settings.elastic_mcp_configured,
         note=settings.health_note,
     )

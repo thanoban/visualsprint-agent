@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from visualsprint_agents.agent_runtime import invoke_summary_agent
 from visualsprint_agents.config import settings
 from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
@@ -12,6 +13,9 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
     """Generate a final report draft through the active adapter mode."""
 
     if settings.cloud_adapter_ready:
+        cloud_response = invoke_summary_agent(payload)
+        if cloud_response is not None:
+            return cloud_response
         return _run_configured_summary_agent_stub(payload)
     return _run_mock_summary_agent(payload)
 

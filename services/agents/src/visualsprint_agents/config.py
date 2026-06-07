@@ -34,6 +34,10 @@ class Settings:
     agent_application_id: str | None = None
     reasoning_agent_id: str | None = None
     summary_agent_id: str | None = None
+    reasoning_agent_endpoint_url: str | None = None
+    summary_agent_endpoint_url: str | None = None
+    agent_bridge_bearer_token: str | None = None
+    agent_request_timeout_seconds: float = 2.0
     elastic_mcp_endpoint: str | None = None
     elastic_api_key_secret_name: str | None = None
     service_account_email: str | None = None
@@ -47,6 +51,18 @@ class Settings:
         return bool(self.google_cloud_project_id and self.summary_agent_id)
 
     @property
+    def reasoning_endpoint_configured(self) -> bool:
+        return self.reasoning_agent_endpoint_url is not None
+
+    @property
+    def summary_endpoint_configured(self) -> bool:
+        return self.summary_agent_endpoint_url is not None
+
+    @property
+    def bridge_auth_configured(self) -> bool:
+        return self.agent_bridge_bearer_token is not None
+
+    @property
     def elastic_mcp_configured(self) -> bool:
         return bool(self.elastic_mcp_endpoint and self.elastic_api_key_secret_name)
 
@@ -56,6 +72,8 @@ class Settings:
             self.agent_mode == "configured_cloud"
             and self.reasoning_agent_configured
             and self.summary_agent_configured
+            and self.reasoning_endpoint_configured
+            and self.summary_endpoint_configured
         )
 
     @property
@@ -67,12 +85,12 @@ class Settings:
             )
         if self.cloud_adapter_ready:
             return (
-                "Cloud adapter configuration is present. The next slice should replace the "
-                "local fallback stubs with real Google Cloud agent invocations."
+                "Cloud adapter configuration and bridge endpoints are present. The service "
+                "will try real agent invocations before falling back locally."
             )
         return (
-            "Configured cloud mode was selected, but one or more Google Cloud agent ids are "
-            "still missing. Local deterministic fallback remains active."
+            "Configured cloud mode was selected, but one or more agent ids or bridge "
+            "endpoints are still missing. Local deterministic fallback remains active."
         )
 
 
@@ -87,6 +105,12 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         agent_application_id=_get(source, "VISUALSPRINT_AGENT_APPLICATION_ID"),
         reasoning_agent_id=_get(source, "VISUALSPRINT_REASONING_AGENT_ID"),
         summary_agent_id=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ID"),
+        reasoning_agent_endpoint_url=_get(source, "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL"),
+        summary_agent_endpoint_url=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL"),
+        agent_bridge_bearer_token=_get(source, "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN"),
+        agent_request_timeout_seconds=float(
+            source.get("VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS", "2.0")
+        ),
         elastic_mcp_endpoint=_get(source, "VISUALSPRINT_ELASTIC_MCP_ENDPOINT"),
         elastic_api_key_secret_name=_get(source, "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME"),
         service_account_email=_get(source, "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL"),
