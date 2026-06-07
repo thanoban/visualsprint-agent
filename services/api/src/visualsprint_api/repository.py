@@ -8,6 +8,7 @@ from threading import Lock
 from uuid import uuid4
 
 from visualsprint_api.config import settings
+from visualsprint_api.insight_pipeline import build_chunk_insight
 from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
     AgentBlockerInput,
@@ -20,6 +21,7 @@ from visualsprint_api.models import (
     CaptureChunkUploadTarget,
     CaptureSessionSummary,
     ChunkContext,
+    ChunkInsight,
     CompleteCaptureChunkUploadRequest,
     CommitmentRecord,
     CreateMeetingRequest,
@@ -255,6 +257,26 @@ class MeetingStore:
                 return None
             chunk_context = self._chunk_context_by_client_id.get((meeting_id, client_chunk_id))
             return None if chunk_context is None else chunk_context.model_copy(deep=True)
+
+    def get_chunk_insight(
+        self,
+        meeting_id: str,
+        client_chunk_id: str,
+    ) -> ChunkInsight | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+
+            chunk_context = self._chunk_context_by_client_id.get((meeting_id, client_chunk_id))
+            if chunk_context is None:
+                return None
+
+            return build_chunk_insight(
+                meeting=meeting.model_copy(deep=True),
+                meeting_state=self._build_meeting_state(meeting),
+                chunk_context=chunk_context.model_copy(deep=True),
+            )
 
     def search_prior_outcomes(
         self,

@@ -298,6 +298,31 @@ export interface ChunkContextResponse {
   chunkContext: ChunkContext;
 }
 
+export interface ChunkInsightFocus {
+  recordType: ReasoningRecordType;
+  summary: string;
+  detail: string;
+  evidence: string[];
+}
+
+export interface ChunkInsight {
+  meetingId: string;
+  meetingTitle: string;
+  meetingNotes: string;
+  clientChunkId: string;
+  focusSummary: string;
+  attentionFlags: string[];
+  reasoningChecklist: string[];
+  focusAreas: ChunkInsightFocus[];
+  memoryQueries: SearchPriorOutcomesRequest[];
+  meetingState: MeetingStateSnapshot;
+  chunkContext: ChunkContext;
+}
+
+export interface ChunkInsightResponse {
+  insight: ChunkInsight;
+}
+
 export interface SearchPriorOutcomesRequest {
   recordType: ReasoningRecordType;
   summary: string;

@@ -1,4 +1,5 @@
 import type {
+  ChunkInsightResponse,
   CompleteCaptureChunkUploadRequest,
   CompleteCaptureChunkUploadResponse,
   CaptureSessionResponse,
@@ -72,6 +73,12 @@ export function endMeeting(meetingId: string) {
 
 export function getFinalReport(meetingId: string) {
   return request<FinalReportResponse>(`/api/meetings/${meetingId}/final-report`);
+}
+
+export function getChunkInsight(meetingId: string, clientChunkId: string) {
+  return request<ChunkInsightResponse>(
+    `/api/meetings/${meetingId}/insights/chunks/${clientChunkId}`,
+  );
 }
 
 export function finalizeReport(meetingId: string) {
