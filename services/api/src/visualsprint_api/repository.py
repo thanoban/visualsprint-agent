@@ -137,6 +137,16 @@ class MeetingStore:
     _final_reports: dict[str, FinalReport] = field(default_factory=dict)
     _lock: Lock = field(default_factory=Lock)
 
+    def reset(self) -> None:
+        """Clear all in-memory state for deterministic test setup."""
+
+        with self._lock:
+            self._meetings.clear()
+            self._chunks_by_client_id.clear()
+            self._chunk_context_by_client_id.clear()
+            self._meeting_revisions.clear()
+            self._final_reports.clear()
+
     def list_meetings(self) -> list[MeetingSummary]:
         with self._lock:
             meetings = sorted(
