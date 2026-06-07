@@ -98,6 +98,33 @@ class PlatformMetaResponse(BaseModel):
     downstreamServices: list[DownstreamServiceStatus] = Field(default_factory=list)
 
 
+class AgentInvocationAuditEntry(BaseModel):
+    invokedAt: datetime
+    agentKind: Literal["reasoning", "summary"]
+    executionMode: Literal["mock", "bridge", "bridge_fallback"]
+    status: Literal["success", "fallback", "error"]
+    targetAgentId: str | None = None
+    requestKey: str = Field(min_length=4, max_length=160)
+    detail: str = Field(min_length=4, max_length=240)
+
+
+class AgentInvocationAuditSummary(BaseModel):
+    available: bool
+    source: Literal["agents_service", "local_unavailable"]
+    total: int = 0
+    reasoningRuns: int = 0
+    summaryRuns: int = 0
+    bridgeRuns: int = 0
+    bridgeFallbackRuns: int = 0
+    mockRuns: int = 0
+    note: str = Field(min_length=4, max_length=240)
+
+
+class AgentInvocationAuditResponse(BaseModel):
+    summary: AgentInvocationAuditSummary
+    invocations: list[AgentInvocationAuditEntry] = Field(default_factory=list)
+
+
 class CaptureChunkUploadTarget(BaseModel):
     method: Literal["PUT"] = "PUT"
     objectPath: str = Field(min_length=8, max_length=240)

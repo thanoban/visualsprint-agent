@@ -8,6 +8,8 @@ from urllib import error, request
 from visualsprint_api.config import settings
 from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
+    AgentInvocationAuditResponse,
+    AgentInvocationAuditSummary,
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
     FinalReport,
@@ -245,6 +247,54 @@ def run_summary_agent_with_source(
     return report, "downstream_service"
 
 
+def get_agents_invocation_audit() -> AgentInvocationAuditResponse:
+    """Fetch the agents invocation audit when the service is configured."""
+
+    if not settings.agents_service_url:
+        return AgentInvocationAuditResponse(
+            summary=AgentInvocationAuditSummary(
+                available=False,
+                source="local_unavailable",
+                note=(
+                    "The standalone agents service is not configured, so invocation audit "
+                    "data is not available through the control plane."
+                ),
+            ),
+            invocations=[],
+        )
+
+    try:
+        response_payload = _get_json(
+            f"{settings.agents_service_url.rstrip('/')}/api/audit/invocations"
+        )
+        return AgentInvocationAuditResponse(
+            summary=AgentInvocationAuditSummary(
+                available=True,
+                source="agents_service",
+                total=int(response_payload["summary"]["total"]),
+                reasoningRuns=int(response_payload["summary"]["reasoningRuns"]),
+                summaryRuns=int(response_payload["summary"]["summaryRuns"]),
+                bridgeRuns=int(response_payload["summary"]["bridgeRuns"]),
+                bridgeFallbackRuns=int(response_payload["summary"]["bridgeFallbackRuns"]),
+                mockRuns=int(response_payload["summary"]["mockRuns"]),
+                note="The standalone agents service provided recent invocation audit data.",
+            ),
+            invocations=response_payload.get("invocations", []),
+        )
+    except (ValueError, KeyError, error.URLError, error.HTTPError):
+        return AgentInvocationAuditResponse(
+            summary=AgentInvocationAuditSummary(
+                available=False,
+                source="local_unavailable",
+                note=(
+                    "The agents service is configured but its invocation audit endpoint "
+                    "is unavailable right now."
+                ),
+            ),
+            invocations=[],
+        )
+
+
 def _post_json(url: str, payload: dict) -> dict:
     response = request.urlopen(
         request.Request(
@@ -253,6 +303,15 @@ def _post_json(url: str, payload: dict) -> dict:
             headers={"Content-Type": "application/json"},
             method="POST",
         ),
+        timeout=settings.service_request_timeout_seconds,
+    )
+    response_bytes = response.read()
+    return json.loads(response_bytes.decode("utf-8"))
+
+
+def _get_json(url: str) -> dict:
+    response = request.urlopen(
+        request.Request(url=url, headers={"Content-Type": "application/json"}, method="GET"),
         timeout=settings.service_request_timeout_seconds,
     )
     response_bytes = response.read()

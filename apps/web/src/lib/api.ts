@@ -1,4 +1,5 @@
 import type {
+  AgentInvocationAuditResponse,
   ChunkInsightResponse,
   CompleteCaptureChunkUploadRequest,
   CompleteCaptureChunkUploadResponse,
@@ -53,6 +54,10 @@ export function listMeetings() {
 
 export function getPlatformMeta() {
   return request<PlatformMetaResponse>("/api/meta");
+}
+
+export function getAgentInvocationAudit() {
+  return request<AgentInvocationAuditResponse>("/api/meta/agents/invocations");
 }
 
 export function getMeeting(meetingId: string) {
