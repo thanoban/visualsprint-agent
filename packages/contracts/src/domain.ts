@@ -73,6 +73,34 @@ export interface FoundationalService {
   responsibility: string;
 }
 
+export interface DownstreamServiceStatus {
+  service: string;
+  kind: "control_plane" | "ingest" | "media";
+  configured: boolean;
+  reachable: boolean;
+  mode: "local" | "remote" | "fallback";
+  baseUrl: null | string;
+  status: "ok" | "unreachable" | "not_configured";
+  version: null | string;
+  track: null | string;
+  note: string;
+}
+
+export interface PlatformMetaResponse {
+  service: string;
+  environment: string;
+  selectedTrack: string;
+  supportedTracks: string[];
+  architecture: {
+    frontend: string;
+    backend: string;
+    agentOrchestration: string;
+    memoryLayer: string;
+  };
+  modules: string[];
+  downstreamServices: DownstreamServiceStatus[];
+}
+
 export interface MeetingMetrics {
   decisionsCount: number;
   commitmentsCount: number;

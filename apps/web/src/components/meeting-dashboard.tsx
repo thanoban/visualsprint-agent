@@ -18,6 +18,7 @@ import {
   type MeetingDetail,
   type MeetingSummaryPacket,
   type MeetingSummary,
+  type PlatformMetaResponse,
   type OpenQuestionRecord,
   type RegisterCaptureChunkRequest,
   type ScreenEvent,
@@ -34,6 +35,7 @@ import {
   getFinalReport,
   getIndexedOutcomeDocuments,
   getMeetingEventsUrl,
+  getPlatformMeta,
   getSummaryPacket,
   endMeeting,
   getApiBaseUrl,
@@ -81,6 +83,7 @@ export function MeetingDashboard() {
   const [chunkInsight, setChunkInsight] = useState<ChunkInsight | null>(null);
   const [summaryPacket, setSummaryPacket] = useState<MeetingSummaryPacket | null>(null);
   const [indexedOutcomes, setIndexedOutcomes] = useState<IndexedOutcomeDocument[]>([]);
+  const [platformMeta, setPlatformMeta] = useState<PlatformMetaResponse | null>(null);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -120,8 +123,10 @@ export function MeetingDashboard() {
     void (async () => {
       setError(null);
       try {
+        const metaResponse = await getPlatformMeta();
         const meetingResponse = await listMeetings();
         startTransition(() => {
+          setPlatformMeta(metaResponse);
           setMeetings(meetingResponse.meetings);
         });
         const meetingList = meetingResponse.meetings;
@@ -635,6 +640,21 @@ export function MeetingDashboard() {
                 The UI only enables live capture when the connector and meeting
                 lifecycle state both allow it.
               </p>
+            </Card>
+
+            <Card title="Platform topology" eyebrow="Service boundaries">
+              {platformMeta ? (
+                <div className="space-y-3">
+                  {platformMeta.downstreamServices.map((service) => (
+                    <DownstreamServiceCard key={service.kind} service={service} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No platform status yet"
+                  body="The dashboard will show control-plane, ingest, and media service status once metadata loads."
+                />
+              )}
             </Card>
 
             <Card title="Capture rollout" eyebrow="Development path">
@@ -1246,6 +1266,39 @@ function SupportBadge({ label, ok }: { label: string; ok: boolean }) {
       <p className="text-xs uppercase tracking-[0.18em]">{label}</p>
       <p className="mt-2 text-sm font-semibold">{ok ? "Available" : "Unavailable"}</p>
     </div>
+  );
+}
+
+function DownstreamServiceCard({
+  service,
+}: {
+  service: PlatformMetaResponse["downstreamServices"][number];
+}) {
+  const statusClassName =
+    service.status === "ok"
+      ? "bg-emerald-100 text-emerald-800"
+      : service.status === "unreachable"
+        ? "bg-amber-100 text-amber-800"
+        : "bg-slate-200 text-slate-700";
+
+  return (
+    <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{service.service}</p>
+          <p className="mt-1 text-xs uppercase tracking-[0.16em] text-slate-500">
+            {service.kind} · {service.mode}
+          </p>
+        </div>
+        <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${statusClassName}`}>
+          {service.status}
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-slate-600">{service.note}</p>
+      <p className="mt-3 text-xs text-slate-500">
+        {service.baseUrl ?? "local process"} · version {service.version ?? "n/a"} · track {service.track ?? "n/a"}
+      </p>
+    </article>
   );
 }
 

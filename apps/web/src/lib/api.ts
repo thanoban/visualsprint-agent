@@ -8,6 +8,7 @@ import type {
   FinalReportResponse,
   IndexedOutcomeDocumentsResponse,
   MeetingSummaryPacketResponse,
+  PlatformMetaResponse,
   MeetingStreamEvent,
   MeetingDetailResponse,
   MeetingListResponse,
@@ -48,6 +49,10 @@ export function getMeetingEventsUrl(meetingId: string) {
 
 export function listMeetings() {
   return request<MeetingListResponse>("/api/meetings");
+}
+
+export function getPlatformMeta() {
+  return request<PlatformMetaResponse>("/api/meta");
 }
 
 export function getMeeting(meetingId: string) {
