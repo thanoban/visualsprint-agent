@@ -11,6 +11,23 @@ def test_ingest_health_and_transcript_processing():
         assert health_response.status_code == 200
         assert health_response.json()["service"] == "visualsprint-ingest"
 
+        upload_response = client.post(
+            "/api/uploads/chunks/reserve",
+            json={
+                "meetingId": "mtg_ingest_001",
+                "captureSessionId": "cap_ingest_001",
+                "clientChunkId": "client-chunk-ingest-001",
+                "sequence": 2,
+                "mimeType": "video/webm",
+            },
+        )
+        assert upload_response.status_code == 200
+        upload_payload = upload_response.json()
+        assert upload_payload["clientChunkId"] == "client-chunk-ingest-001"
+        assert upload_payload["uploadTarget"]["objectPath"].endswith(
+            "client-chunk-ingest-001.webm"
+        )
+
         transcript_response = client.post(
             "/api/transcript/chunks/process",
             json={

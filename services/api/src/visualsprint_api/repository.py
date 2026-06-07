@@ -42,7 +42,11 @@ from visualsprint_api.models import (
     MeetingMetrics,
     MeetingSummary,
 )
-from visualsprint_api.service_clients import process_media_chunk, process_transcript_chunk
+from visualsprint_api.service_clients import (
+    process_media_chunk,
+    process_transcript_chunk,
+    reserve_chunk_upload_target,
+)
 from visualsprint_api.summary_pipeline import build_meeting_summary_packet
 
 
@@ -591,9 +595,12 @@ class MeetingStore:
                 )
 
             recorded_at = _utc_now()
-            storage_object_path = (
-                f"meetings/{meeting_id}/capture-sessions/"
-                f"{meeting.activeCaptureSession.id}/chunks/{payload.clientChunkId}.webm"
+            upload_target = reserve_chunk_upload_target(
+                meeting_id=meeting_id,
+                capture_session_id=meeting.activeCaptureSession.id,
+                client_chunk_id=payload.clientChunkId,
+                sequence=payload.sequence,
+                mime_type=payload.mimeType,
             )
             chunk = CaptureChunkSummary(
                 id=f"chk_{uuid4().hex[:12]}",
@@ -605,14 +612,8 @@ class MeetingStore:
                 mimeType=payload.mimeType,
                 lifecycleStatus="registered",
                 uploadStatus="pending",
-                storageObjectPath=storage_object_path,
-                uploadTarget=CaptureChunkUploadTarget(
-                    objectPath=storage_object_path,
-                    requiredHeaders={
-                        "Content-Type": payload.mimeType,
-                        "X-VisualSprint-Chunk-Id": payload.clientChunkId,
-                    },
-                ),
+                storageObjectPath=upload_target.objectPath,
+                uploadTarget=upload_target,
                 processingStatus="registered",
                 frameCount=0,
                 transcriptSegmentCount=0,

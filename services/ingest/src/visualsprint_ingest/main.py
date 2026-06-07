@@ -5,8 +5,15 @@ from __future__ import annotations
 from fastapi import FastAPI
 
 from visualsprint_ingest.config import settings
-from visualsprint_ingest.models import ChunkTranscriptRequest, ChunkTranscriptResponse, ServiceHealth
+from visualsprint_ingest.models import (
+    ChunkTranscriptRequest,
+    ChunkTranscriptResponse,
+    ChunkUploadReservationRequest,
+    ChunkUploadReservationResponse,
+    ServiceHealth,
+)
 from visualsprint_ingest.pipeline import build_transcript_segments
+from visualsprint_ingest.uploads import reserve_chunk_upload_target
 
 
 app = FastAPI(
@@ -33,6 +40,15 @@ def process_chunk_transcript(payload: ChunkTranscriptRequest) -> ChunkTranscript
         clientChunkId=payload.clientChunkId,
         transcriptSegments=transcript_segments,
         transcriptSegmentCount=len(transcript_segments),
+    )
+
+
+@app.post("/api/uploads/chunks/reserve", response_model=ChunkUploadReservationResponse)
+def reserve_chunk_upload(payload: ChunkUploadReservationRequest) -> ChunkUploadReservationResponse:
+    upload_target = reserve_chunk_upload_target(payload)
+    return ChunkUploadReservationResponse(
+        clientChunkId=payload.clientChunkId,
+        uploadTarget=upload_target,
     )
 
 
