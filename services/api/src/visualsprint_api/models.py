@@ -273,6 +273,31 @@ class ChunkContextResponse(BaseModel):
     chunkContext: ChunkContext
 
 
+class ChunkInsightFocus(BaseModel):
+    recordType: ReasoningRecordType
+    summary: str = Field(min_length=6, max_length=240)
+    detail: str = Field(min_length=8, max_length=500)
+    evidence: list[str] = Field(default_factory=list, max_length=6)
+
+
+class ChunkInsight(BaseModel):
+    meetingId: str
+    meetingTitle: str = Field(min_length=3, max_length=120)
+    meetingNotes: str = Field(default="", max_length=500)
+    clientChunkId: str = Field(min_length=8, max_length=120)
+    focusSummary: str = Field(min_length=12, max_length=400)
+    attentionFlags: list[str] = Field(default_factory=list, max_length=6)
+    reasoningChecklist: list[str] = Field(default_factory=list, max_length=8)
+    focusAreas: list[ChunkInsightFocus] = Field(default_factory=list, max_length=6)
+    memoryQueries: list["SearchPriorOutcomesRequest"] = Field(default_factory=list, max_length=6)
+    meetingState: MeetingStateSnapshot
+    chunkContext: ChunkContext
+
+
+class ChunkInsightResponse(BaseModel):
+    insight: ChunkInsight
+
+
 class SearchPriorOutcomesRequest(BaseModel):
     recordType: ReasoningRecordType
     summary: str = Field(min_length=6, max_length=240)
@@ -281,6 +306,10 @@ class SearchPriorOutcomesRequest(BaseModel):
 
 class SearchPriorOutcomesResponse(BaseModel):
     matches: list[MemoryMatch]
+
+
+ChunkInsight.model_rebuild()
+ChunkInsightResponse.model_rebuild()
 
 
 class MeetingStreamEvent(BaseModel):
