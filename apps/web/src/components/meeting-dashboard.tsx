@@ -1106,7 +1106,10 @@ export function MeetingDashboard() {
               {selectedMeeting?.status === "ended" && finalReport?.meetingId === selectedMeeting.id ? (
                 <div className="space-y-5">
                   <div className="rounded-[1.25rem] border border-slate-900/10 bg-white p-4">
-                    <p className="text-sm font-semibold text-slate-900">Executive summary</p>
+                    <div className="flex items-start justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-900">Executive summary</p>
+                      <SourceModeBadge label="summary" mode={finalReport.summarySource} />
+                    </div>
                     <p className="mt-2 text-sm leading-6 text-slate-600">{finalReport.executiveSummary}</p>
                     <p className="mt-3 text-xs text-slate-500">{formatTimestamp(finalReport.generatedAt)}</p>
                   </div>
@@ -1389,6 +1392,11 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
           <p className="mt-2 break-all text-xs text-slate-500">
             {chunk.clientChunkId} · {chunk.storageObjectPath}
           </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <SourceModeBadge label="transcript" mode={chunk.transcriptSource} />
+            <SourceModeBadge label="media" mode={chunk.mediaSource} />
+            <SourceModeBadge label="reasoning" mode={chunk.reasoningSource} />
+          </div>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
@@ -1410,6 +1418,25 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
         </div>
       </div>
     </article>
+  );
+}
+
+function SourceModeBadge({
+  label,
+  mode,
+}: {
+  label: string;
+  mode: CaptureChunkSummary["transcriptSource"] | FinalReport["summarySource"];
+}) {
+  const className =
+    mode === "downstream_service"
+      ? "bg-sky-100 text-sky-800"
+      : "bg-slate-100 text-slate-600";
+
+  return (
+    <span className={`rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] ${className}`}>
+      {label} {formatProcessingSourceMode(mode)}
+    </span>
   );
 }
 
@@ -1875,6 +1902,12 @@ function buildClientChunkId(captureSessionId: string, sequence: number) {
 
 function formatRecorderMimeType(value: string) {
   return value === "browser-default" ? "browser default" : value;
+}
+
+function formatProcessingSourceMode(
+  value: CaptureChunkSummary["transcriptSource"] | FinalReport["summarySource"],
+) {
+  return value === "downstream_service" ? "service" : "local";
 }
 
 function formatScreenEventKind(value: ScreenEvent["kind"]) {
