@@ -212,12 +212,20 @@ export interface RegisterCaptureChunkRequest {
   mimeType: string;
 }
 
+export interface CompleteCaptureChunkUploadRequest {
+  clientChunkId: string;
+}
+
 export interface CaptureSessionResponse {
   meeting: MeetingDetail;
   captureSession: CaptureSessionSummary;
 }
 
 export interface RegisterCaptureChunkResponse extends CaptureSessionResponse {
+  chunk: CaptureChunkSummary;
+}
+
+export interface CompleteCaptureChunkUploadResponse extends CaptureSessionResponse {
   chunk: CaptureChunkSummary;
 }
 

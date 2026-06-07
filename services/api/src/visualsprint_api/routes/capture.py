@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, status
 
 from visualsprint_api.models import (
+    CompleteCaptureChunkUploadRequest,
+    CompleteCaptureChunkUploadResponse,
     CaptureSessionResponse,
     RegisterCaptureChunkRequest,
     RegisterCaptureChunkResponse,
@@ -88,6 +90,38 @@ def register_capture_chunk(
         )
     meeting, capture_session, chunk = result
     return RegisterCaptureChunkResponse(
+        meeting=meeting,
+        captureSession=capture_session,
+        chunk=chunk,
+    )
+
+
+@router.post("/chunk/upload-complete", response_model=CompleteCaptureChunkUploadResponse)
+def complete_capture_chunk_upload(
+    meeting_id: str,
+    payload: CompleteCaptureChunkUploadRequest,
+) -> CompleteCaptureChunkUploadResponse:
+    meeting = repository.get_meeting(meeting_id)
+    if meeting is None or meeting.activeCaptureSession is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meeting or capture session not found",
+        )
+
+    try:
+        result = repository.complete_capture_chunk_upload(meeting_id, payload)
+    except MeetingInvariantError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=str(error),
+        ) from error
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Meeting or capture session not found",
+        )
+    meeting, capture_session, chunk = result
+    return CompleteCaptureChunkUploadResponse(
         meeting=meeting,
         captureSession=capture_session,
         chunk=chunk,

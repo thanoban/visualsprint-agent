@@ -36,6 +36,7 @@ The API exposes:
 - `POST /api/meetings/{meeting_id}/end`
 - `POST /api/meetings/{meeting_id}/capture-sessions/start`
 - `POST /api/meetings/{meeting_id}/capture-sessions/chunk`
+- `POST /api/meetings/{meeting_id}/capture-sessions/chunk/upload-complete`
 - `POST /api/meetings/{meeting_id}/capture-sessions/complete`
 
 The web app expects the API at `http://127.0.0.1:8000` by default. Override with:
@@ -56,7 +57,8 @@ Capture-specific smoke test idea:
 2. Start the meeting.
 3. Begin browser capture from the dashboard.
 4. Let the recorder emit one or more chunks.
-5. Confirm the recent chunk list shows processed chunk state.
-6. Confirm each chunk shows a client chunk id, storage object path, and upload-ready lifecycle metadata.
-7. Confirm transcript segments, decisions, commitments, blockers, and memory matches appear in the dashboard.
-8. Stop capture and confirm the capture session closes cleanly.
+5. Confirm each new chunk first appears with upload-ready lifecycle metadata.
+6. Confirm the upload-complete step advances the same chunk into processing and then processed.
+7. Confirm each chunk shows a client chunk id, storage object path, and upload metadata.
+8. Confirm transcript segments, decisions, commitments, blockers, and memory matches appear in the dashboard.
+9. Stop capture and confirm the capture session closes cleanly.

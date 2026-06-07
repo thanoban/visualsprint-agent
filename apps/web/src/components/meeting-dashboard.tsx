@@ -20,6 +20,7 @@ import {
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+  completeCaptureChunkUpload,
   completeCaptureSession,
   createMeeting,
   endMeeting,
@@ -248,6 +249,11 @@ export function MeetingDashboard() {
         chunkRequestQueueRef.current = chunkRequestQueueRef.current.then(async () => {
           const chunkResponse = await registerCaptureChunk(selectedMeeting.id, payload);
           applyMeeting(chunkResponse.meeting);
+
+          const uploadResponse = await completeCaptureChunkUpload(selectedMeeting.id, {
+            clientChunkId: payload.clientChunkId,
+          });
+          applyMeeting(uploadResponse.meeting);
         }).catch((chunkError) => {
           setError(getErrorMessage(chunkError));
         });

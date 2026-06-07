@@ -13,6 +13,7 @@ from visualsprint_api.models import (
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
     CaptureSessionSummary,
+    CompleteCaptureChunkUploadRequest,
     CommitmentRecord,
     CreateMeetingRequest,
     DecisionRecord,
@@ -349,13 +350,52 @@ class MeetingStore:
                     ),
                 ),
             )
-            self._apply_mock_processing(meeting, chunk)
+            self._mark_chunk_upload_ready(meeting, chunk)
             meeting.latestEvents = meeting.latestEvents[:12]
 
             return (
                 meeting.model_copy(deep=True),
                 meeting.activeCaptureSession.model_copy(deep=True),
                 chunk,
+            )
+
+    def complete_capture_chunk_upload(
+        self,
+        meeting_id: str,
+        payload: CompleteCaptureChunkUploadRequest,
+    ) -> tuple[MeetingDetail, CaptureSessionSummary, CaptureChunkSummary] | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None or meeting.activeCaptureSession is None:
+                return None
+            if meeting.activeCaptureSession.status != "recording":
+                raise MeetingInvariantError(
+                    "Chunk upload completion requires an active recording capture session"
+                )
+
+            chunk_key = (meeting_id, payload.clientChunkId)
+            chunk = self._chunks_by_client_id.get(chunk_key)
+            if chunk is None:
+                raise MeetingInvariantError("Chunk upload completion target was not found")
+            if chunk.uploadStatus == "uploaded":
+                return (
+                    meeting.model_copy(deep=True),
+                    meeting.activeCaptureSession.model_copy(deep=True),
+                    chunk.model_copy(deep=True),
+                )
+            if chunk.uploadStatus != "ready":
+                raise MeetingInvariantError(
+                    "Chunk upload completion requires an upload-ready chunk"
+                )
+
+            self._mark_chunk_uploaded(meeting, chunk)
+            self._apply_mock_processing(meeting, chunk)
+            meeting.latestEvents = meeting.latestEvents[:12]
+
+            return (
+                meeting.model_copy(deep=True),
+                meeting.activeCaptureSession.model_copy(deep=True),
+                chunk.model_copy(deep=True),
             )
 
     def complete_capture_session(
@@ -387,6 +427,48 @@ class MeetingStore:
             return meeting.model_copy(deep=True), meeting.activeCaptureSession.model_copy(
                 deep=True
             )
+
+    def _mark_chunk_upload_ready(
+        self,
+        meeting: MeetingDetail,
+        chunk: CaptureChunkSummary,
+    ) -> None:
+        chunk.lifecycleStatus = "upload_ready"
+        chunk.uploadStatus = "ready"
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=recorded_at,
+                title=f"Chunk {chunk.sequence} upload contract prepared",
+                detail=(
+                    f"Storage key {chunk.storageObjectPath} is reserved for the "
+                    "future signed-upload path."
+                ),
+            ),
+        )
+
+    def _mark_chunk_uploaded(
+        self,
+        meeting: MeetingDetail,
+        chunk: CaptureChunkSummary,
+    ) -> None:
+        chunk.lifecycleStatus = "uploaded"
+        chunk.uploadStatus = "uploaded"
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=recorded_at,
+                title=f"Chunk {chunk.sequence} upload acknowledged",
+                detail=(
+                    "The local development pipeline marks the upload stage complete "
+                    "before mock processing continues."
+                ),
+            ),
+        )
 
     def _apply_mock_processing(
         self,
@@ -422,36 +504,6 @@ class MeetingStore:
             list(reversed(transcript_segments)) + meeting.recentTranscriptSegments
         )[:10]
         meeting.metrics.transcriptSegmentsCount += len(transcript_segments)
-        chunk.lifecycleStatus = "upload_ready"
-        chunk.uploadStatus = "ready"
-        meeting.latestEvents.insert(
-            0,
-            LiveEvent(
-                id=f"evt_{uuid4().hex[:12]}",
-                kind="capture",
-                at=recorded_at,
-                title=f"Chunk {chunk.sequence} upload contract prepared",
-                detail=(
-                    f"Storage key {chunk.storageObjectPath} is reserved for the "
-                    "future signed-upload path."
-                ),
-            ),
-        )
-        chunk.lifecycleStatus = "uploaded"
-        chunk.uploadStatus = "uploaded"
-        meeting.latestEvents.insert(
-            0,
-            LiveEvent(
-                id=f"evt_{uuid4().hex[:12]}",
-                kind="capture",
-                at=recorded_at,
-                title=f"Chunk {chunk.sequence} upload acknowledged",
-                detail=(
-                    "The local development pipeline marks the upload stage complete "
-                    "before mock processing continues."
-                ),
-            ),
-        )
         chunk.lifecycleStatus = "processing"
         chunk.processingStatus = "processing"
         chunk.transcriptSegmentCount = len(transcript_segments)
