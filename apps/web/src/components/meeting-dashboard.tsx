@@ -210,7 +210,7 @@ export function MeetingDashboard() {
       resources = await buildCaptureResources();
       const preferredMimeType = resolveRecorderMimeType();
       const response = await startCaptureSession(selectedMeeting.id, {
-        recorderMimeType: preferredMimeType,
+        recorderMimeType: preferredMimeType || null,
         hasDisplayVideo: resources.hasDisplayVideo,
         hasDisplayAudio: resources.hasDisplayAudio,
         hasMicrophoneAudio: resources.hasMicrophoneAudio,
@@ -234,12 +234,15 @@ export function MeetingDashboard() {
         }
 
         const now = Date.now();
+        const sequence = chunkSequenceRef.current + 1;
         const payload: RegisterCaptureChunkRequest = {
-          sequence: ++chunkSequenceRef.current,
+          clientChunkId: buildClientChunkId(response.captureSession.id, sequence),
+          sequence,
           durationMs: Math.max(now - chunkStartedAtRef.current, 250),
           byteSize: event.data.size,
           mimeType: event.data.type || preferredMimeType || "video/webm",
         };
+        chunkSequenceRef.current = sequence;
         chunkStartedAtRef.current = now;
 
         chunkRequestQueueRef.current = chunkRequestQueueRef.current.then(async () => {
@@ -586,7 +589,7 @@ export function MeetingDashboard() {
                         </p>
                         <p className="mt-2 text-sm leading-6 text-slate-600">
                           {activeCaptureSession
-                            ? `Recorder ${activeCaptureSession.recorderMimeType} is ${activeCaptureSession.status}.`
+                            ? `Recorder ${formatRecorderMimeType(activeCaptureSession.recorderMimeType)} is ${activeCaptureSession.status}.`
                             : "Start the meeting, then begin browser capture to register a live session and start emitting chunk metadata."}
                         </p>
                       </div>
@@ -943,10 +946,19 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
           <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
             {chunk.transcriptSegmentCount} transcript segments · {chunk.signalCount} derived signals
           </p>
+          <p className="mt-2 break-all text-xs text-slate-500">
+            {chunk.clientChunkId} · {chunk.storageObjectPath}
+          </p>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
-            {chunk.processingStatus}
+            {chunk.lifecycleStatus}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            upload {chunk.uploadStatus}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            processing {chunk.processingStatus}
           </span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
             {chunk.mimeType}
@@ -1211,6 +1223,14 @@ function resolveRecorderMimeType() {
   }
 
   return candidates.find((candidate) => MediaRecorder.isTypeSupported(candidate)) ?? "";
+}
+
+function buildClientChunkId(captureSessionId: string, sequence: number) {
+  return `${captureSessionId}_chunk_${String(sequence).padStart(4, "0")}`;
+}
+
+function formatRecorderMimeType(value: string) {
+  return value === "browser-default" ? "browser default" : value;
 }
 
 const inputClassName =

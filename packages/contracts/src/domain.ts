@@ -22,6 +22,13 @@ export type LiveEventKind =
   | "memory";
 export type CaptureSessionStatus = "idle" | "recording" | "completed";
 export type ChunkProcessingStatus = "registered" | "processing" | "processed";
+export type CaptureChunkLifecycleStatus =
+  | "registered"
+  | "upload_ready"
+  | "uploaded"
+  | "processing"
+  | "processed";
+export type CaptureChunkUploadStatus = "pending" | "ready" | "uploaded";
 export type BlockerSeverity = "low" | "medium" | "high";
 export type MemoryMatchStrength = "related" | "recurring" | "critical";
 
@@ -59,13 +66,26 @@ export interface MeetingMetrics {
   capturedBytes: number;
 }
 
+export interface CaptureChunkUploadTarget {
+  method: "PUT";
+  objectPath: string;
+  signedUrl: null | string;
+  requiredHeaders: Record<string, string>;
+  expiresAt: null | string;
+}
+
 export interface CaptureChunkSummary {
   id: string;
+  clientChunkId: string;
   sequence: number;
   recordedAt: string;
   durationMs: number;
   byteSize: number;
   mimeType: string;
+  lifecycleStatus: CaptureChunkLifecycleStatus;
+  uploadStatus: CaptureChunkUploadStatus;
+  storageObjectPath: string;
+  uploadTarget: CaptureChunkUploadTarget;
   processingStatus: ChunkProcessingStatus;
   transcriptSegmentCount: number;
   signalCount: number;
@@ -178,13 +198,14 @@ export interface MeetingDetailResponse {
 }
 
 export interface StartCaptureSessionRequest {
-  recorderMimeType: string;
+  recorderMimeType: null | string;
   hasDisplayVideo: boolean;
   hasDisplayAudio: boolean;
   hasMicrophoneAudio: boolean;
 }
 
 export interface RegisterCaptureChunkRequest {
+  clientChunkId: string;
   sequence: number;
   durationMs: number;
   byteSize: number;
