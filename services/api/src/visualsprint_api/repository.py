@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from threading import Lock
 from uuid import uuid4
 
 from visualsprint_api.config import settings
+from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
     BlockerRecord,
     CaptureChunkSummary,
@@ -24,8 +25,8 @@ from visualsprint_api.models import (
     MeetingDetail,
     MeetingMetrics,
     MeetingSummary,
-    TranscriptSegment,
 )
+from visualsprint_api.transcript_pipeline import build_transcript_segments
 
 
 def _utc_now() -> datetime:
@@ -41,22 +42,6 @@ def _normalize_recorder_mime_type(value: str | None) -> str:
         return "browser-default"
     return value.strip()
 
-
-SPEAKER_ROTATION = ("Avery", "Jordan", "Mina", "Theo", "Samir", "Priya")
-TRANSCRIPT_TEMPLATES = (
-    (
-        "We have a release risk around the authentication flow because the environment config is still drifting.",
-        "Let's lock the release path today and record the owner so the blocker does not roll into another sprint.",
-    ),
-    (
-        "The shared screen confirms the deployment pipeline failed on the same migration validation step again.",
-        "If we isolate the data fix and rerun staging today, we can unblock the release candidate before tomorrow.",
-    ),
-    (
-        "Support escalations increased after the last rollout, so we need a visible decision on alert ownership.",
-        "I want the meeting summary to call out the exact commitment and whether this was promised in earlier meetings.",
-    ),
-)
 
 DECISION_TEMPLATES = (
     (
@@ -153,6 +138,7 @@ class MeetingStore:
             activeCaptureSession=None,
             recentCaptureChunks=[],
             recentTranscriptSegments=[],
+            recentScreenEvents=[],
             recentDecisions=[],
             recentCommitments=[],
             recentBlockers=[],
@@ -325,7 +311,9 @@ class MeetingStore:
                     },
                 ),
                 processingStatus="registered",
+                frameCount=0,
                 transcriptSegmentCount=0,
+                visualEventCount=0,
                 signalCount=0,
             )
             self._chunks_by_client_id[chunk_key] = chunk
@@ -433,6 +421,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         chunk: CaptureChunkSummary,
     ) -> None:
+        recorded_at = chunk.recordedAt
         chunk.lifecycleStatus = "upload_ready"
         chunk.uploadStatus = "ready"
         meeting.latestEvents.insert(
@@ -454,6 +443,7 @@ class MeetingStore:
         meeting: MeetingDetail,
         chunk: CaptureChunkSummary,
     ) -> None:
+        recorded_at = chunk.recordedAt
         chunk.lifecycleStatus = "uploaded"
         chunk.uploadStatus = "uploaded"
         meeting.latestEvents.insert(
@@ -476,37 +466,24 @@ class MeetingStore:
         chunk: CaptureChunkSummary,
     ) -> None:
         recorded_at = chunk.recordedAt
-        template_index = (chunk.sequence - 1) % len(TRANSCRIPT_TEMPLATES)
-        first_line, second_line = TRANSCRIPT_TEMPLATES[template_index]
-        speaker_one = SPEAKER_ROTATION[(chunk.sequence - 1) % len(SPEAKER_ROTATION)]
-        speaker_two = SPEAKER_ROTATION[chunk.sequence % len(SPEAKER_ROTATION)]
-        first_end = recorded_at + timedelta(milliseconds=max(chunk.durationMs // 2, 250))
-        final_end = recorded_at + timedelta(milliseconds=max(chunk.durationMs, 500))
-
-        transcript_segments = [
-            TranscriptSegment(
-                id=f"trn_{uuid4().hex[:12]}",
-                speakerLabel=speaker_one,
-                startedAt=recorded_at,
-                endedAt=first_end,
-                text=first_line,
-            ),
-            TranscriptSegment(
-                id=f"trn_{uuid4().hex[:12]}",
-                speakerLabel=speaker_two,
-                startedAt=first_end,
-                endedAt=final_end,
-                text=second_line,
-            ),
-        ]
+        template_index = (chunk.sequence - 1) % len(DECISION_TEMPLATES)
+        transcript_segments = build_transcript_segments(chunk)
+        frame_count, screen_events = build_screen_events(chunk)
+        final_end = transcript_segments[-1].endedAt
 
         meeting.recentTranscriptSegments = (
             list(reversed(transcript_segments)) + meeting.recentTranscriptSegments
         )[:10]
         meeting.metrics.transcriptSegmentsCount += len(transcript_segments)
+        meeting.recentScreenEvents = (list(reversed(screen_events)) + meeting.recentScreenEvents)[
+            :10
+        ]
+        meeting.metrics.visualEventsCount += len(screen_events)
         chunk.lifecycleStatus = "processing"
         chunk.processingStatus = "processing"
+        chunk.frameCount = frame_count
         chunk.transcriptSegmentCount = len(transcript_segments)
+        chunk.visualEventCount = len(screen_events)
         meeting.latestEvents.insert(
             0,
             LiveEvent(
@@ -515,8 +492,21 @@ class MeetingStore:
                 at=final_end,
                 title=f"Transcript extracted for chunk {chunk.sequence}",
                 detail=(
-                    f"{speaker_one} and {speaker_two} segments were produced from the "
-                    "capture window."
+                    f"{transcript_segments[0].speakerLabel} and {transcript_segments[-1].speakerLabel} "
+                    "segments were produced from the capture window."
+                ),
+            ),
+        )
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="capture",
+                at=recorded_at,
+                title=f"Visual evidence extracted for chunk {chunk.sequence}",
+                detail=(
+                    f"{len(screen_events)} screen events were derived from "
+                    f"{frame_count} extracted frames."
                 ),
             ),
         )
