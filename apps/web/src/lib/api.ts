@@ -1,5 +1,6 @@
 import type {
   AgentInvocationAuditResponse,
+  AgentSmokeResponse,
   ChunkInsightResponse,
   CompleteCaptureChunkUploadRequest,
   CompleteCaptureChunkUploadResponse,
@@ -58,6 +59,15 @@ export function getPlatformMeta() {
 
 export function getAgentInvocationAudit() {
   return request<AgentInvocationAuditResponse>("/api/meta/agents/invocations");
+}
+
+export function runAgentSmoke(meetingId: string, clientChunkId?: string) {
+  const query = clientChunkId
+    ? `?clientChunkId=${encodeURIComponent(clientChunkId)}`
+    : "";
+  return request<AgentSmokeResponse>(`/api/meetings/${meetingId}/agents/smoke${query}`, {
+    method: "POST",
+  });
 }
 
 export function getMeeting(meetingId: string) {
