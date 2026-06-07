@@ -18,6 +18,9 @@ class Settings:
     environment: str = field(default_factory=lambda: os.getenv("VISUALSPRINT_ENV", "development"))
     version: str = "0.1.0"
     selected_track: str = field(default_factory=lambda: os.getenv("VISUALSPRINT_TRACK", "elastic"))
+    agents_service_url: str | None = field(
+        default_factory=lambda: os.getenv("VISUALSPRINT_AGENTS_SERVICE_URL") or None
+    )
     ingest_service_url: str | None = field(
         default_factory=lambda: os.getenv("VISUALSPRINT_INGEST_SERVICE_URL") or None
     )

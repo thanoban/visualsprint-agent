@@ -10,8 +10,12 @@ from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
+    FinalReport,
+    MeetingSummaryPacket,
+    RegisterAgentOutputsRequest,
     ScreenEvent,
     TranscriptSegment,
+    ChunkInsight,
 )
 from visualsprint_api.transcript_pipeline import build_transcript_segments
 
@@ -114,6 +118,47 @@ def process_media_chunk(chunk: CaptureChunkSummary) -> tuple[int, list[ScreenEve
         )
     except (KeyError, ValueError, error.URLError, error.HTTPError):
         return build_screen_events(chunk)
+
+
+def run_chunk_reasoning(insight: ChunkInsight) -> RegisterAgentOutputsRequest | None:
+    """Call the agents service for chunk reasoning when configured."""
+
+    if not settings.agents_service_url:
+        return None
+
+    try:
+        response_payload = _post_json(
+            f"{settings.agents_service_url.rstrip('/')}/api/reasoning/chunks/run",
+            insight.model_dump(mode="json"),
+        )
+        return RegisterAgentOutputsRequest.model_validate(response_payload)
+    except (ValueError, error.URLError, error.HTTPError):
+        return None
+
+
+def run_summary_agent(packet: MeetingSummaryPacket) -> FinalReport | None:
+    """Call the agents service for end-of-meeting summary generation when configured."""
+
+    if not settings.agents_service_url:
+        return None
+
+    try:
+        response_payload = _post_json(
+            f"{settings.agents_service_url.rstrip('/')}/api/summary/meetings/run",
+            packet.model_dump(mode="json"),
+        )
+        return FinalReport(
+            meetingId=packet.meetingId,
+            generatedAt=response_payload["generatedAt"],
+            executiveSummary=response_payload["executiveSummary"],
+            decisions=packet.decisions,
+            commitments=packet.commitments,
+            blockers=packet.blockers,
+            openQuestions=packet.openQuestions,
+            memoryHighlights=packet.memoryHighlights,
+        )
+    except (ValueError, error.URLError, error.HTTPError):
+        return None
 
 
 def _post_json(url: str, payload: dict) -> dict:
