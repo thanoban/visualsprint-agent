@@ -11,6 +11,7 @@ import {
   type CommitmentRecord,
   type CreateMeetingRequest,
   type DecisionRecord,
+  type FinalReport,
   type MemoryMatch,
   type MeetingDetail,
   type MeetingSummary,
@@ -25,6 +26,8 @@ import {
   completeCaptureChunkUpload,
   completeCaptureSession,
   createMeeting,
+  finalizeReport,
+  getFinalReport,
   getMeetingEventsUrl,
   endMeeting,
   getApiBaseUrl,
@@ -68,6 +71,7 @@ export function MeetingDashboard() {
   const [error, setError] = useState<string | null>(null);
   const [capturePhase, setCapturePhase] = useState<CapturePhase>("idle");
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
+  const [finalReport, setFinalReport] = useState<FinalReport | null>(null);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -127,6 +131,30 @@ export function MeetingDashboard() {
       cleanupCaptureRef.current?.();
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id || selectedMeeting.status !== "ended") {
+      return;
+    }
+
+    void (async () => {
+      try {
+        const reportResponse = await getFinalReport(selectedMeeting.id);
+        startTransition(() => {
+          setFinalReport(reportResponse.report);
+        });
+      } catch {
+        try {
+          const reportResponse = await finalizeReport(selectedMeeting.id);
+          startTransition(() => {
+            setFinalReport(reportResponse.report);
+          });
+        } catch (reportError) {
+          setError(getErrorMessage(reportError));
+        }
+      }
+    })();
+  }, [selectedMeeting?.id, selectedMeeting?.status]);
 
   useEffect(() => {
     if (!selectedMeeting?.id) {
@@ -214,6 +242,12 @@ export function MeetingDashboard() {
           : await endMeeting(selectedMeeting.id);
 
       applyMeeting(response.meeting);
+      if (action === "end") {
+        const reportResponse = await finalizeReport(selectedMeeting.id);
+        startTransition(() => {
+          setFinalReport(reportResponse.report);
+        });
+      }
       await refreshMeetings();
     } catch (actionError) {
       setError(getErrorMessage(actionError));
@@ -808,6 +842,43 @@ export function MeetingDashboard() {
                 <EmptyState
                   title="No reasoning target"
                   body="Choose a meeting to inspect live reasoning outputs."
+                />
+              )}
+            </Card>
+
+            <Card title="Final report" eyebrow="Hero deliverable">
+              {selectedMeeting?.status === "ended" && finalReport?.meetingId === selectedMeeting.id ? (
+                <div className="space-y-5">
+                  <div className="rounded-[1.25rem] border border-slate-900/10 bg-white p-4">
+                    <p className="text-sm font-semibold text-slate-900">Executive summary</p>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{finalReport.executiveSummary}</p>
+                    <p className="mt-3 text-xs text-slate-500">{formatTimestamp(finalReport.generatedAt)}</p>
+                  </div>
+                  <div className="grid gap-4 xl:grid-cols-2">
+                    <SignalColumn
+                      title="Report decisions"
+                      emptyTitle="No report decisions"
+                      emptyBody="Finalize a meeting with decisions to populate this section."
+                    >
+                      {finalReport.decisions.map((decision) => (
+                        <DecisionCard key={decision.id} decision={decision} />
+                      ))}
+                    </SignalColumn>
+                    <SignalColumn
+                      title="Report open questions"
+                      emptyTitle="No report questions"
+                      emptyBody="Open questions will surface here when the meeting closes."
+                    >
+                      {finalReport.openQuestions.map((openQuestion) => (
+                        <OpenQuestionCard key={openQuestion.id} openQuestion={openQuestion} />
+                      ))}
+                    </SignalColumn>
+                  </div>
+                </div>
+              ) : (
+                <EmptyState
+                  title="No final report yet"
+                  body="End a meeting to generate the deterministic final report surface."
                 />
               )}
             </Card>

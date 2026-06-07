@@ -4,6 +4,7 @@ import type {
   CaptureSessionResponse,
   CreateMeetingRequest,
   CreateMeetingResponse,
+  FinalReportResponse,
   MeetingStreamEvent,
   MeetingDetailResponse,
   MeetingListResponse,
@@ -63,6 +64,16 @@ export function startMeeting(meetingId: string) {
 
 export function endMeeting(meetingId: string) {
   return request<MeetingDetailResponse>(`/api/meetings/${meetingId}/end`, {
+    method: "POST",
+  });
+}
+
+export function getFinalReport(meetingId: string) {
+  return request<FinalReportResponse>(`/api/meetings/${meetingId}/final-report`);
+}
+
+export function finalizeReport(meetingId: string) {
+  return request<FinalReportResponse>(`/api/meetings/${meetingId}/final-report`, {
     method: "POST",
   });
 }

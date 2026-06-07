@@ -287,3 +287,18 @@ class MeetingStreamEvent(BaseModel):
     type: Literal["meeting.updated"] = "meeting.updated"
     revision: int = Field(ge=0)
     meeting: MeetingDetail
+
+
+class FinalReport(BaseModel):
+    meetingId: str
+    generatedAt: datetime
+    executiveSummary: str = Field(min_length=12, max_length=600)
+    decisions: list[DecisionRecord] = Field(default_factory=list)
+    commitments: list[CommitmentRecord] = Field(default_factory=list)
+    blockers: list[BlockerRecord] = Field(default_factory=list)
+    openQuestions: list[OpenQuestionRecord] = Field(default_factory=list)
+    memoryHighlights: list[MemoryMatch] = Field(default_factory=list)
+
+
+class FinalReportResponse(BaseModel):
+    report: FinalReport

@@ -19,6 +19,7 @@ from visualsprint_api.models import (
     CommitmentRecord,
     CreateMeetingRequest,
     DecisionRecord,
+    FinalReport,
     MeetingStateSnapshot,
     OpenQuestionRecord,
     RegisterCaptureChunkRequest,
@@ -123,6 +124,7 @@ class MeetingStore:
         default_factory=dict
     )
     _meeting_revisions: dict[str, int] = field(default_factory=dict)
+    _final_reports: dict[str, FinalReport] = field(default_factory=dict)
     _lock: Lock = field(default_factory=Lock)
 
     def list_meetings(self) -> list[MeetingSummary]:
@@ -189,6 +191,11 @@ class MeetingStore:
                 return None
             return self._meeting_revisions.get(meeting_id, 0)
 
+    def get_final_report(self, meeting_id: str) -> FinalReport | None:
+        with self._lock:
+            report = self._final_reports.get(meeting_id)
+            return None if report is None else report.model_copy(deep=True)
+
     def start_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
             meeting = self._meetings.get(meeting_id)
@@ -212,8 +219,19 @@ class MeetingStore:
                         ),
                     ),
                 )
+                self._final_reports[meeting_id] = self._build_final_report(meeting)
                 self._mark_meeting_updated(meeting.id)
             return meeting.model_copy(deep=True)
+
+    def finalize_report(self, meeting_id: str) -> FinalReport | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            report = self._build_final_report(meeting)
+            self._final_reports[meeting_id] = report
+            self._mark_meeting_updated(meeting_id)
+            return report.model_copy(deep=True)
 
     def get_meeting_state(self, meeting_id: str) -> MeetingStateSnapshot | None:
         with self._lock:
@@ -793,6 +811,40 @@ class MeetingStore:
 
     def _mark_meeting_updated(self, meeting_id: str) -> None:
         self._meeting_revisions[meeting_id] = self._meeting_revisions.get(meeting_id, 0) + 1
+
+    def _build_final_report(self, meeting: MeetingDetail) -> FinalReport:
+        summary_parts = [
+            f"{meeting.title} captured {len(meeting.recentDecisions)} decisions,",
+            f"{len(meeting.recentCommitments)} commitments, and",
+            f"{len(meeting.recentBlockers)} blockers.",
+        ]
+        if meeting.recentOpenQuestions:
+            summary_parts.append(
+                f"{len(meeting.recentOpenQuestions)} open questions remain for follow-up."
+            )
+        if meeting.recentMemoryMatches:
+            summary_parts.append(
+                "Historical memory matches were attached to help the team spot recurring issues."
+            )
+
+        return FinalReport(
+            meetingId=meeting.id,
+            generatedAt=_utc_now(),
+            executiveSummary=" ".join(summary_parts),
+            decisions=[decision.model_copy(deep=True) for decision in meeting.recentDecisions],
+            commitments=[
+                commitment.model_copy(deep=True) for commitment in meeting.recentCommitments
+            ],
+            blockers=[blocker.model_copy(deep=True) for blocker in meeting.recentBlockers],
+            openQuestions=[
+                open_question.model_copy(deep=True)
+                for open_question in meeting.recentOpenQuestions
+            ],
+            memoryHighlights=[
+                memory_match.model_copy(deep=True)
+                for memory_match in meeting.recentMemoryMatches
+            ],
+        )
 
 
 repository = MeetingStore()
