@@ -50,6 +50,7 @@ class MeetingMetrics(BaseModel):
     commitmentsCount: int = 0
     blockersCount: int = 0
     memoryMatchesCount: int = 0
+    openQuestionsCount: int = 0
     transcriptSegmentsCount: int = 0
     visualEventsCount: int = 0
     captureEventsCount: int = 0
@@ -154,6 +155,13 @@ class MemoryMatch(BaseModel):
     recordedAt: datetime
 
 
+class OpenQuestionRecord(BaseModel):
+    id: str
+    question: str = Field(min_length=8, max_length=240)
+    speakerLabel: str = Field(min_length=2, max_length=60)
+    recordedAt: datetime
+
+
 class MeetingSummary(BaseModel):
     id: str
     title: str = Field(min_length=3, max_length=120)
@@ -178,6 +186,7 @@ class MeetingDetail(MeetingSummary):
     recentCommitments: list[CommitmentRecord] = Field(default_factory=list)
     recentBlockers: list[BlockerRecord] = Field(default_factory=list)
     recentMemoryMatches: list[MemoryMatch] = Field(default_factory=list)
+    recentOpenQuestions: list[OpenQuestionRecord] = Field(default_factory=list)
 
 
 class CreateMeetingRequest(BaseModel):
@@ -229,3 +238,30 @@ class RegisterCaptureChunkResponse(CaptureSessionResponse):
 
 class CompleteCaptureChunkUploadResponse(CaptureSessionResponse):
     chunk: CaptureChunkSummary
+
+
+class MeetingStateSnapshot(BaseModel):
+    meetingId: str
+    meetingStatus: MeetingStatus
+    activeCaptureSessionId: str | None = None
+    latestChunkClientId: str | None = None
+    openDecisions: list[DecisionRecord] = Field(default_factory=list)
+    openCommitments: list[CommitmentRecord] = Field(default_factory=list)
+    openBlockers: list[BlockerRecord] = Field(default_factory=list)
+    openQuestions: list[OpenQuestionRecord] = Field(default_factory=list)
+
+
+class MeetingStateResponse(BaseModel):
+    meetingState: MeetingStateSnapshot
+
+
+class ChunkContext(BaseModel):
+    chunk: CaptureChunkSummary
+    transcriptSegments: list[TranscriptSegment] = Field(default_factory=list)
+    screenEvents: list[ScreenEvent] = Field(default_factory=list)
+
+
+class ChunkContextResponse(BaseModel):
+    meetingId: str
+    meetingState: MeetingStateSnapshot
+    chunkContext: ChunkContext

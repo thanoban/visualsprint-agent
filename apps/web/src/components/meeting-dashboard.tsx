@@ -14,6 +14,7 @@ import {
   type MemoryMatch,
   type MeetingDetail,
   type MeetingSummary,
+  type OpenQuestionRecord,
   type RegisterCaptureChunkRequest,
   type ScreenEvent,
   type TranscriptSegment,
@@ -327,6 +328,7 @@ export function MeetingDashboard() {
   const recentCommitments = selectedMeeting?.recentCommitments ?? [];
   const recentBlockers = selectedMeeting?.recentBlockers ?? [];
   const recentMemoryMatches = selectedMeeting?.recentMemoryMatches ?? [];
+  const recentOpenQuestions = selectedMeeting?.recentOpenQuestions ?? [];
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.18),_transparent_28%),linear-gradient(180deg,#09121b_0%,#0a1521_30%,#f4efe2_30%,#f7f4ec_100%)] text-slate-100">
@@ -548,6 +550,7 @@ export function MeetingDashboard() {
                     <MetricCard label="Decisions" value={String(selectedMeeting.metrics.decisionsCount)} />
                     <MetricCard label="Commitments" value={String(selectedMeeting.metrics.commitmentsCount)} />
                     <MetricCard label="Blockers" value={String(selectedMeeting.metrics.blockersCount)} />
+                    <MetricCard label="Open questions" value={String(selectedMeeting.metrics.openQuestionsCount)} />
                     <MetricCard label="Transcript segments" value={String(selectedMeeting.metrics.transcriptSegmentsCount)} />
                     <MetricCard label="Visual events" value={String(selectedMeeting.metrics.visualEventsCount)} />
                     <MetricCard label="Memory matches" value={String(selectedMeeting.metrics.memoryMatchesCount)} />
@@ -752,6 +755,16 @@ export function MeetingDashboard() {
                   >
                     {recentMemoryMatches.map((memoryMatch) => (
                       <MemoryMatchCard key={memoryMatch.id} memoryMatch={memoryMatch} />
+                    ))}
+                  </SignalColumn>
+
+                  <SignalColumn
+                    title="Open questions"
+                    emptyTitle="No open questions yet"
+                    emptyBody="Unresolved questions will appear here for the final report handoff."
+                  >
+                    {recentOpenQuestions.map((openQuestion) => (
+                      <OpenQuestionCard key={openQuestion.id} openQuestion={openQuestion} />
                     ))}
                   </SignalColumn>
                 </div>
@@ -1111,6 +1124,17 @@ function MemoryMatchCard({ memoryMatch }: { memoryMatch: MemoryMatch }) {
       </p>
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
         {memoryMatch.strength} · {formatTimestamp(memoryMatch.recordedAt)}
+      </p>
+    </article>
+  );
+}
+
+function OpenQuestionCard({ openQuestion }: { openQuestion: OpenQuestionRecord }) {
+  return (
+    <article className="rounded-[1rem] border border-slate-900/10 bg-slate-50 p-4">
+      <p className="text-sm font-semibold text-slate-900">{openQuestion.question}</p>
+      <p className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-500">
+        {openQuestion.speakerLabel} · {formatTimestamp(openQuestion.recordedAt)}
       </p>
     </article>
   );

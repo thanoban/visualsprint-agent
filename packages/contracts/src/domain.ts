@@ -67,6 +67,7 @@ export interface MeetingMetrics {
   commitmentsCount: number;
   blockersCount: number;
   memoryMatchesCount: number;
+  openQuestionsCount: number;
   transcriptSegmentsCount: number;
   visualEventsCount: number;
   captureEventsCount: number;
@@ -185,6 +186,13 @@ export interface MemoryMatch {
   recordedAt: string;
 }
 
+export interface OpenQuestionRecord {
+  id: string;
+  question: string;
+  speakerLabel: string;
+  recordedAt: string;
+}
+
 export interface MeetingDetail extends MeetingSummary {
   latestEvents: LiveEvent[];
   activeCaptureSession: null | CaptureSessionSummary;
@@ -195,6 +203,7 @@ export interface MeetingDetail extends MeetingSummary {
   recentCommitments: CommitmentRecord[];
   recentBlockers: BlockerRecord[];
   recentMemoryMatches: MemoryMatch[];
+  recentOpenQuestions: OpenQuestionRecord[];
 }
 
 export interface CreateMeetingRequest {
@@ -246,6 +255,33 @@ export interface RegisterCaptureChunkResponse extends CaptureSessionResponse {
 
 export interface CompleteCaptureChunkUploadResponse extends CaptureSessionResponse {
   chunk: CaptureChunkSummary;
+}
+
+export interface MeetingStateSnapshot {
+  meetingId: string;
+  meetingStatus: MeetingStatus;
+  activeCaptureSessionId: null | string;
+  latestChunkClientId: null | string;
+  openDecisions: DecisionRecord[];
+  openCommitments: CommitmentRecord[];
+  openBlockers: BlockerRecord[];
+  openQuestions: OpenQuestionRecord[];
+}
+
+export interface MeetingStateResponse {
+  meetingState: MeetingStateSnapshot;
+}
+
+export interface ChunkContext {
+  chunk: CaptureChunkSummary;
+  transcriptSegments: TranscriptSegment[];
+  screenEvents: ScreenEvent[];
+}
+
+export interface ChunkContextResponse {
+  meetingId: string;
+  meetingState: MeetingStateSnapshot;
+  chunkContext: ChunkContext;
 }
 
 export interface ServiceHealth {

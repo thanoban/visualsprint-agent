@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status
 from visualsprint_api.models import (
     CreateMeetingRequest,
     CreateMeetingResponse,
+    MeetingStateResponse,
     MeetingDetailResponse,
     MeetingListResponse,
 )
@@ -31,6 +32,14 @@ def get_meeting(meeting_id: str) -> MeetingDetailResponse:
     if meeting is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
     return MeetingDetailResponse(meeting=meeting)
+
+
+@router.get("/{meeting_id}/state", response_model=MeetingStateResponse)
+def get_meeting_state(meeting_id: str) -> MeetingStateResponse:
+    meeting_state = repository.get_meeting_state(meeting_id)
+    if meeting_state is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Meeting not found")
+    return MeetingStateResponse(meetingState=meeting_state)
 
 
 @router.post("/{meeting_id}/start", response_model=MeetingDetailResponse)

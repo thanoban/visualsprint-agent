@@ -14,10 +14,13 @@ from visualsprint_api.models import (
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
     CaptureSessionSummary,
+    ChunkContext,
     CompleteCaptureChunkUploadRequest,
     CommitmentRecord,
     CreateMeetingRequest,
     DecisionRecord,
+    MeetingStateSnapshot,
+    OpenQuestionRecord,
     RegisterCaptureChunkRequest,
     StartCaptureSessionRequest,
     LiveEvent,
@@ -88,6 +91,12 @@ MEMORY_TEMPLATES = (
     ),
 )
 
+OPEN_QUESTION_TEMPLATES = (
+    "Should the release freeze be lifted immediately after the auth configuration fix is validated?",
+    "Do we need a separate owner for rollback verification before the next deployment attempt?",
+    "Which team should own the alert-routing handoff once this sprint closes?",
+)
+
 
 @dataclass(slots=True)
 class MeetingStore:
@@ -95,6 +104,9 @@ class MeetingStore:
 
     _meetings: dict[str, MeetingDetail] = field(default_factory=dict)
     _chunks_by_client_id: dict[tuple[str, str], CaptureChunkSummary] = field(
+        default_factory=dict
+    )
+    _chunk_context_by_client_id: dict[tuple[str, str], ChunkContext] = field(
         default_factory=dict
     )
     _lock: Lock = field(default_factory=Lock)
@@ -143,6 +155,7 @@ class MeetingStore:
             recentCommitments=[],
             recentBlockers=[],
             recentMemoryMatches=[],
+            recentOpenQuestions=[],
         )
 
         with self._lock:
@@ -179,6 +192,24 @@ class MeetingStore:
                     ),
                 )
             return meeting.model_copy(deep=True)
+
+    def get_meeting_state(self, meeting_id: str) -> MeetingStateSnapshot | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            return self._build_meeting_state(meeting)
+
+    def get_chunk_context(
+        self,
+        meeting_id: str,
+        client_chunk_id: str,
+    ) -> ChunkContext | None:
+        with self._lock:
+            if meeting_id not in self._meetings:
+                return None
+            chunk_context = self._chunk_context_by_client_id.get((meeting_id, client_chunk_id))
+            return None if chunk_context is None else chunk_context.model_copy(deep=True)
 
     def end_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -317,6 +348,11 @@ class MeetingStore:
                 signalCount=0,
             )
             self._chunks_by_client_id[chunk_key] = chunk
+            self._chunk_context_by_client_id[chunk_key] = ChunkContext(
+                chunk=chunk.model_copy(deep=True),
+                transcriptSegments=[],
+                screenEvents=[],
+            )
 
             meeting.activeCaptureSession.chunkCount += 1
             meeting.activeCaptureSession.totalBytes += payload.byteSize
@@ -606,9 +642,60 @@ class MeetingStore:
         )
         signal_count += 1
 
+        open_question = OpenQuestionRecord(
+            id=f"oqn_{uuid4().hex[:12]}",
+            question=OPEN_QUESTION_TEMPLATES[template_index],
+            speakerLabel=transcript_segments[-1].speakerLabel,
+            recordedAt=final_end,
+        )
+        meeting.recentOpenQuestions.insert(0, open_question)
+        meeting.recentOpenQuestions = meeting.recentOpenQuestions[:6]
+        meeting.metrics.openQuestionsCount += 1
+        meeting.latestEvents.insert(
+            0,
+            LiveEvent(
+                id=f"evt_{uuid4().hex[:12]}",
+                kind="decision",
+                at=final_end,
+                title="Open question captured",
+                detail=open_question.question,
+            ),
+        )
+        signal_count += 1
+
         chunk.lifecycleStatus = "processed"
         chunk.processingStatus = "processed"
         chunk.signalCount = signal_count
+        self._chunk_context_by_client_id[(meeting.id, chunk.clientChunkId)] = ChunkContext(
+            chunk=chunk.model_copy(deep=True),
+            transcriptSegments=[segment.model_copy(deep=True) for segment in transcript_segments],
+            screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
+        )
+
+    def _build_meeting_state(self, meeting: MeetingDetail) -> MeetingStateSnapshot:
+        latest_chunk_client_id = (
+            meeting.recentCaptureChunks[0].clientChunkId
+            if meeting.recentCaptureChunks
+            else None
+        )
+        active_capture_session_id = (
+            meeting.activeCaptureSession.id if meeting.activeCaptureSession is not None else None
+        )
+        return MeetingStateSnapshot(
+            meetingId=meeting.id,
+            meetingStatus=meeting.status,
+            activeCaptureSessionId=active_capture_session_id,
+            latestChunkClientId=latest_chunk_client_id,
+            openDecisions=[decision.model_copy(deep=True) for decision in meeting.recentDecisions],
+            openCommitments=[
+                commitment.model_copy(deep=True) for commitment in meeting.recentCommitments
+            ],
+            openBlockers=[blocker.model_copy(deep=True) for blocker in meeting.recentBlockers],
+            openQuestions=[
+                open_question.model_copy(deep=True)
+                for open_question in meeting.recentOpenQuestions
+            ],
+        )
 
 
 repository = MeetingStore()
