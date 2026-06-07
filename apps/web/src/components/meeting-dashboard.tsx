@@ -15,6 +15,7 @@ import {
   type MeetingDetail,
   type MeetingSummary,
   type RegisterCaptureChunkRequest,
+  type ScreenEvent,
   type TranscriptSegment,
 } from "@visualsprint/contracts";
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -321,6 +322,7 @@ export function MeetingDashboard() {
   const recentChunks = selectedMeeting?.recentCaptureChunks ?? [];
   const activeCaptureSession = selectedMeeting?.activeCaptureSession;
   const recentTranscriptSegments = selectedMeeting?.recentTranscriptSegments ?? [];
+  const recentScreenEvents = selectedMeeting?.recentScreenEvents ?? [];
   const recentDecisions = selectedMeeting?.recentDecisions ?? [];
   const recentCommitments = selectedMeeting?.recentCommitments ?? [];
   const recentBlockers = selectedMeeting?.recentBlockers ?? [];
@@ -337,13 +339,13 @@ export function MeetingDashboard() {
               </p>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Turn capture chunks into live transcript and reasoning signals.
+                  Turn capture chunks into transcript, visual evidence, and reasoning signals.
                 </h1>
                 <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
                   This slice keeps the real browser capture path and layers in a
                   development-safe processing loop so each chunk now produces mock
-                  transcript, decision, blocker, commitment, and memory outputs for
-                  the dashboard.
+                  transcript, visual evidence, decision, blocker, commitment, and
+                  memory outputs for the dashboard.
                 </p>
               </div>
             </div>
@@ -547,6 +549,7 @@ export function MeetingDashboard() {
                     <MetricCard label="Commitments" value={String(selectedMeeting.metrics.commitmentsCount)} />
                     <MetricCard label="Blockers" value={String(selectedMeeting.metrics.blockersCount)} />
                     <MetricCard label="Transcript segments" value={String(selectedMeeting.metrics.transcriptSegmentsCount)} />
+                    <MetricCard label="Visual events" value={String(selectedMeeting.metrics.visualEventsCount)} />
                     <MetricCard label="Memory matches" value={String(selectedMeeting.metrics.memoryMatchesCount)} />
                   </div>
 
@@ -687,6 +690,28 @@ export function MeetingDashboard() {
               )}
             </Card>
 
+            <Card title="Visual evidence" eyebrow="Frame extraction">
+              {selectedMeeting ? (
+                <div className="space-y-3">
+                  {recentScreenEvents.length === 0 ? (
+                    <EmptyState
+                      title="No visual evidence yet"
+                      body="Once chunks are uploaded, extracted frames and screen events will show up here."
+                    />
+                  ) : (
+                    recentScreenEvents.map((screenEvent) => (
+                      <ScreenEventCard key={screenEvent.id} screenEvent={screenEvent} />
+                    ))
+                  )}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No visual target"
+                  body="Choose a meeting to inspect derived screen evidence."
+                />
+              )}
+            </Card>
+
             <Card title="Reasoning outputs" eyebrow="Agent-facing signals">
               {selectedMeeting ? (
                 <div className="grid gap-4 xl:grid-cols-2">
@@ -795,9 +820,9 @@ export function MeetingDashboard() {
           <p className="font-medium text-slate-900">Current implementation note</p>
           <p>
             This slice adds mock chunk processing behind the real browser capture
-            path, so transcript segments and reasoning signals now render live.
-            Cloud storage uploads and managed Google Agent Builder runtime
-            orchestration are still upcoming.
+            path, so transcript segments, visual evidence, and reasoning signals
+            now render live. Cloud storage uploads and managed Google Agent Builder
+            runtime orchestration are still upcoming.
           </p>
           <p className="mt-2">
             Official track options: {partnerTracks.map((track) => track.label).join(", ")}.
@@ -950,7 +975,7 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
             {formatBytes(chunk.byteSize)} captured over {formatDuration(chunk.durationMs)}.
           </p>
           <p className="mt-2 text-xs uppercase tracking-[0.16em] text-slate-500">
-            {chunk.transcriptSegmentCount} transcript segments · {chunk.signalCount} derived signals
+            {chunk.transcriptSegmentCount} transcript segments · {chunk.visualEventCount} visual events · {chunk.signalCount} derived signals
           </p>
           <p className="mt-2 break-all text-xs text-slate-500">
             {chunk.clientChunkId} · {chunk.storageObjectPath}
@@ -965,6 +990,9 @@ function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
           </span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
             processing {chunk.processingStatus}
+          </span>
+          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+            {chunk.frameCount} frames
           </span>
           <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
             {chunk.mimeType}
@@ -987,6 +1015,25 @@ function TranscriptCard({ segment }: { segment: TranscriptSegment }) {
         <span className="whitespace-nowrap text-xs text-slate-500">
           {formatTimestamp(segment.startedAt)}
         </span>
+      </div>
+    </article>
+  );
+}
+
+function ScreenEventCard({ screenEvent }: { screenEvent: ScreenEvent }) {
+  return (
+    <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold text-slate-900">{formatScreenEventKind(screenEvent.kind)}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-600">{screenEvent.summary}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
+            {formatFrameTimestamp(screenEvent.frameTimestampMs)}
+          </p>
+          <p className="mt-2 text-xs text-slate-500">{formatTimestamp(screenEvent.recordedAt)}</p>
+        </div>
       </div>
     </article>
   );
@@ -1106,6 +1153,10 @@ function formatDuration(durationMs: number) {
     return `${durationMs} ms`;
   }
   return `${(durationMs / 1000).toFixed(1)} s`;
+}
+
+function formatFrameTimestamp(value: number) {
+  return `${(value / 1000).toFixed(1)} s`;
 }
 
 function formatBytes(byteSize: number) {
@@ -1237,6 +1288,10 @@ function buildClientChunkId(captureSessionId: string, sequence: number) {
 
 function formatRecorderMimeType(value: string) {
   return value === "browser-default" ? "browser default" : value;
+}
+
+function formatScreenEventKind(value: ScreenEvent["kind"]) {
+  return value.replaceAll("_", " ");
 }
 
 const inputClassName =

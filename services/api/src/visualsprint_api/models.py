@@ -26,6 +26,14 @@ CaptureChunkLifecycleStatus = Literal[
 CaptureChunkUploadStatus = Literal["pending", "ready", "uploaded"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
+ScreenEventKind = Literal[
+    "code_editor",
+    "terminal",
+    "diagram",
+    "slide",
+    "error",
+    "ui_state",
+]
 LiveEventKind = Literal[
     "system",
     "capture",
@@ -43,6 +51,7 @@ class MeetingMetrics(BaseModel):
     blockersCount: int = 0
     memoryMatchesCount: int = 0
     transcriptSegmentsCount: int = 0
+    visualEventsCount: int = 0
     captureEventsCount: int = 0
     captureChunksCount: int = 0
     capturedBytes: int = 0
@@ -69,7 +78,9 @@ class CaptureChunkSummary(BaseModel):
     storageObjectPath: str = Field(min_length=8, max_length=240)
     uploadTarget: CaptureChunkUploadTarget
     processingStatus: ChunkProcessingStatus
+    frameCount: int = Field(default=0, ge=0)
     transcriptSegmentCount: int = 0
+    visualEventCount: int = 0
     signalCount: int = 0
 
 
@@ -101,6 +112,14 @@ class TranscriptSegment(BaseModel):
     startedAt: datetime
     endedAt: datetime
     text: str = Field(min_length=8, max_length=500)
+
+
+class ScreenEvent(BaseModel):
+    id: str
+    kind: ScreenEventKind
+    summary: str = Field(min_length=6, max_length=220)
+    frameTimestampMs: int = Field(ge=0)
+    recordedAt: datetime
 
 
 class DecisionRecord(BaseModel):
@@ -154,6 +173,7 @@ class MeetingDetail(MeetingSummary):
     activeCaptureSession: CaptureSessionSummary | None = None
     recentCaptureChunks: list[CaptureChunkSummary] = Field(default_factory=list)
     recentTranscriptSegments: list[TranscriptSegment] = Field(default_factory=list)
+    recentScreenEvents: list[ScreenEvent] = Field(default_factory=list)
     recentDecisions: list[DecisionRecord] = Field(default_factory=list)
     recentCommitments: list[CommitmentRecord] = Field(default_factory=list)
     recentBlockers: list[BlockerRecord] = Field(default_factory=list)

@@ -31,6 +31,13 @@ export type CaptureChunkLifecycleStatus =
 export type CaptureChunkUploadStatus = "pending" | "ready" | "uploaded";
 export type BlockerSeverity = "low" | "medium" | "high";
 export type MemoryMatchStrength = "related" | "recurring" | "critical";
+export type ScreenEventKind =
+  | "code_editor"
+  | "terminal"
+  | "diagram"
+  | "slide"
+  | "error"
+  | "ui_state";
 
 export interface PartnerTrack {
   slug: PartnerTrackSlug;
@@ -61,6 +68,7 @@ export interface MeetingMetrics {
   blockersCount: number;
   memoryMatchesCount: number;
   transcriptSegmentsCount: number;
+  visualEventsCount: number;
   captureEventsCount: number;
   captureChunksCount: number;
   capturedBytes: number;
@@ -87,7 +95,9 @@ export interface CaptureChunkSummary {
   storageObjectPath: string;
   uploadTarget: CaptureChunkUploadTarget;
   processingStatus: ChunkProcessingStatus;
+  frameCount: number;
   transcriptSegmentCount: number;
+  visualEventCount: number;
   signalCount: number;
 }
 
@@ -135,6 +145,14 @@ export interface TranscriptSegment {
   text: string;
 }
 
+export interface ScreenEvent {
+  id: string;
+  kind: ScreenEventKind;
+  summary: string;
+  frameTimestampMs: number;
+  recordedAt: string;
+}
+
 export interface DecisionRecord {
   id: string;
   title: string;
@@ -172,6 +190,7 @@ export interface MeetingDetail extends MeetingSummary {
   activeCaptureSession: null | CaptureSessionSummary;
   recentCaptureChunks: CaptureChunkSummary[];
   recentTranscriptSegments: TranscriptSegment[];
+  recentScreenEvents: ScreenEvent[];
   recentDecisions: DecisionRecord[];
   recentCommitments: CommitmentRecord[];
   recentBlockers: BlockerRecord[];
