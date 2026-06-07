@@ -113,6 +113,33 @@ export interface PlatformMetaResponse {
   downstreamServices: DownstreamServiceStatus[];
 }
 
+export interface AgentInvocationAuditEntry {
+  invokedAt: string;
+  agentKind: "reasoning" | "summary";
+  executionMode: "mock" | "bridge" | "bridge_fallback";
+  status: "success" | "fallback" | "error";
+  targetAgentId: null | string;
+  requestKey: string;
+  detail: string;
+}
+
+export interface AgentInvocationAuditSummary {
+  available: boolean;
+  source: "agents_service" | "local_unavailable";
+  total: number;
+  reasoningRuns: number;
+  summaryRuns: number;
+  bridgeRuns: number;
+  bridgeFallbackRuns: number;
+  mockRuns: number;
+  note: string;
+}
+
+export interface AgentInvocationAuditResponse {
+  summary: AgentInvocationAuditSummary;
+  invocations: AgentInvocationAuditEntry[];
+}
+
 export interface MeetingMetrics {
   decisionsCount: number;
   commitmentsCount: number;

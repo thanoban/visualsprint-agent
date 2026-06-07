@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type AgentInvocationAuditResponse,
   captureStages,
   dashboardModules,
   partnerTracks,
@@ -31,6 +32,7 @@ import {
   completeCaptureSession,
   createMeeting,
   finalizeReport,
+  getAgentInvocationAudit,
   getChunkInsight,
   getFinalReport,
   getIndexedOutcomeDocuments,
@@ -85,6 +87,7 @@ export function MeetingDashboard() {
   const [summaryPacket, setSummaryPacket] = useState<MeetingSummaryPacket | null>(null);
   const [indexedOutcomes, setIndexedOutcomes] = useState<IndexedOutcomeDocument[]>([]);
   const [platformMeta, setPlatformMeta] = useState<PlatformMetaResponse | null>(null);
+  const [agentInvocationAudit, setAgentInvocationAudit] = useState<AgentInvocationAuditResponse | null>(null);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -125,9 +128,11 @@ export function MeetingDashboard() {
       setError(null);
       try {
         const metaResponse = await getPlatformMeta();
+        const auditResponse = await getAgentInvocationAudit();
         const meetingResponse = await listMeetings();
         startTransition(() => {
           setPlatformMeta(metaResponse);
+          setAgentInvocationAudit(auditResponse);
           setMeetings(meetingResponse.meetings);
         });
         const meetingList = meetingResponse.meetings;
@@ -140,6 +145,28 @@ export function MeetingDashboard() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const auditResponse = await getAgentInvocationAudit();
+        startTransition(() => {
+          setAgentInvocationAudit(auditResponse);
+        });
+      } catch {
+        startTransition(() => {
+          setAgentInvocationAudit(null);
+        });
+      }
+    })();
+  }, [
+    selectedMeeting?.latestEvents,
+    selectedMeeting?.metrics.captureChunksCount,
+    selectedMeeting?.metrics.decisionsCount,
+    selectedMeeting?.metrics.commitmentsCount,
+    selectedMeeting?.metrics.blockersCount,
+    selectedMeeting?.metrics.openQuestionsCount,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -678,6 +705,85 @@ export function MeetingDashboard() {
                 <EmptyState
                   title="No platform status yet"
                   body="The dashboard will show downstream services and Elastic readiness once metadata loads."
+                />
+              )}
+            </Card>
+
+            <Card title="Agent invocation audit" eyebrow="Adapter runtime">
+              {agentInvocationAudit ? (
+                <div className="space-y-4">
+                  <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                    <InfoTile
+                      label="Audit source"
+                      value={agentInvocationAudit.summary.source.replaceAll("_", " ")}
+                    />
+                    <InfoTile
+                      label="Bridge runs"
+                      value={String(agentInvocationAudit.summary.bridgeRuns)}
+                    />
+                    <InfoTile
+                      label="Fallback runs"
+                      value={String(agentInvocationAudit.summary.bridgeFallbackRuns)}
+                    />
+                    <InfoTile
+                      label="Mock runs"
+                      value={String(agentInvocationAudit.summary.mockRuns)}
+                    />
+                    <InfoTile
+                      label="Reasoning runs"
+                      value={String(agentInvocationAudit.summary.reasoningRuns)}
+                    />
+                    <InfoTile
+                      label="Summary runs"
+                      value={String(agentInvocationAudit.summary.summaryRuns)}
+                    />
+                  </div>
+                  <p className="text-sm leading-6 text-slate-600">
+                    {agentInvocationAudit.summary.note}
+                  </p>
+                  {agentInvocationAudit.summary.available ? (
+                    <div className="space-y-3">
+                      {agentInvocationAudit.invocations.length === 0 ? (
+                        <EmptyState
+                          title="No invocations yet"
+                          body="Run capture reasoning or summary generation to populate the recent adapter audit trail."
+                        />
+                      ) : (
+                        agentInvocationAudit.invocations.slice(0, 6).map((invocation) => (
+                          <article
+                            key={`${invocation.agentKind}-${invocation.requestKey}-${invocation.invokedAt}`}
+                            className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <p className="text-sm font-semibold text-slate-900">
+                                {invocation.agentKind} · {formatInvocationExecutionMode(invocation.executionMode)}
+                              </p>
+                              <p className="text-xs uppercase tracking-[0.18em] text-slate-500">
+                                {invocation.status}
+                              </p>
+                            </div>
+                            <p className="mt-2 text-sm leading-6 text-slate-600">
+                              {invocation.detail}
+                            </p>
+                            <p className="mt-2 text-xs text-slate-500">
+                              key {invocation.requestKey}
+                              {invocation.targetAgentId ? ` · agent ${invocation.targetAgentId}` : ""}
+                            </p>
+                          </article>
+                        ))
+                      )}
+                    </div>
+                  ) : (
+                    <EmptyState
+                      title="Audit unavailable"
+                      body="The control plane can only proxy adapter audit data when the standalone agents service is configured and reachable."
+                    />
+                  )}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No audit data yet"
+                  body="The dashboard will show recent adapter invocations once the audit proxy loads."
                 />
               )}
             </Card>
@@ -1933,6 +2039,10 @@ function formatProcessingSourceMode(
   value: CaptureChunkSummary["transcriptSource"] | FinalReport["summarySource"],
 ) {
   return value === "downstream_service" ? "service" : "local";
+}
+
+function formatInvocationExecutionMode(value: "mock" | "bridge" | "bridge_fallback") {
+  return value.replaceAll("_", " ");
 }
 
 function formatScreenEventKind(value: ScreenEvent["kind"]) {

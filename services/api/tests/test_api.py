@@ -551,6 +551,68 @@ def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch)
     assert patched_payload["memoryIntegration"]["provider"] == "elastic"
 
 
+def test_agents_invocation_audit_proxy_reports_fallback_when_unavailable(client: TestClient):
+    response = client.get("/api/meta/agents/invocations")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["available"] is False
+    assert payload["summary"]["source"] == "local_unavailable"
+    assert payload["summary"]["total"] == 0
+    assert payload["invocations"] == []
+
+
+def test_agents_invocation_audit_proxy_can_surface_service_data(client: TestClient, monkeypatch):
+    from visualsprint_api.models import AgentInvocationAuditResponse
+
+    monkeypatch.setattr(
+        "visualsprint_api.routes.agents.get_agents_invocation_audit",
+        lambda: AgentInvocationAuditResponse.model_validate(
+            {
+                "summary": {
+                    "available": True,
+                    "source": "agents_service",
+                    "total": 2,
+                    "reasoningRuns": 1,
+                    "summaryRuns": 1,
+                    "bridgeRuns": 1,
+                    "bridgeFallbackRuns": 1,
+                    "mockRuns": 0,
+                    "note": "The standalone agents service provided recent invocation audit data.",
+                },
+                "invocations": [
+                    {
+                        "invokedAt": "2026-06-08T09:00:00Z",
+                        "agentKind": "summary",
+                        "executionMode": "bridge_fallback",
+                        "status": "fallback",
+                        "targetAgentId": "summary-agent",
+                        "requestKey": "mtg_001",
+                        "detail": "Configured bridge was unavailable, so deterministic summary fallback was used.",
+                    },
+                    {
+                        "invokedAt": "2026-06-08T08:59:00Z",
+                        "agentKind": "reasoning",
+                        "executionMode": "bridge",
+                        "status": "success",
+                        "targetAgentId": "reasoning-agent",
+                        "requestKey": "chunk_001",
+                        "detail": "Configured bridge produced the reasoning response.",
+                    },
+                ],
+            }
+        ),
+    )
+
+    response = client.get("/api/meta/agents/invocations")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["summary"]["available"] is True
+    assert payload["summary"]["bridgeRuns"] == 1
+    assert payload["summary"]["bridgeFallbackRuns"] == 1
+    assert payload["invocations"][0]["agentKind"] == "summary"
+    assert payload["invocations"][1]["executionMode"] == "bridge"
+
+
 def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, monkeypatch):
     meeting_id = _create_live_browser_meeting(client)
     _start_capture_session(client, meeting_id)
