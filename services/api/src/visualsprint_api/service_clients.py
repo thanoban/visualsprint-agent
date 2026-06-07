@@ -12,6 +12,7 @@ from visualsprint_api.models import (
     CaptureChunkUploadTarget,
     FinalReport,
     MeetingSummaryPacket,
+    ProcessingSourceMode,
     RegisterAgentOutputsRequest,
     ScreenEvent,
     TranscriptSegment,
@@ -89,6 +90,37 @@ def process_transcript_chunk(chunk: CaptureChunkSummary) -> list[TranscriptSegme
         return build_transcript_segments(chunk)
 
 
+def process_transcript_chunk_with_source(
+    chunk: CaptureChunkSummary,
+) -> tuple[list[TranscriptSegment], ProcessingSourceMode]:
+    if not settings.ingest_service_url:
+        return build_transcript_segments(chunk), "local_fallback"
+
+    payload = {
+        "chunkId": chunk.id,
+        "clientChunkId": chunk.clientChunkId,
+        "sequence": chunk.sequence,
+        "recordedAt": chunk.recordedAt.isoformat(),
+        "durationMs": chunk.durationMs,
+        "mimeType": chunk.mimeType,
+    }
+
+    try:
+        response_payload = _post_json(
+            f"{settings.ingest_service_url.rstrip('/')}/api/transcript/chunks/process",
+            payload,
+        )
+        return (
+            [
+                TranscriptSegment.model_validate(segment)
+                for segment in response_payload["transcriptSegments"]
+            ],
+            "downstream_service",
+        )
+    except (KeyError, ValueError, error.URLError, error.HTTPError):
+        return build_transcript_segments(chunk), "local_fallback"
+
+
 def process_media_chunk(chunk: CaptureChunkSummary) -> tuple[int, list[ScreenEvent]]:
     """Use the media service when available, otherwise fall back locally."""
 
@@ -120,6 +152,40 @@ def process_media_chunk(chunk: CaptureChunkSummary) -> tuple[int, list[ScreenEve
         return build_screen_events(chunk)
 
 
+def process_media_chunk_with_source(
+    chunk: CaptureChunkSummary,
+) -> tuple[int, list[ScreenEvent], ProcessingSourceMode]:
+    if not settings.media_service_url:
+        frame_count, screen_events = build_screen_events(chunk)
+        return frame_count, screen_events, "local_fallback"
+
+    payload = {
+        "chunkId": chunk.id,
+        "clientChunkId": chunk.clientChunkId,
+        "sequence": chunk.sequence,
+        "recordedAt": chunk.recordedAt.isoformat(),
+        "durationMs": chunk.durationMs,
+        "mimeType": chunk.mimeType,
+    }
+
+    try:
+        response_payload = _post_json(
+            f"{settings.media_service_url.rstrip('/')}/api/media/chunks/process",
+            payload,
+        )
+        return (
+            int(response_payload["frameCount"]),
+            [
+                ScreenEvent.model_validate(screen_event)
+                for screen_event in response_payload["screenEvents"]
+            ],
+            "downstream_service",
+        )
+    except (KeyError, ValueError, error.URLError, error.HTTPError):
+        frame_count, screen_events = build_screen_events(chunk)
+        return frame_count, screen_events, "local_fallback"
+
+
 def run_chunk_reasoning(insight: ChunkInsight) -> RegisterAgentOutputsRequest | None:
     """Call the agents service for chunk reasoning when configured."""
 
@@ -134,6 +200,15 @@ def run_chunk_reasoning(insight: ChunkInsight) -> RegisterAgentOutputsRequest | 
         return RegisterAgentOutputsRequest.model_validate(response_payload)
     except (ValueError, error.URLError, error.HTTPError):
         return None
+
+
+def run_chunk_reasoning_with_source(
+    insight: ChunkInsight,
+) -> tuple[RegisterAgentOutputsRequest | None, ProcessingSourceMode]:
+    payload = run_chunk_reasoning(insight)
+    if payload is None:
+        return None, "local_fallback"
+    return payload, "downstream_service"
 
 
 def run_summary_agent(packet: MeetingSummaryPacket) -> FinalReport | None:
@@ -159,6 +234,15 @@ def run_summary_agent(packet: MeetingSummaryPacket) -> FinalReport | None:
         )
     except (ValueError, error.URLError, error.HTTPError):
         return None
+
+
+def run_summary_agent_with_source(
+    packet: MeetingSummaryPacket,
+) -> tuple[FinalReport | None, ProcessingSourceMode]:
+    report = run_summary_agent(packet)
+    if report is None:
+        return None, "local_fallback"
+    return report, "downstream_service"
 
 
 def _post_json(url: str, payload: dict) -> dict:

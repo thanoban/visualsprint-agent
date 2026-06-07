@@ -16,6 +16,7 @@ SourceConnectorSlug = Literal[
 ]
 CaptureSessionStatus = Literal["idle", "recording", "completed"]
 ChunkProcessingStatus = Literal["registered", "processing", "processed"]
+ProcessingSourceMode = Literal["local_fallback", "downstream_service"]
 CaptureChunkLifecycleStatus = Literal[
     "registered",
     "upload_ready",
@@ -111,6 +112,9 @@ class CaptureChunkSummary(BaseModel):
     transcriptSegmentCount: int = 0
     visualEventCount: int = 0
     signalCount: int = 0
+    transcriptSource: ProcessingSourceMode = "local_fallback"
+    mediaSource: ProcessingSourceMode = "local_fallback"
+    reasoningSource: ProcessingSourceMode = "local_fallback"
 
 
 class CaptureSessionSummary(BaseModel):
@@ -426,6 +430,7 @@ class FinalReport(BaseModel):
     meetingId: str
     generatedAt: datetime
     executiveSummary: str = Field(min_length=12, max_length=600)
+    summarySource: ProcessingSourceMode = "local_fallback"
     decisions: list[DecisionRecord] = Field(default_factory=list)
     commitments: list[CommitmentRecord] = Field(default_factory=list)
     blockers: list[BlockerRecord] = Field(default_factory=list)

@@ -43,11 +43,11 @@ from visualsprint_api.models import (
     MeetingSummary,
 )
 from visualsprint_api.service_clients import (
-    process_media_chunk,
-    process_transcript_chunk,
+    process_media_chunk_with_source,
+    process_transcript_chunk_with_source,
     reserve_chunk_upload_target,
-    run_chunk_reasoning,
-    run_summary_agent,
+    run_chunk_reasoning_with_source,
+    run_summary_agent_with_source,
 )
 from visualsprint_api.summary_pipeline import build_meeting_summary_packet
 
@@ -283,7 +283,10 @@ class MeetingStore:
                 meeting=meeting.model_copy(deep=True),
                 meeting_state=self._build_meeting_state(meeting),
             )
-            report = run_summary_agent(summary_packet) or self._build_final_report(meeting)
+            report, summary_source = run_summary_agent_with_source(summary_packet)
+            if report is None:
+                report = self._build_final_report(meeting)
+            report.summarySource = summary_source
             self._final_reports[meeting_id] = report
             self._mark_meeting_updated(meeting_id)
             return report.model_copy(deep=True)
@@ -625,6 +628,9 @@ class MeetingStore:
                 transcriptSegmentCount=0,
                 visualEventCount=0,
                 signalCount=0,
+                transcriptSource="local_fallback",
+                mediaSource="local_fallback",
+                reasoningSource="local_fallback",
             )
             self._chunks_by_client_id[chunk_key] = chunk
             self._chunk_context_by_client_id[chunk_key] = ChunkContext(
@@ -785,8 +791,8 @@ class MeetingStore:
     ) -> None:
         recorded_at = chunk.recordedAt
         template_index = (chunk.sequence - 1) % len(DECISION_TEMPLATES)
-        transcript_segments = process_transcript_chunk(chunk)
-        frame_count, screen_events = process_media_chunk(chunk)
+        transcript_segments, transcript_source = process_transcript_chunk_with_source(chunk)
+        frame_count, screen_events, media_source = process_media_chunk_with_source(chunk)
         final_end = transcript_segments[-1].endedAt
 
         meeting.recentTranscriptSegments = (
@@ -802,6 +808,8 @@ class MeetingStore:
         chunk.frameCount = frame_count
         chunk.transcriptSegmentCount = len(transcript_segments)
         chunk.visualEventCount = len(screen_events)
+        chunk.transcriptSource = transcript_source
+        chunk.mediaSource = media_source
         meeting.latestEvents.insert(
             0,
             LiveEvent(
@@ -843,7 +851,8 @@ class MeetingStore:
                 screenEvents=[screen_event.model_copy(deep=True) for screen_event in screen_events],
             ),
         )
-        agent_outputs = run_chunk_reasoning(chunk_insight)
+        agent_outputs, reasoning_source = run_chunk_reasoning_with_source(chunk_insight)
+        chunk.reasoningSource = reasoning_source
         if agent_outputs is not None:
             signal_count = self._apply_agent_outputs_to_meeting(
                 meeting=meeting,

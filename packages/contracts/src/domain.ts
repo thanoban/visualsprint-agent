@@ -22,6 +22,7 @@ export type LiveEventKind =
   | "memory";
 export type CaptureSessionStatus = "idle" | "recording" | "completed";
 export type ChunkProcessingStatus = "registered" | "processing" | "processed";
+export type ProcessingSourceMode = "local_fallback" | "downstream_service";
 export type CaptureChunkLifecycleStatus =
   | "registered"
   | "upload_ready"
@@ -139,6 +140,9 @@ export interface CaptureChunkSummary {
   transcriptSegmentCount: number;
   visualEventCount: number;
   signalCount: number;
+  transcriptSource: ProcessingSourceMode;
+  mediaSource: ProcessingSourceMode;
+  reasoningSource: ProcessingSourceMode;
 }
 
 export interface CaptureSessionSummary {
@@ -448,6 +452,7 @@ export interface FinalReport {
   meetingId: string;
   generatedAt: string;
   executiveSummary: string;
+  summarySource: ProcessingSourceMode;
   decisions: DecisionRecord[];
   commitments: CommitmentRecord[];
   blockers: BlockerRecord[];

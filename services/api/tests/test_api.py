@@ -92,6 +92,9 @@ def test_processed_chunk_exposes_context_insight_and_memory_surfaces(client: Tes
     context_payload = context_response.json()
     assert len(context_payload["chunkContext"]["transcriptSegments"]) == 2
     assert len(context_payload["chunkContext"]["screenEvents"]) >= 1
+    assert context_payload["chunkContext"]["chunk"]["transcriptSource"] == "local_fallback"
+    assert context_payload["chunkContext"]["chunk"]["mediaSource"] == "local_fallback"
+    assert context_payload["chunkContext"]["chunk"]["reasoningSource"] == "local_fallback"
     assert context_payload["meetingState"]["latestChunkClientId"] == "client-chunk-1001"
 
     insight_response = client.get(f"/api/meetings/{meeting_id}/insights/chunks/client-chunk-1001")
@@ -188,6 +191,7 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     assert finalize_response.status_code == 200
     final_report = finalize_response.json()["report"]
     assert final_report["meetingId"] == meeting_id
+    assert final_report["summarySource"] == "local_fallback"
     assert len(final_report["decisions"]) >= 2
     assert len(final_report["openQuestions"]) >= 1
     assert len(final_report["decisions"][0]["evidence"]) >= 1
@@ -355,7 +359,7 @@ def test_chunk_processing_can_use_service_boundary_processors(client: TestClient
                 endedAt=chunk.recordedAt,
                 text="A second transcript segment arrived from the ingest service surface.",
             ),
-        ]
+        ], "downstream_service"
 
     def fake_media_processor(chunk):
         return (
@@ -369,10 +373,17 @@ def test_chunk_processing_can_use_service_boundary_processors(client: TestClient
                     recordedAt=chunk.recordedAt,
                 )
             ],
+            "downstream_service",
         )
 
-    monkeypatch.setattr("visualsprint_api.repository.process_transcript_chunk", fake_transcript_processor)
-    monkeypatch.setattr("visualsprint_api.repository.process_media_chunk", fake_media_processor)
+    monkeypatch.setattr(
+        "visualsprint_api.repository.process_transcript_chunk_with_source",
+        fake_transcript_processor,
+    )
+    monkeypatch.setattr(
+        "visualsprint_api.repository.process_media_chunk_with_source",
+        fake_media_processor,
+    )
 
     _process_chunk(client, meeting_id, "client-chunk-5001")
 
@@ -383,6 +394,8 @@ def test_chunk_processing_can_use_service_boundary_processors(client: TestClient
     payload = context_response.json()["chunkContext"]
     assert payload["transcriptSegments"][0]["speakerLabel"] == "ServiceAvery"
     assert payload["screenEvents"][0]["summary"] == "Service boundary media processor supplied this visual event."
+    assert payload["chunk"]["transcriptSource"] == "downstream_service"
+    assert payload["chunk"]["mediaSource"] == "downstream_service"
 
 
 def test_chunk_registration_can_use_ingest_upload_reservation(client: TestClient, monkeypatch):
@@ -501,24 +514,27 @@ def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, m
     from visualsprint_api.models import RegisterAgentOutputsRequest
 
     monkeypatch.setattr(
-        "visualsprint_api.repository.run_chunk_reasoning",
-        lambda insight: RegisterAgentOutputsRequest(
-            clientChunkId=insight.clientChunkId,
-            decisions=[
-                {
-                    "title": "Service-generated decision",
-                    "rationale": "The agents service produced this reasoning output.",
-                    "speakerLabel": "AgentsService",
-                }
-            ],
-            commitments=[],
-            blockers=[],
-            openQuestions=[],
-            memoryMatches=[],
-            resolvedDecisionIds=[],
-            resolvedCommitmentIds=[],
-            resolvedBlockerIds=[],
-            resolvedOpenQuestionIds=[],
+        "visualsprint_api.repository.run_chunk_reasoning_with_source",
+        lambda insight: (
+            RegisterAgentOutputsRequest(
+                clientChunkId=insight.clientChunkId,
+                decisions=[
+                    {
+                        "title": "Service-generated decision",
+                        "rationale": "The agents service produced this reasoning output.",
+                        "speakerLabel": "AgentsService",
+                    }
+                ],
+                commitments=[],
+                blockers=[],
+                openQuestions=[],
+                memoryMatches=[],
+                resolvedDecisionIds=[],
+                resolvedCommitmentIds=[],
+                resolvedBlockerIds=[],
+                resolvedOpenQuestionIds=[],
+            ),
+            "downstream_service",
         ),
     )
 
@@ -526,8 +542,10 @@ def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, m
 
     meeting_response = client.get(f"/api/meetings/{meeting_id}")
     assert meeting_response.status_code == 200
-    decisions = meeting_response.json()["meeting"]["recentDecisions"]
+    meeting_payload = meeting_response.json()["meeting"]
+    decisions = meeting_payload["recentDecisions"]
     assert any(decision["title"] == "Service-generated decision" for decision in decisions)
+    assert meeting_payload["recentCaptureChunks"][0]["reasoningSource"] == "downstream_service"
 
 
 def test_finalize_report_can_use_agents_summary_service(client: TestClient, monkeypatch):
@@ -542,19 +560,24 @@ def test_finalize_report_can_use_agents_summary_service(client: TestClient, monk
     from visualsprint_api.models import FinalReport
 
     monkeypatch.setattr(
-        "visualsprint_api.repository.run_summary_agent",
-        lambda packet: FinalReport(
-            meetingId=packet.meetingId,
-            generatedAt="2026-06-07T10:00:00Z",
-            executiveSummary="Agents service generated this final summary.",
-            decisions=packet.decisions,
-            commitments=packet.commitments,
-            blockers=packet.blockers,
-            openQuestions=packet.openQuestions,
-            memoryHighlights=packet.memoryHighlights,
+        "visualsprint_api.repository.run_summary_agent_with_source",
+        lambda packet: (
+            FinalReport(
+                meetingId=packet.meetingId,
+                generatedAt="2026-06-07T10:00:00Z",
+                executiveSummary="Agents service generated this final summary.",
+                summarySource="downstream_service",
+                decisions=packet.decisions,
+                commitments=packet.commitments,
+                blockers=packet.blockers,
+                openQuestions=packet.openQuestions,
+                memoryHighlights=packet.memoryHighlights,
+            ),
+            "downstream_service",
         ),
     )
 
     finalize_response = client.post(f"/api/meetings/{meeting_id}/final-report")
     assert finalize_response.status_code == 200
     assert finalize_response.json()["report"]["executiveSummary"] == "Agents service generated this final summary."
+    assert finalize_response.json()["report"]["summarySource"] == "downstream_service"
