@@ -140,6 +140,33 @@ export interface AgentInvocationAuditResponse {
   invocations: AgentInvocationAuditEntry[];
 }
 
+export interface AgentSmokeReasoningResult {
+  attempted: boolean;
+  selectedChunkId: null | string;
+  source: "local_fallback" | "downstream_service";
+  producedOutput: boolean;
+  decisionCount: number;
+  commitmentCount: number;
+  blockerCount: number;
+  openQuestionCount: number;
+  memoryMatchCount: number;
+  note: string;
+}
+
+export interface AgentSmokeSummaryResult {
+  attempted: boolean;
+  source: "local_fallback" | "downstream_service";
+  producedOutput: boolean;
+  executiveSummaryLength: number;
+  note: string;
+}
+
+export interface AgentSmokeResponse {
+  meetingId: string;
+  reasoning: AgentSmokeReasoningResult;
+  summary: AgentSmokeSummaryResult;
+}
+
 export interface MeetingMetrics {
   decisionsCount: number;
   commitmentsCount: number;

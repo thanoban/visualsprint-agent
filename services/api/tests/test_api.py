@@ -613,6 +613,84 @@ def test_agents_invocation_audit_proxy_can_surface_service_data(client: TestClie
     assert payload["invocations"][1]["executionMode"] == "bridge"
 
 
+def test_agent_smoke_uses_processed_chunk_and_summary_packet(client: TestClient, monkeypatch):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-7001", sequence=1)
+    assert register_response.status_code == 200
+    _process_chunk(client, meeting_id, "client-chunk-7001")
+
+    from visualsprint_api.models import FinalReport, RegisterAgentOutputsRequest
+
+    monkeypatch.setattr(
+        "visualsprint_api.routes.agents.run_chunk_reasoning_with_source",
+        lambda insight: (
+            RegisterAgentOutputsRequest(
+                clientChunkId=insight.clientChunkId,
+                decisions=[
+                    {
+                        "title": "Smoke decision",
+                        "rationale": "Smoke route exercised the reasoning adapter seam.",
+                        "speakerLabel": "SmokeAgent",
+                    }
+                ],
+                commitments=[],
+                blockers=[],
+                openQuestions=[],
+                memoryMatches=[],
+                resolvedDecisionIds=[],
+                resolvedCommitmentIds=[],
+                resolvedBlockerIds=[],
+                resolvedOpenQuestionIds=[],
+            ),
+            "downstream_service",
+        ),
+    )
+    monkeypatch.setattr(
+        "visualsprint_api.routes.agents.run_summary_agent_with_source",
+        lambda packet: (
+            FinalReport(
+                meetingId=packet.meetingId,
+                generatedAt="2026-06-08T10:00:00Z",
+                executiveSummary="Smoke summary output.",
+                summarySource="downstream_service",
+                decisions=packet.decisions,
+                commitments=packet.commitments,
+                blockers=packet.blockers,
+                openQuestions=packet.openQuestions,
+                memoryHighlights=packet.memoryHighlights,
+            ),
+            "downstream_service",
+        ),
+    )
+
+    response = client.post(f"/api/meetings/{meeting_id}/agents/smoke")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["meetingId"] == meeting_id
+    assert payload["reasoning"]["attempted"] is True
+    assert payload["reasoning"]["selectedChunkId"] == "client-chunk-7001"
+    assert payload["reasoning"]["source"] == "downstream_service"
+    assert payload["reasoning"]["producedOutput"] is True
+    assert payload["reasoning"]["decisionCount"] == 1
+    assert payload["summary"]["attempted"] is True
+    assert payload["summary"]["source"] == "downstream_service"
+    assert payload["summary"]["producedOutput"] is True
+    assert payload["summary"]["executiveSummaryLength"] > 0
+
+
+def test_agent_smoke_handles_meeting_without_processed_chunk(client: TestClient):
+    meeting_id = _create_live_browser_meeting(client)
+
+    response = client.post(f"/api/meetings/{meeting_id}/agents/smoke")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["reasoning"]["attempted"] is False
+    assert payload["reasoning"]["selectedChunkId"] is None
+    assert payload["summary"]["attempted"] is True
+    assert payload["summary"]["source"] == "local_fallback"
+
+
 def test_chunk_processing_can_use_agents_reasoning_service(client: TestClient, monkeypatch):
     meeting_id = _create_live_browser_meeting(client)
     _start_capture_session(client, meeting_id)

@@ -125,6 +125,33 @@ class AgentInvocationAuditResponse(BaseModel):
     invocations: list[AgentInvocationAuditEntry] = Field(default_factory=list)
 
 
+class AgentSmokeReasoningResult(BaseModel):
+    attempted: bool
+    selectedChunkId: str | None = None
+    source: ProcessingSourceMode
+    producedOutput: bool
+    decisionCount: int = 0
+    commitmentCount: int = 0
+    blockerCount: int = 0
+    openQuestionCount: int = 0
+    memoryMatchCount: int = 0
+    note: str = Field(min_length=4, max_length=240)
+
+
+class AgentSmokeSummaryResult(BaseModel):
+    attempted: bool
+    source: ProcessingSourceMode
+    producedOutput: bool
+    executiveSummaryLength: int = 0
+    note: str = Field(min_length=4, max_length=240)
+
+
+class AgentSmokeResponse(BaseModel):
+    meetingId: str
+    reasoning: AgentSmokeReasoningResult
+    summary: AgentSmokeSummaryResult
+
+
 class CaptureChunkUploadTarget(BaseModel):
     method: Literal["PUT"] = "PUT"
     objectPath: str = Field(min_length=8, max_length=240)
