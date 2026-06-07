@@ -4,10 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
 
 def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
+    """Generate a final report draft through the active adapter mode."""
+
+    if settings.cloud_adapter_ready:
+        return _run_configured_summary_agent_stub(payload)
+    return _run_mock_summary_agent(payload)
+
+
+def _run_mock_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
     """Generate a deterministic final report draft from the summary packet."""
 
     summary_parts = [
@@ -29,3 +38,9 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
         openQuestions=payload.openQuestions,
         memoryHighlights=payload.memoryHighlights,
     )
+
+
+def _run_configured_summary_agent_stub(payload: SummaryPacketRequest) -> FinalReportDraft:
+    """Keep the current contract stable until the real Google Cloud call path lands."""
+
+    return _run_mock_summary_agent(payload)

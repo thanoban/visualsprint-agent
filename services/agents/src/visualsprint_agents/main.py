@@ -19,7 +19,7 @@ from visualsprint_agents.summary import run_summary_agent
 app = FastAPI(
     title="VisualSprint Agents",
     version=settings.version,
-    summary="Development stub for chunk reasoning and summary-agent behavior.",
+    summary="Adapter boundary for chunk reasoning and summary-agent behavior.",
 )
 
 
@@ -29,6 +29,11 @@ def get_health() -> ServiceHealth:
         service=settings.service_name,
         version=settings.version,
         track=settings.selected_track,
+        mode=settings.agent_mode,
+        reasoningAgentConfigured=settings.reasoning_agent_configured,
+        summaryAgentConfigured=settings.summary_agent_configured,
+        elasticMcpConfigured=settings.elastic_mcp_configured,
+        note=settings.health_note,
     )
 
 
@@ -46,5 +51,5 @@ def run_meeting_summary(payload: SummaryPacketRequest) -> FinalReportDraft:
 def get_root() -> dict[str, str]:
     return {
         "name": "VisualSprint Agents",
-        "message": "Development agent stubs are online.",
+        "message": settings.health_note,
     }
