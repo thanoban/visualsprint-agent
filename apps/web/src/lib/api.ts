@@ -4,6 +4,7 @@ import type {
   CaptureSessionResponse,
   CreateMeetingRequest,
   CreateMeetingResponse,
+  MeetingStreamEvent,
   MeetingDetailResponse,
   MeetingListResponse,
   RegisterCaptureChunkRequest,
@@ -33,6 +34,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export function getApiBaseUrl() {
   return defaultApiBaseUrl;
+}
+
+export function getMeetingEventsUrl(meetingId: string) {
+  return `${defaultApiBaseUrl}/api/meetings/${meetingId}/events`;
 }
 
 export function listMeetings() {
@@ -109,3 +114,5 @@ export function completeCaptureSession(meetingId: string) {
     },
   );
 }
+
+export type { MeetingStreamEvent };
