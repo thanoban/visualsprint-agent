@@ -407,6 +407,35 @@ class MeetingStore:
                 source_chunk.clientChunkId,
                 evidence_refs,
             )
+            resolved_count = 0
+            resolved_count += self._resolve_decisions(
+                meeting,
+                payload.resolvedDecisionIds,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
+            resolved_count += self._resolve_commitments(
+                meeting,
+                payload.resolvedCommitmentIds,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
+            resolved_count += self._resolve_blockers(
+                meeting,
+                payload.resolvedBlockerIds,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
+            resolved_count += self._resolve_open_questions(
+                meeting,
+                payload.resolvedOpenQuestionIds,
+                recorded_at,
+                source_chunk.clientChunkId,
+                evidence_refs,
+            )
             self._persist_memory_matches(meeting, payload.memoryMatches, recorded_at)
 
             source_chunk.signalCount += (
@@ -415,6 +444,7 @@ class MeetingStore:
                 + len(payload.blockers)
                 + len(payload.openQuestions)
                 + len(payload.memoryMatches)
+                + resolved_count
             )
             meeting.latestEvents.insert(
                 0,
@@ -428,7 +458,8 @@ class MeetingStore:
                         f"{len(payload.decisions)} decisions, "
                         f"{len(payload.commitments)} commitments, "
                         f"{len(payload.blockers)} blockers, "
-                        f"{len(payload.openQuestions)} open questions."
+                        f"{len(payload.openQuestions)} open questions, "
+                        f"and {resolved_count} resolved records."
                     ),
                 ),
             )
@@ -929,14 +960,24 @@ class MeetingStore:
             meetingStatus=meeting.status,
             activeCaptureSessionId=active_capture_session_id,
             latestChunkClientId=latest_chunk_client_id,
-            openDecisions=[decision.model_copy(deep=True) for decision in meeting.recentDecisions],
+            openDecisions=[
+                decision.model_copy(deep=True)
+                for decision in meeting.recentDecisions
+                if decision.status != "resolved"
+            ],
             openCommitments=[
                 commitment.model_copy(deep=True) for commitment in meeting.recentCommitments
+                if commitment.status != "resolved"
             ],
-            openBlockers=[blocker.model_copy(deep=True) for blocker in meeting.recentBlockers],
+            openBlockers=[
+                blocker.model_copy(deep=True)
+                for blocker in meeting.recentBlockers
+                if blocker.status != "resolved"
+            ],
             openQuestions=[
                 open_question.model_copy(deep=True)
                 for open_question in meeting.recentOpenQuestions
+                if open_question.status != "resolved"
             ],
         )
 
@@ -1051,6 +1092,70 @@ class MeetingStore:
                 chunk_client_id=chunk_client_id,
                 evidence_refs=evidence_refs,
             )
+
+    def _resolve_decisions(
+        self,
+        meeting: MeetingDetail,
+        decision_ids: list[str],
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        return self._resolve_reasoning_records(
+            records=meeting.recentDecisions,
+            record_ids=decision_ids,
+            recorded_at=recorded_at,
+            chunk_client_id=chunk_client_id,
+            evidence_refs=evidence_refs,
+        )
+
+    def _resolve_commitments(
+        self,
+        meeting: MeetingDetail,
+        commitment_ids: list[str],
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        return self._resolve_reasoning_records(
+            records=meeting.recentCommitments,
+            record_ids=commitment_ids,
+            recorded_at=recorded_at,
+            chunk_client_id=chunk_client_id,
+            evidence_refs=evidence_refs,
+        )
+
+    def _resolve_blockers(
+        self,
+        meeting: MeetingDetail,
+        blocker_ids: list[str],
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        return self._resolve_reasoning_records(
+            records=meeting.recentBlockers,
+            record_ids=blocker_ids,
+            recorded_at=recorded_at,
+            chunk_client_id=chunk_client_id,
+            evidence_refs=evidence_refs,
+        )
+
+    def _resolve_open_questions(
+        self,
+        meeting: MeetingDetail,
+        open_question_ids: list[str],
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        return self._resolve_reasoning_records(
+            records=meeting.recentOpenQuestions,
+            record_ids=open_question_ids,
+            recorded_at=recorded_at,
+            chunk_client_id=chunk_client_id,
+            evidence_refs=evidence_refs,
+        )
 
     def _upsert_decision(
         self,
@@ -1234,6 +1339,34 @@ class MeetingStore:
         current_value = getattr(meeting.metrics, metric_attr)
         setattr(meeting.metrics, metric_attr, current_value + 1)
         return created_record
+
+    def _resolve_reasoning_records(
+        self,
+        records: list,
+        record_ids: list[str],
+        recorded_at: datetime,
+        chunk_client_id: str,
+        evidence_refs: list[EvidenceReference],
+    ) -> int:
+        resolved_count = 0
+        for target_id in record_ids:
+            for index, record in enumerate(records):
+                if record.id != target_id or record.status == "resolved":
+                    continue
+                updated_record = record.model_copy(
+                    update={
+                        "status": "resolved",
+                        "lastUpdatedChunkId": chunk_client_id,
+                        "recordedAt": recorded_at,
+                        "evidence": self._clone_evidence(evidence_refs),
+                    }
+                )
+                records.pop(index)
+                records.insert(0, updated_record)
+                resolved_count += 1
+                break
+        del records[6:]
+        return resolved_count
 
     def _build_evidence_references(
         self,

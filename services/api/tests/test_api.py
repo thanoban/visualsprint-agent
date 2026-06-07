@@ -212,6 +212,10 @@ def test_repeated_agent_outputs_update_existing_records_instead_of_duplicating(c
         "blockers": [],
         "openQuestions": [],
         "memoryMatches": [],
+        "resolvedDecisionIds": [],
+        "resolvedCommitmentIds": [],
+        "resolvedBlockerIds": [],
+        "resolvedOpenQuestionIds": [],
     }
 
     first_response = client.post(f"/api/meetings/{meeting_id}/outputs/register", json=payload)
@@ -239,3 +243,73 @@ def test_repeated_agent_outputs_update_existing_records_instead_of_duplicating(c
     assert second_decision["firstSeenChunkId"] == "client-chunk-3001"
     assert second_decision["lastUpdatedChunkId"] == "client-chunk-3001"
     assert second_meeting["metrics"]["decisionsCount"] == first_decisions_count
+
+
+def test_resolved_records_leave_open_state_and_can_reopen(client: TestClient):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-4001", sequence=1)
+    assert register_response.status_code == 200
+    _process_chunk(client, meeting_id, "client-chunk-4001")
+
+    initial_meeting = client.get(f"/api/meetings/{meeting_id}").json()["meeting"]
+    target_decision = initial_meeting["recentDecisions"][0]
+
+    resolve_response = client.post(
+        f"/api/meetings/{meeting_id}/outputs/register",
+        json={
+            "clientChunkId": "client-chunk-4001",
+            "decisions": [],
+            "commitments": [],
+            "blockers": [],
+            "openQuestions": [],
+            "memoryMatches": [],
+            "resolvedDecisionIds": [target_decision["id"]],
+            "resolvedCommitmentIds": [],
+            "resolvedBlockerIds": [],
+            "resolvedOpenQuestionIds": [],
+        },
+    )
+    assert resolve_response.status_code == 200
+    resolved_meeting = resolve_response.json()["meeting"]
+    resolved_decision = next(
+        decision for decision in resolved_meeting["recentDecisions"] if decision["id"] == target_decision["id"]
+    )
+    assert resolved_decision["status"] == "resolved"
+    assert all(
+        decision["id"] != target_decision["id"]
+        for decision in resolve_response.json()["meetingState"]["openDecisions"]
+    )
+
+    reopen_response = client.post(
+        f"/api/meetings/{meeting_id}/outputs/register",
+        json={
+            "clientChunkId": "client-chunk-4001",
+            "decisions": [
+                {
+                    "title": target_decision["title"],
+                    "rationale": target_decision["rationale"],
+                    "speakerLabel": target_decision["speakerLabel"],
+                }
+            ],
+            "commitments": [],
+            "blockers": [],
+            "openQuestions": [],
+            "memoryMatches": [],
+            "resolvedDecisionIds": [],
+            "resolvedCommitmentIds": [],
+            "resolvedBlockerIds": [],
+            "resolvedOpenQuestionIds": [],
+        },
+    )
+    assert reopen_response.status_code == 200
+    reopened_decision = next(
+        decision
+        for decision in reopen_response.json()["meeting"]["recentDecisions"]
+        if decision["id"] == target_decision["id"]
+    )
+    assert reopened_decision["status"] == "reopened"
+    assert any(
+        decision["id"] == target_decision["id"]
+        for decision in reopen_response.json()["meetingState"]["openDecisions"]
+    )

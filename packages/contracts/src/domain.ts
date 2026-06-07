@@ -449,6 +449,10 @@ export interface RegisterAgentOutputsRequest {
   blockers: AgentBlockerInput[];
   openQuestions: AgentOpenQuestionInput[];
   memoryMatches: AgentMemoryMatchInput[];
+  resolvedDecisionIds: string[];
+  resolvedCommitmentIds: string[];
+  resolvedBlockerIds: string[];
+  resolvedOpenQuestionIds: string[];
 }
 
 export interface RegisterAgentOutputsResponse {

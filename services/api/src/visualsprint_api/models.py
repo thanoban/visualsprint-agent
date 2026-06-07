@@ -430,6 +430,10 @@ class RegisterAgentOutputsRequest(BaseModel):
     blockers: list[AgentBlockerInput] = Field(default_factory=list)
     openQuestions: list[AgentOpenQuestionInput] = Field(default_factory=list)
     memoryMatches: list[AgentMemoryMatchInput] = Field(default_factory=list)
+    resolvedDecisionIds: list[str] = Field(default_factory=list, max_length=12)
+    resolvedCommitmentIds: list[str] = Field(default_factory=list, max_length=12)
+    resolvedBlockerIds: list[str] = Field(default_factory=list, max_length=12)
+    resolvedOpenQuestionIds: list[str] = Field(default_factory=list, max_length=12)
 
 
 class RegisterAgentOutputsResponse(BaseModel):
