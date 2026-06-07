@@ -8,6 +8,27 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+class ChunkUploadReservationRequest(BaseModel):
+    meetingId: str = Field(min_length=4, max_length=120)
+    captureSessionId: str = Field(min_length=4, max_length=120)
+    clientChunkId: str = Field(min_length=8, max_length=120)
+    sequence: int = Field(ge=1)
+    mimeType: str = Field(min_length=3, max_length=120)
+
+
+class ChunkUploadTarget(BaseModel):
+    method: Literal["PUT"] = "PUT"
+    objectPath: str = Field(min_length=8, max_length=240)
+    signedUrl: str | None = None
+    requiredHeaders: dict[str, str] = Field(default_factory=dict)
+    expiresAt: datetime | None = None
+
+
+class ChunkUploadReservationResponse(BaseModel):
+    clientChunkId: str
+    uploadTarget: ChunkUploadTarget
+
+
 class TranscriptSegment(BaseModel):
     id: str
     speakerLabel: str = Field(min_length=2, max_length=60)

@@ -385,6 +385,38 @@ def test_chunk_processing_can_use_service_boundary_processors(client: TestClient
     assert payload["screenEvents"][0]["summary"] == "Service boundary media processor supplied this visual event."
 
 
+def test_chunk_registration_can_use_ingest_upload_reservation(client: TestClient, monkeypatch):
+    meeting_id = _create_live_browser_meeting(client)
+    capture_session = _start_capture_session(client, meeting_id)
+
+    def fake_upload_target_reservation(**kwargs):
+        from visualsprint_api.models import CaptureChunkUploadTarget
+
+        return CaptureChunkUploadTarget(
+            objectPath=(
+                f"reserved/{kwargs['meeting_id']}/{kwargs['capture_session_id']}/"
+                f"{kwargs['client_chunk_id']}.webm"
+            ),
+            requiredHeaders={
+                "Content-Type": kwargs["mime_type"],
+                "X-VisualSprint-Reservation": "service",
+            },
+        )
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.reserve_chunk_upload_target",
+        fake_upload_target_reservation,
+    )
+
+    register_response = _register_chunk(client, meeting_id, "client-chunk-5101", sequence=1)
+    assert register_response.status_code == 200
+    payload = register_response.json()["chunk"]
+    assert payload["storageObjectPath"].startswith("reserved/")
+    assert payload["storageObjectPath"].endswith("client-chunk-5101.webm")
+    assert payload["uploadTarget"]["requiredHeaders"]["X-VisualSprint-Reservation"] == "service"
+    assert capture_session["id"] in payload["storageObjectPath"]
+
+
 def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch):
     fallback_meta_response = client.get("/api/meta")
     assert fallback_meta_response.status_code == 200
