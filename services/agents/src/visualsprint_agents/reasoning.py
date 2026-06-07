@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import (
     AgentBlockerInput,
     AgentCommitmentInput,
@@ -14,6 +15,14 @@ from visualsprint_agents.models import (
 
 
 def run_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse:
+    """Generate reasoning outputs through the active adapter mode."""
+
+    if settings.cloud_adapter_ready:
+        return _run_configured_reasoning_agent_stub(payload)
+    return _run_mock_reasoning_agent(payload)
+
+
+def _run_mock_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse:
     """Generate deterministic reasoning outputs from the assembled insight."""
 
     decision_summary = payload.focusAreas[0].summary if payload.focusAreas else payload.focusSummary
@@ -59,3 +68,9 @@ def run_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse:
         openQuestions=[open_question],
         memoryMatches=[memory_match],
     )
+
+
+def _run_configured_reasoning_agent_stub(payload: ChunkInsightRequest) -> ReasoningRunResponse:
+    """Keep the response schema stable until the real SDK/tool-calling path lands."""
+
+    return _run_mock_reasoning_agent(payload)

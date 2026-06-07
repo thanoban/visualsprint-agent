@@ -8,6 +8,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 
+AgentAdapterMode = Literal["mock", "configured_cloud"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
 MemoryMatchRelation = Literal["new", "recurring", "reopened", "resolved_previously"]
@@ -139,3 +140,8 @@ class ServiceHealth(BaseModel):
     status: Literal["ok"] = "ok"
     version: str
     track: str
+    mode: AgentAdapterMode
+    reasoningAgentConfigured: bool
+    summaryAgentConfigured: bool
+    elasticMcpConfigured: bool
+    note: str
