@@ -46,6 +46,8 @@ LiveEventKind = Literal[
     "blocker",
     "memory",
 ]
+DownstreamServiceKind = Literal["control_plane", "ingest", "media"]
+DownstreamServiceConnectionStatus = Literal["ok", "unreachable", "not_configured"]
 
 
 class MeetingMetrics(BaseModel):
@@ -59,6 +61,29 @@ class MeetingMetrics(BaseModel):
     captureEventsCount: int = 0
     captureChunksCount: int = 0
     capturedBytes: int = 0
+
+
+class DownstreamServiceStatus(BaseModel):
+    service: str
+    kind: DownstreamServiceKind
+    configured: bool
+    reachable: bool
+    mode: Literal["local", "remote", "fallback"]
+    baseUrl: str | None = None
+    status: DownstreamServiceConnectionStatus
+    version: str | None = None
+    track: str | None = None
+    note: str = Field(min_length=4, max_length=240)
+
+
+class PlatformMetaResponse(BaseModel):
+    service: str
+    environment: str
+    selectedTrack: str
+    supportedTracks: list[str]
+    architecture: dict[str, str]
+    modules: list[str]
+    downstreamServices: list[DownstreamServiceStatus] = Field(default_factory=list)
 
 
 class CaptureChunkUploadTarget(BaseModel):

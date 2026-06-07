@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi.testclient import TestClient
 
 
@@ -385,3 +383,63 @@ def test_chunk_processing_can_use_service_boundary_processors(client: TestClient
     payload = context_response.json()["chunkContext"]
     assert payload["transcriptSegments"][0]["speakerLabel"] == "ServiceAvery"
     assert payload["screenEvents"][0]["summary"] == "Service boundary media processor supplied this visual event."
+
+
+def test_meta_reports_downstream_service_status(client: TestClient, monkeypatch):
+    fallback_meta_response = client.get("/api/meta")
+    assert fallback_meta_response.status_code == 200
+    fallback_services = fallback_meta_response.json()["downstreamServices"]
+    ingest_status = next(service for service in fallback_services if service["kind"] == "ingest")
+    media_status = next(service for service in fallback_services if service["kind"] == "media")
+    assert ingest_status["status"] == "not_configured"
+    assert media_status["status"] == "not_configured"
+
+    from visualsprint_api.models import DownstreamServiceStatus
+
+    monkeypatch.setattr(
+        "visualsprint_api.routes.meta.get_downstream_service_statuses",
+        lambda: [
+            DownstreamServiceStatus(
+                service="visualsprint-api",
+                kind="control_plane",
+                configured=True,
+                reachable=True,
+                mode="local",
+                baseUrl=None,
+                status="ok",
+                version="0.1.0",
+                track="elastic",
+                note="Control plane is healthy.",
+            ),
+            DownstreamServiceStatus(
+                service="visualsprint-ingest",
+                kind="ingest",
+                configured=True,
+                reachable=True,
+                mode="remote",
+                baseUrl="http://127.0.0.1:8100",
+                status="ok",
+                version="0.1.0",
+                track="elastic",
+                note="Ingest service responded successfully.",
+            ),
+            DownstreamServiceStatus(
+                service="visualsprint-media",
+                kind="media",
+                configured=True,
+                reachable=False,
+                mode="fallback",
+                baseUrl="http://127.0.0.1:8200",
+                status="unreachable",
+                version=None,
+                track=None,
+                note="Media service is unreachable; local fallback remains active.",
+            ),
+        ],
+    )
+
+    patched_meta_response = client.get("/api/meta")
+    assert patched_meta_response.status_code == 200
+    patched_services = patched_meta_response.json()["downstreamServices"]
+    assert next(service for service in patched_services if service["kind"] == "ingest")["status"] == "ok"
+    assert next(service for service in patched_services if service["kind"] == "media")["status"] == "unreachable"
