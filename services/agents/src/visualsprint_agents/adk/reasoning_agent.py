@@ -27,6 +27,7 @@ def build_reasoning_agent_blueprint() -> AgentBlueprint:
             "Read transcript and screen evidence together before deciding whether a signal is durable.",
             "Prefer updates, resolutions, or reopen events over duplicate net-new records when the running state already contains the issue.",
             "Use historical retrieval before assigning recurring or reopened memory relations.",
+            "Treat backend-injected memoryMatches as pre-searched historical context and only call search_prior_outcomes when you need additional comparison depth.",
             "Return schema-valid structured outputs only.",
             "Do not invent evidence that is not present in the supplied chunk context.",
         ),

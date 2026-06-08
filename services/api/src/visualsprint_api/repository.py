@@ -341,6 +341,9 @@ class MeetingStore:
         meeting_id: str,
         client_chunk_id: str,
     ) -> ChunkInsight | None:
+        meeting_copy: MeetingDetail | None = None
+        chunk_context_copy: ChunkContext | None = None
+        meeting_state: MeetingStateSnapshot | None = None
         with self._lock:
             meeting = self._meetings.get(meeting_id)
             if meeting is None:
@@ -350,11 +353,22 @@ class MeetingStore:
             if chunk_context is None:
                 return None
 
-            return build_chunk_insight(
-                meeting=meeting.model_copy(deep=True),
-                meeting_state=self._build_meeting_state(meeting),
-                chunk_context=chunk_context.model_copy(deep=True),
-            )
+            meeting_copy = meeting.model_copy(deep=True)
+            chunk_context_copy = chunk_context.model_copy(deep=True)
+            meeting_state = self._build_meeting_state(meeting)
+
+        insight = build_chunk_insight(
+            meeting=meeting_copy,
+            meeting_state=meeting_state,
+            chunk_context=chunk_context_copy,
+        )
+        memory_matches = self._resolve_chunk_memory_matches(
+            meeting_id=meeting_id,
+            memory_queries=insight.memoryQueries,
+        )
+        if memory_matches:
+            return insight.model_copy(update={"memoryMatches": memory_matches})
+        return insight
 
     def search_prior_outcomes(
         self,
@@ -1730,6 +1744,44 @@ class MeetingStore:
             score=0.12,
             snippet="The current development memory layer did not return a strong historical precedent.",
             recordedAt=_utc_now(),
+        )
+
+    def _resolve_chunk_memory_matches(
+        self,
+        *,
+        meeting_id: str,
+        memory_queries: list[SearchPriorOutcomesRequest],
+    ) -> list[MemoryMatch]:
+        if len(memory_queries) == 0:
+            return []
+
+        matches: list[MemoryMatch] = []
+        seen: set[tuple[str, str, str, str]] = set()
+        for query in memory_queries[:3]:
+            query_matches = self.search_prior_outcomes(meeting_id, query)
+            if query_matches is None:
+                continue
+            for match in query_matches:
+                if self._is_placeholder_memory_match(match):
+                    continue
+                dedupe_key = (
+                    match.sourceMeetingId,
+                    match.summary,
+                    match.relation,
+                    match.snippet,
+                )
+                if dedupe_key in seen:
+                    continue
+                seen.add(dedupe_key)
+                matches.append(match.model_copy(deep=True))
+                if len(matches) >= 6:
+                    return matches
+        return matches
+
+    def _is_placeholder_memory_match(self, match: MemoryMatch) -> bool:
+        return (
+            match.sourceMeetingId.endswith("_new_signal")
+            and match.summary.startswith("No strong historical match was found")
         )
 
     def _index_decision(self, meeting_id: str, record: DecisionRecord) -> None:

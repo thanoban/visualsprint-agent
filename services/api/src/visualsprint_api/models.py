@@ -512,6 +512,7 @@ class ChunkInsight(BaseModel):
     reasoningChecklist: list[str] = Field(default_factory=list, max_length=8)
     focusAreas: list[ChunkInsightFocus] = Field(default_factory=list, max_length=6)
     memoryQueries: list["SearchPriorOutcomesRequest"] = Field(default_factory=list, max_length=6)
+    memoryMatches: list[MemoryMatch] = Field(default_factory=list, max_length=6)
     meetingState: MeetingStateSnapshot
     chunkContext: ChunkContext
 
