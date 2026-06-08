@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+from visualsprint_agents.adk.prompting import render_instruction_text
+from visualsprint_agents.adk.runtime import AdkAgentScaffold, create_root_agent
 from visualsprint_agents.adk.shared import AgentBlueprint
 from visualsprint_agents.adk.tool_contracts import FINALIZE_REPORT_TOOL
+from visualsprint_agents.adk.tools import finalize_report
+from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
 
 def build_summary_agent_blueprint() -> AgentBlueprint:
@@ -25,3 +29,41 @@ def build_summary_agent_blueprint() -> AgentBlueprint:
         ),
         tools=(FINALIZE_REPORT_TOOL,),
     )
+
+
+def build_summary_agent_scaffold() -> AdkAgentScaffold:
+    blueprint = build_summary_agent_blueprint()
+    return AdkAgentScaffold(
+        agent_id=blueprint.agent_id,
+        display_name=blueprint.display_name,
+        description=(
+            "Turn the assembled meeting summary packet into a durable final report for "
+            "the VisualSprint control plane."
+        ),
+        model="gemini-flash-latest",
+        instruction=render_instruction_text(
+            blueprint,
+            input_contract=blueprint.input_contract,
+            output_contract=blueprint.output_contract,
+            output_schema_enforced=False,
+        ),
+        input_model=SummaryPacketRequest,
+        output_model=FinalReportDraft,
+        input_schema=SummaryPacketRequest.model_json_schema(),
+        output_schema=FinalReportDraft.model_json_schema(),
+        tools=(finalize_report,),
+        output_key="final_report_draft",
+        include_contents="none",
+        enforce_output_schema=False,
+        notes=(
+            "The summary scaffold also keeps output schema metadata for deployment "
+            "export, while relying on instruction-driven JSON output in tool-using runs.",
+        ),
+    )
+
+
+def build_summary_root_agent() -> object:
+    return create_root_agent(build_summary_agent_scaffold())
+
+
+root_agent = build_summary_root_agent()

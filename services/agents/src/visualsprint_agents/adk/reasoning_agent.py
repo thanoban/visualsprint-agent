@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from visualsprint_agents.adk.prompting import render_instruction_text
+from visualsprint_agents.adk.runtime import AdkAgentScaffold, create_root_agent
 from visualsprint_agents.adk.shared import AgentBlueprint
 from visualsprint_agents.adk.tool_contracts import (
     REGISTER_OUTPUTS_TOOL,
     SEARCH_PRIOR_OUTCOMES_TOOL,
 )
+from visualsprint_agents.adk.tools import register_outputs, search_prior_outcomes
+from visualsprint_agents.models import ChunkInsightRequest, ReasoningRunResponse
 
 
 def build_reasoning_agent_blueprint() -> AgentBlueprint:
@@ -31,3 +35,41 @@ def build_reasoning_agent_blueprint() -> AgentBlueprint:
             REGISTER_OUTPUTS_TOOL,
         ),
     )
+
+
+def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
+    blueprint = build_reasoning_agent_blueprint()
+    return AdkAgentScaffold(
+        agent_id=blueprint.agent_id,
+        display_name=blueprint.display_name,
+        description=(
+            "Reason over assembled chunk context and emit durable structured outcomes "
+            "for the VisualSprint control plane."
+        ),
+        model="gemini-flash-latest",
+        instruction=render_instruction_text(
+            blueprint,
+            input_contract=blueprint.input_contract,
+            output_contract=blueprint.output_contract,
+            output_schema_enforced=False,
+        ),
+        input_model=ChunkInsightRequest,
+        output_model=ReasoningRunResponse,
+        input_schema=ChunkInsightRequest.model_json_schema(),
+        output_schema=ReasoningRunResponse.model_json_schema(),
+        tools=(search_prior_outcomes, register_outputs),
+        output_key="reasoning_run_response",
+        include_contents="none",
+        enforce_output_schema=False,
+        notes=(
+            "The scaffold keeps output schema metadata for deployment/export, but it "
+            "does not enforce output_schema at runtime because this agent uses tools.",
+        ),
+    )
+
+
+def build_reasoning_root_agent() -> object:
+    return create_root_agent(build_reasoning_agent_scaffold())
+
+
+root_agent = build_reasoning_root_agent()

@@ -25,20 +25,18 @@ spec:
               value: configured_cloud
             - name: VISUALSPRINT_DEPLOYMENT_TARGET
               value: cloud_run
+            - name: VISUALSPRINT_AGENT_RUNTIME_BACKEND
+              value: vertex_ai_reasoning_engine
             - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID
               value: PROJECT_ID
             - name: VISUALSPRINT_GOOGLE_CLOUD_LOCATION
               value: us-central1
             - name: VISUALSPRINT_AGENT_APPLICATION_ID
               value: VISUALSPRINT_AGENT_APP_ID
-            - name: VISUALSPRINT_REASONING_AGENT_ID
-              value: VISUALSPRINT_REASONING_AGENT_ID
-            - name: VISUALSPRINT_SUMMARY_AGENT_ID
-              value: VISUALSPRINT_SUMMARY_AGENT_ID
-            - name: VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL
-              value: https://reasoning-bridge.example/run
-            - name: VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL
-              value: https://summary-bridge.example/run
+            - name: VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME
+              value: projects/PROJECT_NUMBER/locations/us-central1/reasoningEngines/REASONING_ENGINE_ID
+            - name: VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME
+              value: projects/PROJECT_NUMBER/locations/us-central1/reasoningEngines/SUMMARY_ENGINE_ID
             - name: VISUALSPRINT_CLOUD_RUN_SERVICE_URL
               value: https://visualsprint-agents-REPLACE.a.run.app
             - name: VISUALSPRINT_SERVICE_ACCOUNT_EMAIL
@@ -47,5 +45,3 @@ spec:
               value: https://app.visualsprint.dev
             - name: VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS
               value: "4.0"
-            - name: VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME
-              value: visualsprint-agent-bridge-token

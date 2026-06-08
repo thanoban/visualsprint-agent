@@ -13,7 +13,16 @@ from visualsprint_agents.models import (
 from visualsprint_agents.config import build_settings
 from visualsprint_agents.adk import (
     build_reasoning_agent_blueprint,
+    build_reasoning_agent_scaffold,
+    build_reasoning_root_agent,
     build_summary_agent_blueprint,
+    build_summary_agent_scaffold,
+    build_summary_root_agent,
+)
+from visualsprint_agents.adk.tools import (
+    finalize_report,
+    register_outputs,
+    search_prior_outcomes,
 )
 from visualsprint_agents.evals import (
     load_reasoning_eval_fixtures,
@@ -203,6 +212,61 @@ def test_adk_blueprints_match_repo_contracts():
     assert summary_blueprint.input_contract == "MeetingSummaryPacket"
     assert summary_blueprint.output_contract == "FinalReport"
     assert len(summary_blueprint.tools) == 1
+
+
+def test_adk_scaffolds_export_schema_and_tool_alignment():
+    reasoning_scaffold = build_reasoning_agent_scaffold()
+    summary_scaffold = build_summary_agent_scaffold()
+
+    assert reasoning_scaffold.input_schema["title"] == "ChunkInsightRequest"
+    assert reasoning_scaffold.output_schema["title"] == "ReasoningRunResponse"
+    assert [tool.__name__ for tool in reasoning_scaffold.tools] == [
+        "search_prior_outcomes",
+        "register_outputs",
+    ]
+    assert reasoning_scaffold.enforce_output_schema is False
+    assert summary_scaffold.input_schema["title"] == "SummaryPacketRequest"
+    assert summary_scaffold.output_schema["title"] == "FinalReportDraft"
+    assert [tool.__name__ for tool in summary_scaffold.tools] == ["finalize_report"]
+    assert summary_scaffold.enforce_output_schema is False
+
+
+def test_adk_root_agents_build_either_real_adk_agents_or_scaffolds():
+    reasoning_root = build_reasoning_root_agent()
+    summary_root = build_summary_root_agent()
+
+    assert (
+        getattr(reasoning_root, "agent_id", None)
+        or getattr(reasoning_root, "name", None)
+    ) == "visualsprint_reasoning_agent"
+    assert (
+        getattr(summary_root, "agent_id", None)
+        or getattr(summary_root, "name", None)
+    ) == "visualsprint_summary_agent"
+
+
+def test_adk_placeholder_tools_expose_expected_contract_notes():
+    search_result = search_prior_outcomes(
+        recordType="blocker",
+        summary="Release risk",
+        detail="A dependency is slipping.",
+    )
+    register_result = register_outputs(
+        meetingId="mtg_adk_001",
+        clientChunkId="chunk_adk_001",
+        payload={"decisions": [], "blockers": []},
+    )
+    finalize_result = finalize_report(
+        meetingId="mtg_adk_001",
+        report={"executiveSummary": "Done"},
+    )
+
+    assert search_result["status"] == "not_configured"
+    assert search_result["matches"] == []
+    assert register_result["status"] == "deferred"
+    assert register_result["acceptedKeys"] == ["blockers", "decisions"]
+    assert finalize_result["status"] == "deferred"
+    assert finalize_result["acceptedKeys"] == ["executiveSummary"]
 
 
 def test_vertex_normalization_handles_multiple_response_shapes():

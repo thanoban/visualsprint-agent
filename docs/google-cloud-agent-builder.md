@@ -371,7 +371,7 @@ One practical structure would be:
 - `services/agents/src/visualsprint_agents/adk/summary_agent.py`
 - `services/agents/src/visualsprint_agents/adk/tools/`
 
-This exact folder does not exist yet. It is the recommended next implementation step.
+This folder now exists as an initial scaffold. The remaining work is to mature it into the real deployed ADK implementation and replace placeholder tools with production integrations.
 
 ### Step 6. Build the reasoning agent in ADK
 
