@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 from visualsprint_api.config import build_settings
+from visualsprint_api.models import MemoryMatch
 
 
 def _create_live_browser_meeting(client: TestClient) -> str:
@@ -240,6 +241,114 @@ def test_summary_packet_output_registration_and_final_report_flow(client: TestCl
     ended_summary_response = client.get(f"/api/meetings/{meeting_id}/summary-packet")
     assert ended_summary_response.status_code == 200
     assert ended_summary_response.json()["summaryPacket"]["meetingStatus"] == "ended"
+
+
+def test_register_outputs_can_upsert_indexed_documents_to_elasticsearch(
+    client: TestClient,
+    monkeypatch,
+):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-elastic-001", sequence=1)
+    assert register_response.status_code == 200
+    _process_chunk(client, meeting_id, "client-chunk-elastic-001")
+
+    captured: dict[str, object] = {}
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.settings",
+        build_settings(
+            {
+                "ELASTICSEARCH_URL": "https://elastic.example",
+                "ELASTICSEARCH_API_KEY_SECRET": "elastic-api-key",
+                "ELASTIC_INDEX_OUTCOMES": "visualsprint-outcomes",
+            }
+        ),
+    )
+
+    def fake_upsert(*, config, meeting, documents):
+        captured["index"] = config.elastic_index_outcomes
+        captured["meeting_id"] = meeting.id
+        captured["document_count"] = len(documents)
+        captured["record_types"] = sorted({document.recordType for document in documents})
+        return len(documents)
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.upsert_indexed_outcomes_to_elasticsearch",
+        fake_upsert,
+    )
+
+    outputs_response = client.post(
+        f"/api/meetings/{meeting_id}/outputs/register",
+        json={
+            "clientChunkId": "client-chunk-elastic-001",
+            "decisions": [
+                {
+                    "title": "Publish the rollback plan before the next deploy",
+                    "rationale": "The team wants a durable handoff artifact before resuming release work.",
+                    "speakerLabel": "Jordan",
+                }
+            ],
+            "commitments": [],
+            "blockers": [],
+            "openQuestions": [],
+            "memoryMatches": [],
+        },
+    )
+
+    assert outputs_response.status_code == 200
+    assert captured["index"] == "visualsprint-outcomes"
+    assert captured["meeting_id"] == meeting_id
+    assert captured["document_count"] >= 2
+    assert "decision" in captured["record_types"]
+
+
+def test_search_prior_outcomes_can_use_elasticsearch_when_configured(
+    client: TestClient,
+    monkeypatch,
+):
+    meeting_id = _create_live_browser_meeting(client)
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.settings",
+        build_settings(
+            {
+                "ELASTICSEARCH_URL": "https://elastic.example",
+                "ELASTICSEARCH_API_KEY_SECRET": "elastic-api-key",
+                "ELASTIC_INDEX_OUTCOMES": "visualsprint-outcomes",
+            }
+        ),
+    )
+    monkeypatch.setattr(
+        "visualsprint_api.repository.search_prior_outcomes_in_elasticsearch",
+        lambda **kwargs: [
+            MemoryMatch(
+                id="mem_elastic_001",
+                sourceMeetingId="mtg_hist_elastic_001",
+                summary="A similar blocker was found in Elastic.",
+                sourceMeetingTitle="Incident review",
+                strength="recurring",
+                relation="recurring",
+                score=0.88,
+                snippet="Elastic search returned a closely related blocker document.",
+                recordedAt="2026-06-08T10:00:00Z",
+            )
+        ],
+    )
+
+    response = client.post(
+        f"/api/meetings/{meeting_id}/memory/search-prior-outcomes",
+        json={
+            "recordType": "blocker",
+            "summary": "Authentication release blocker is still active",
+            "detail": "The auth configuration drift is blocking the release and needs a historical comparison.",
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["matches"][0]["sourceMeetingId"] == "mtg_hist_elastic_001"
+    assert payload["matches"][0]["relation"] == "recurring"
 
 
 def test_repeated_agent_outputs_update_existing_records_instead_of_duplicating(client: TestClient):

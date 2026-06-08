@@ -1,0 +1,151 @@
+"""Small Elastic client for deterministic outcome write-back and lookup."""
+
+from __future__ import annotations
+
+import json
+from urllib import error, parse, request
+
+from visualsprint_api.config import Settings
+from visualsprint_api.elastic_mapping import (
+    build_elasticsearch_document_body,
+    map_elastic_document_to_memory_match,
+    map_indexed_outcome_to_elastic_document,
+)
+from visualsprint_api.elastic_models import ElasticOutcomeDocument
+from visualsprint_api.models import (
+    IndexedOutcomeDocument,
+    MeetingDetail,
+    MemoryMatch,
+    SearchPriorOutcomesRequest,
+)
+
+
+def upsert_indexed_outcomes_to_elasticsearch(
+    *,
+    config: Settings,
+    meeting: MeetingDetail,
+    documents: list[IndexedOutcomeDocument],
+) -> int | None:
+    if not config.elastic_writeback_configured or not config.elastic_index_outcomes:
+        return None
+
+    upserted = 0
+    for outcome in documents:
+        elastic_document = map_indexed_outcome_to_elastic_document(
+            meeting_title=meeting.title,
+            outcome=outcome,
+        )
+        path = (
+            f"/{parse.quote(config.elastic_index_outcomes, safe='')}/_doc/"
+            f"{parse.quote(elastic_document.document_id, safe='')}"
+        )
+        payload = build_elasticsearch_document_body(elastic_document)
+        response = _elastic_request_json(
+            config=config,
+            method="PUT",
+            path=path,
+            payload=payload,
+        )
+        if response is None:
+            return None
+        upserted += 1
+    return upserted
+
+
+def search_prior_outcomes_in_elasticsearch(
+    *,
+    config: Settings,
+    meeting: MeetingDetail,
+    payload: SearchPriorOutcomesRequest,
+) -> list[MemoryMatch] | None:
+    if not config.elastic_writeback_configured or not config.elastic_index_outcomes:
+        return None
+
+    query_text = " ".join(part for part in (payload.summary, payload.detail) if part.strip())
+    body = {
+        "size": 3,
+        "_source": True,
+        "query": {
+            "bool": {
+                "filter": [
+                    {"term": {"tenant_id": "default"}},
+                    {"term": {"record_type": payload.recordType}},
+                ],
+                "should": [
+                    {"match": {"summary": {"query": payload.summary, "boost": 3}}},
+                    {"match": {"detail": {"query": payload.detail, "boost": 2}}},
+                    {
+                        "multi_match": {
+                            "query": query_text,
+                            "fields": ["summary^3", "detail^2", "meeting_title"],
+                        }
+                    },
+                ],
+                "minimum_should_match": 1,
+            }
+        },
+    }
+    response = _elastic_request_json(
+        config=config,
+        method="POST",
+        path=f"/{parse.quote(config.elastic_index_outcomes, safe='')}/_search",
+        payload=body,
+    )
+    if response is None:
+        return None
+
+    hits = response.get("hits", {}).get("hits", [])
+    matches: list[MemoryMatch] = []
+    for hit in hits[:3]:
+        source = hit.get("_source")
+        if not isinstance(source, dict):
+            continue
+        try:
+            document = ElasticOutcomeDocument.model_validate(source)
+        except ValueError:
+            continue
+        raw_score = hit.get("_score", 0.0)
+        try:
+            score = float(raw_score)
+        except (TypeError, ValueError):
+            score = 0.0
+        normalized_score = max(0.0, min(score / 10.0, 1.0))
+        matches.append(
+            map_elastic_document_to_memory_match(
+                document=document,
+                score=normalized_score,
+                recorded_at=meeting.createdAt,
+            )
+        )
+    return matches
+
+
+def _elastic_request_json(
+    *,
+    config: Settings,
+    method: str,
+    path: str,
+    payload: dict,
+) -> dict | None:
+    if not config.elasticsearch_url or not config.elasticsearch_api_key_secret:
+        return None
+
+    base_url = config.elasticsearch_url.rstrip("/")
+    url = f"{base_url}{path}"
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"ApiKey {config.elasticsearch_api_key_secret}",
+    }
+    try:
+        response = request.urlopen(
+            request.Request(
+                url=url,
+                data=json.dumps(payload).encode("utf-8"),
+                headers=headers,
+                method=method,
+            ),
+            timeout=config.service_request_timeout_seconds,
+        )
+        return json.loads(response.read().decode("utf-8"))
+    except (error.URLError, error.HTTPError, json.JSONDecodeError):
+        return None
