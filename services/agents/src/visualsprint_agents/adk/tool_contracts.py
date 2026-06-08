@@ -25,3 +25,11 @@ SEARCH_PRIOR_OUTCOMES_TOOL = AgentToolBlueprint(
         "before labeling a signal as new, recurring, reopened, or resolved_previously."
     ),
 )
+
+CREATE_ACTION_RECOMMENDATIONS_TOOL = AgentToolBlueprint(
+    name="create_action_recommendations",
+    purpose=(
+        "Generate structured Jira and Slack action recommendations from a final report. "
+        "Only suggest actions when explicit evidence exists. Never execute directly."
+    ),
+)

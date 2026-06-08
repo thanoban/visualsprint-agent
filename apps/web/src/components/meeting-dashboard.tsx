@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type ActionRecommendation,
   type AgentSmokeResponse,
   type AgentInvocationAuditResponse,
   captureStages,
@@ -29,22 +30,27 @@ import {
 import { startTransition, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
+  approveActionRecommendation,
   completeCaptureChunkUpload,
   completeCaptureSession,
   createMeeting,
+  endMeeting,
+  executeActionRecommendation,
   finalizeReport,
+  generateActionRecommendations,
+  getActionRecommendations,
   getAgentInvocationAudit,
+  getApiBaseUrl,
   getChunkInsight,
   getFinalReport,
   getIndexedOutcomeDocuments,
+  getMeeting,
   getMeetingEventsUrl,
   getPlatformMeta,
   getSummaryPacket,
-  endMeeting,
-  getApiBaseUrl,
-  getMeeting,
   listMeetings,
   registerCaptureChunk,
+  rejectActionRecommendation,
   runAgentSmoke,
   runCaptureChunkReasoning,
   startCaptureSession,
@@ -91,6 +97,7 @@ export function MeetingDashboard() {
   const [platformMeta, setPlatformMeta] = useState<PlatformMetaResponse | null>(null);
   const [agentInvocationAudit, setAgentInvocationAudit] = useState<AgentInvocationAuditResponse | null>(null);
   const [agentSmokeResult, setAgentSmokeResult] = useState<AgentSmokeResponse | null>(null);
+  const [actionRecommendations, setActionRecommendations] = useState<ActionRecommendation[]>([]);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -290,6 +297,31 @@ export function MeetingDashboard() {
 
   useEffect(() => {
     if (!selectedMeeting?.id) {
+      startTransition(() => {
+        setActionRecommendations([]);
+      });
+      return;
+    }
+
+    void (async () => {
+      try {
+        const response = await getActionRecommendations(selectedMeeting.id);
+        startTransition(() => {
+          setActionRecommendations(response.recommendations);
+        });
+      } catch {
+        startTransition(() => {
+          setActionRecommendations([]);
+        });
+      }
+    })();
+  }, [
+    selectedMeeting?.id,
+    selectedMeeting?.metrics.actionRecommendationsCount,
+  ]);
+
+  useEffect(() => {
+    if (!selectedMeeting?.id) {
       return;
     }
     if (typeof EventSource === "undefined") {
@@ -412,6 +444,91 @@ export function MeetingDashboard() {
       });
     } catch (smokeError) {
       setError(getErrorMessage(smokeError));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleGenerateActionRecommendations() {
+    if (!selectedMeeting) {
+      return;
+    }
+    setIsBusy(true);
+    setError(null);
+    try {
+      const response = await generateActionRecommendations(selectedMeeting.id);
+      startTransition(() => {
+        setActionRecommendations(response.recommendations);
+      });
+      await refreshMeeting(selectedMeeting.id);
+    } catch (genError) {
+      setError(getErrorMessage(genError));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleApproveAction(recommendationId: string) {
+    if (!selectedMeeting) {
+      return;
+    }
+    setIsBusy(true);
+    setError(null);
+    try {
+      await approveActionRecommendation(selectedMeeting.id, recommendationId, {
+        approved: true,
+        note: "Approved by operator",
+      });
+      await refreshMeeting(selectedMeeting.id);
+      const response = await getActionRecommendations(selectedMeeting.id);
+      startTransition(() => {
+        setActionRecommendations(response.recommendations);
+      });
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleRejectAction(recommendationId: string) {
+    if (!selectedMeeting) {
+      return;
+    }
+    setIsBusy(true);
+    setError(null);
+    try {
+      await rejectActionRecommendation(selectedMeeting.id, recommendationId, {
+        approved: false,
+        note: "Rejected by operator",
+      });
+      await refreshMeeting(selectedMeeting.id);
+      const response = await getActionRecommendations(selectedMeeting.id);
+      startTransition(() => {
+        setActionRecommendations(response.recommendations);
+      });
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleExecuteAction(recommendationId: string) {
+    if (!selectedMeeting) {
+      return;
+    }
+    setIsBusy(true);
+    setError(null);
+    try {
+      await executeActionRecommendation(selectedMeeting.id, recommendationId);
+      await refreshMeeting(selectedMeeting.id);
+      const response = await getActionRecommendations(selectedMeeting.id);
+      startTransition(() => {
+        setActionRecommendations(response.recommendations);
+      });
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setIsBusy(false);
     }
@@ -1015,6 +1132,137 @@ export function MeetingDashboard() {
                 <EmptyState
                   title="No meeting selected"
                   body="Choose a meeting before running the adapter smoke check."
+                />
+              )}
+            </Card>
+
+            <Card title="Action recommendations" eyebrow="Approval portal">
+              {selectedMeeting ? (
+                <div className="space-y-5">
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      className={secondaryLightButtonClassName}
+                      disabled={isBusy || selectedMeeting.status !== "ended"}
+                      onClick={() => {
+                        void handleGenerateActionRecommendations();
+                      }}
+                      type="button"
+                    >
+                      Generate recommendations
+                    </button>
+                  </div>
+                  {actionRecommendations.length === 0 ? (
+                    <EmptyState
+                      title="No recommendations yet"
+                      body={
+                        selectedMeeting.status === "ended"
+                          ? "Generate recommendations to see Jira and Slack suggestions."
+                          : "End the meeting first to generate action recommendations."
+                      }
+                    />
+                  ) : (
+                    <div className="space-y-3">
+                      {actionRecommendations.map((rec) => (
+                        <article
+                          key={rec.id}
+                          className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4"
+                        >
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                                {rec.type.replace(/_/g, " ")}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  rec.status === "pending"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : rec.status === "approved"
+                                      ? "bg-blue-100 text-blue-700"
+                                      : rec.status === "executed"
+                                        ? "bg-emerald-100 text-emerald-700"
+                                        : rec.status === "rejected"
+                                          ? "bg-slate-100 text-slate-500"
+                                          : "bg-red-100 text-red-700"
+                                }`}
+                              >
+                                {rec.status}
+                              </span>
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                  rec.urgency === "critical"
+                                    ? "bg-red-100 text-red-700"
+                                    : rec.urgency === "high"
+                                      ? "bg-orange-100 text-orange-700"
+                                      : rec.urgency === "medium"
+                                        ? "bg-yellow-100 text-yellow-700"
+                                        : "bg-green-100 text-green-700"
+                                }`}
+                              >
+                                {rec.urgency}
+                              </span>
+                            </div>
+                            <span className="text-xs text-slate-500">
+                              confidence {(rec.confidence * 100).toFixed(0)}%
+                            </span>
+                          </div>
+                          <p className="mt-2 text-sm font-semibold text-slate-900">
+                            {rec.jiraDetails?.title ?? rec.slackDetails?.title ?? "Untitled"}
+                          </p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">
+                            {rec.jiraDetails?.description ?? rec.slackDetails?.message ?? ""}
+                          </p>
+                          {rec.executionResult && (
+                            <p className="mt-1 text-xs text-slate-500">
+                              {rec.executionResult}
+                            </p>
+                          )}
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {rec.status === "pending" && (
+                              <>
+                                <button
+                                  className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-700 disabled:opacity-50"
+                                  disabled={isBusy}
+                                  onClick={() => {
+                                    void handleApproveAction(rec.id);
+                                  }}
+                                  type="button"
+                                >
+                                  Approve
+                                </button>
+                                <button
+                                  className="rounded-lg bg-slate-200 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-300 disabled:opacity-50"
+                                  disabled={isBusy}
+                                  onClick={() => {
+                                    void handleRejectAction(rec.id);
+                                  }}
+                                  type="button"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                            {rec.status === "approved" && (
+                              <button
+                                className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                                disabled={isBusy}
+                                onClick={() => {
+                                  void handleExecuteAction(rec.id);
+                                }}
+                                type="button"
+                              >
+                                Execute
+                              </button>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <EmptyState
+                  title="No meeting selected"
+                  body="Choose a meeting to view action recommendations."
                 />
               )}
             </Card>

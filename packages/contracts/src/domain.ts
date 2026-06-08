@@ -51,6 +51,38 @@ export type ScreenEventKind =
   | "error"
   | "ui_state";
 
+export type ActionRecommendationType =
+  | "jira_create_issue"
+  | "jira_update_issue"
+  | "jira_resolve_issue"
+  | "slack_post_summary"
+  | "slack_broadcast_decision"
+  | "slack_alert_blocker"
+  | "slack_remind_commitment"
+  | "slack_notify_resolution";
+
+export type JiraIssueType = "task" | "story" | "bug";
+
+export type JiraAction = "create_issue" | "update_issue" | "resolve_issue";
+
+export type SlackActionType =
+  | "post_summary"
+  | "broadcast_decision"
+  | "alert_blocker"
+  | "remind_commitment"
+  | "notify_resolution";
+
+export type ActionRecommendationStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "executed"
+  | "failed";
+
+export type ActionUrgency = "critical" | "high" | "medium" | "low";
+
+export type ActionConfidenceLevel = "low" | "medium" | "high";
+
 export interface PartnerTrack {
   slug: PartnerTrackSlug;
   label: string;
@@ -183,6 +215,7 @@ export interface MeetingMetrics {
   captureEventsCount: number;
   captureChunksCount: number;
   capturedBytes: number;
+  actionRecommendationsCount: number;
 }
 
 export interface CaptureChunkUploadTarget {
@@ -347,6 +380,7 @@ export interface MeetingDetail extends MeetingSummary {
   recentBlockers: BlockerRecord[];
   recentMemoryMatches: MemoryMatch[];
   recentOpenQuestions: OpenQuestionRecord[];
+  recentActionRecommendations: ActionRecommendation[];
 }
 
 export interface CreateMeetingRequest {
@@ -510,6 +544,71 @@ export interface IndexedOutcomeDocument {
 
 export interface IndexedOutcomeDocumentsResponse {
   documents: IndexedOutcomeDocument[];
+}
+
+export interface JiraRecommendation {
+  action: JiraAction;
+  issueType: JiraIssueType;
+  title: string;
+  description: string;
+  priority: "lowest" | "low" | "medium" | "high" | "highest";
+  ownerLabel: string;
+  evidence: EvidenceReference[];
+  confidence: number;
+}
+
+export interface SlackRecommendation {
+  type: SlackActionType;
+  channel: string;
+  title: string;
+  message: string;
+  evidence: EvidenceReference[];
+  confidence: number;
+}
+
+export interface ActionRecommendation {
+  id: string;
+  meetingId: string;
+  type: ActionRecommendationType;
+  status: ActionRecommendationStatus;
+  urgency: ActionUrgency;
+  confidence: number;
+  jiraDetails: JiraRecommendation | null;
+  slackDetails: SlackRecommendation | null;
+  evidence: EvidenceReference[];
+  createdAt: string;
+  updatedAt: string;
+  executedAt: string | null;
+  executionResult: string | null;
+}
+
+export interface ActionRecommendationInput {
+  type: ActionRecommendationType;
+  urgency: ActionUrgency;
+  confidence: number;
+  jiraDetails: JiraRecommendation | null;
+  slackDetails: SlackRecommendation | null;
+  evidence: EvidenceReference[];
+}
+
+export interface ActionApprovalRequest {
+  approved: boolean;
+  note: string;
+}
+
+export interface ActionExecutionResult {
+  recommendationId: string;
+  status: "executed" | "failed";
+  detail: string;
+  executedAt: string;
+}
+
+export interface ActionRecommendationsResponse {
+  recommendations: ActionRecommendation[];
+}
+
+export interface ActionRecommendationResponse {
+  recommendation: ActionRecommendation;
 }
 
 export interface MeetingStreamEvent {

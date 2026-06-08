@@ -8,15 +8,19 @@ from urllib import error, request
 from visualsprint_api.config import settings
 from visualsprint_api.media_pipeline import build_screen_events
 from visualsprint_api.models import (
+    ActionRecommendation,
+    ActionRecommendationInput,
     AgentInvocationAuditResponse,
     AgentInvocationAuditSummary,
     CaptureChunkSummary,
     CaptureChunkUploadTarget,
     FinalReport,
+    JiraRecommendation,
     MeetingSummaryPacket,
     ProcessingSourceMode,
     RegisterAgentOutputsRequest,
     ScreenEvent,
+    SlackRecommendation,
     TranscriptSegment,
     ChunkInsight,
 )
@@ -245,6 +249,81 @@ def run_summary_agent_with_source(
     if report is None:
         return None, "local_fallback"
     return report, "downstream_service"
+
+
+def run_action_agent(
+    report: FinalReport,
+    meeting_title: str,
+) -> list[ActionRecommendationInput] | None:
+    """Call the agents service for action recommendations when configured."""
+
+    if not settings.agents_service_url:
+        return None
+
+    payload = {
+        "meetingId": report.meetingId,
+        "meetingTitle": meeting_title,
+        "executiveSummary": report.executiveSummary,
+        "decisions": [d.model_dump(mode="json") for d in report.decisions],
+        "commitments": [c.model_dump(mode="json") for c in report.commitments],
+        "blockers": [b.model_dump(mode="json") for b in report.blockers],
+        "openQuestions": [q.model_dump(mode="json") for q in report.openQuestions],
+    }
+
+    try:
+        response_payload = _post_json(
+            f"{settings.agents_service_url.rstrip('/')}/api/action/meetings/run",
+            payload,
+        )
+        recommendations = response_payload.get("recommendations", [])
+        return [_build_action_recommendation_input(r) for r in recommendations]
+    except (ValueError, KeyError, error.URLError, error.HTTPError):
+        return None
+
+
+def _build_action_recommendation_input(raw: dict) -> ActionRecommendationInput:
+    jira_details = None
+    raw_jira = raw.get("jiraDetails")
+    if raw_jira is not None:
+        jira_details = JiraRecommendation(
+            action=raw_jira["action"],
+            issueType=raw_jira["issueType"],
+            title=raw_jira["title"],
+            description=raw_jira["description"],
+            priority=raw_jira.get("priority", "medium"),
+            ownerLabel=raw_jira.get("ownerLabel", "not mentioned"),
+            evidence=[],
+            confidence=raw_jira.get("confidence", 0.0),
+        )
+    slack_details = None
+    raw_slack = raw.get("slackDetails")
+    if raw_slack is not None:
+        slack_details = SlackRecommendation(
+            type=raw_slack["type"],
+            channel=raw_slack.get("channel", "not specified"),
+            title=raw_slack["title"],
+            message=raw_slack["message"],
+            evidence=[],
+            confidence=raw_slack.get("confidence", 0.0),
+        )
+    return ActionRecommendationInput(
+        type=raw["type"],
+        urgency=raw["urgency"],
+        confidence=raw.get("confidence", 0.0),
+        jiraDetails=jira_details,
+        slackDetails=slack_details,
+        evidence=[],
+    )
+
+
+def run_action_agent_with_source(
+    report: FinalReport,
+    meeting_title: str,
+) -> tuple[list[ActionRecommendationInput] | None, ProcessingSourceMode]:
+    recommendations = run_action_agent(report, meeting_title)
+    if recommendations is None:
+        return None, "local_fallback"
+    return recommendations, "downstream_service"
 
 
 def get_agents_invocation_audit() -> AgentInvocationAuditResponse:

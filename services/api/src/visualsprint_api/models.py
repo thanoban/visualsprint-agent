@@ -49,6 +49,34 @@ LiveEventKind = Literal[
 ]
 DownstreamServiceKind = Literal["control_plane", "agents", "ingest", "media"]
 DownstreamServiceConnectionStatus = Literal["ok", "unreachable", "not_configured"]
+ActionRecommendationType = Literal[
+    "jira_create_issue",
+    "jira_update_issue",
+    "jira_resolve_issue",
+    "slack_post_summary",
+    "slack_broadcast_decision",
+    "slack_alert_blocker",
+    "slack_remind_commitment",
+    "slack_notify_resolution",
+]
+JiraIssueType = Literal["task", "story", "bug"]
+JiraAction = Literal["create_issue", "update_issue", "resolve_issue"]
+SlackActionType = Literal[
+    "post_summary",
+    "broadcast_decision",
+    "alert_blocker",
+    "remind_commitment",
+    "notify_resolution",
+]
+ActionRecommendationStatus = Literal[
+    "pending",
+    "approved",
+    "rejected",
+    "executed",
+    "failed",
+]
+ActionUrgency = Literal["critical", "high", "medium", "low"]
+ActionConfidenceLevel = Literal["low", "medium", "high"]
 
 
 class MeetingMetrics(BaseModel):
@@ -62,6 +90,7 @@ class MeetingMetrics(BaseModel):
     captureEventsCount: int = 0
     captureChunksCount: int = 0
     capturedBytes: int = 0
+    actionRecommendationsCount: int = 0
 
 
 class DownstreamServiceStatus(BaseModel):
@@ -309,6 +338,71 @@ class MeetingSummary(BaseModel):
     metrics: MeetingMetrics
 
 
+class JiraRecommendation(BaseModel):
+    action: JiraAction
+    issueType: JiraIssueType
+    title: str = Field(min_length=4, max_length=180)
+    description: str = Field(min_length=8, max_length=600)
+    priority: Literal["lowest", "low", "medium", "high", "highest"] = "medium"
+    ownerLabel: str = Field(default="not mentioned", min_length=2, max_length=60)
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class SlackRecommendation(BaseModel):
+    type: SlackActionType
+    channel: str = Field(default="not specified", min_length=2, max_length=120)
+    title: str = Field(min_length=4, max_length=180)
+    message: str = Field(min_length=8, max_length=800)
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+
+class ActionRecommendation(BaseModel):
+    id: str
+    meetingId: str
+    type: ActionRecommendationType
+    status: ActionRecommendationStatus
+    urgency: ActionUrgency
+    confidence: float = Field(ge=0.0, le=1.0)
+    jiraDetails: JiraRecommendation | None = None
+    slackDetails: SlackRecommendation | None = None
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
+    createdAt: datetime
+    updatedAt: datetime
+    executedAt: datetime | None = None
+    executionResult: str | None = Field(default=None, max_length=500)
+
+
+class ActionRecommendationInput(BaseModel):
+    type: ActionRecommendationType
+    urgency: ActionUrgency
+    confidence: float = Field(ge=0.0, le=1.0)
+    jiraDetails: JiraRecommendation | None = None
+    slackDetails: SlackRecommendation | None = None
+    evidence: list[EvidenceReference] = Field(default_factory=list, max_length=4)
+
+
+class ActionApprovalRequest(BaseModel):
+    approved: bool
+    note: str = Field(default="", max_length=240)
+
+
+class ActionExecutionResult(BaseModel):
+    recommendationId: str
+    status: Literal["executed", "failed"]
+    detail: str = Field(min_length=4, max_length=500)
+    executedAt: datetime
+
+
+class ActionRecommendationsResponse(BaseModel):
+    recommendations: list[ActionRecommendation] = Field(default_factory=list)
+
+
+class ActionRecommendationResponse(BaseModel):
+    recommendation: ActionRecommendation
+
+
 class MeetingDetail(MeetingSummary):
     latestEvents: list[LiveEvent] = Field(default_factory=list)
     activeCaptureSession: CaptureSessionSummary | None = None
@@ -320,6 +414,7 @@ class MeetingDetail(MeetingSummary):
     recentBlockers: list[BlockerRecord] = Field(default_factory=list)
     recentMemoryMatches: list[MemoryMatch] = Field(default_factory=list)
     recentOpenQuestions: list[OpenQuestionRecord] = Field(default_factory=list)
+    recentActionRecommendations: list[ActionRecommendation] = Field(default_factory=list)
 
 
 class CreateMeetingRequest(BaseModel):

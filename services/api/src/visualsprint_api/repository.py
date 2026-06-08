@@ -14,7 +14,14 @@ from visualsprint_api.elastic_client import (
     upsert_indexed_outcomes_to_elasticsearch,
 )
 from visualsprint_api.insight_pipeline import build_chunk_insight
+from visualsprint_api.action_executors import execute_jira_action, execute_slack_action
 from visualsprint_api.models import (
+    ActionApprovalRequest,
+    ActionRecommendation,
+    ActionRecommendationInput,
+    ActionRecommendationStatus,
+    ActionRecommendationType,
+    ActionExecutionResult,
     AgentBlockerInput,
     AgentCommitmentInput,
     AgentDecisionInput,
@@ -33,12 +40,14 @@ from visualsprint_api.models import (
     EvidenceReference,
     FinalReport,
     IndexedOutcomeDocument,
+    JiraRecommendation,
     MeetingStateSnapshot,
     MeetingSummaryPacket,
     OpenQuestionRecord,
     RegisterCaptureChunkRequest,
     RegisterAgentOutputsRequest,
     SearchPriorOutcomesRequest,
+    SlackRecommendation,
     StartCaptureSessionRequest,
     LiveEvent,
     MemoryMatch,
@@ -50,6 +59,7 @@ from visualsprint_api.service_clients import (
     process_media_chunk_with_source,
     process_transcript_chunk_with_source,
     reserve_chunk_upload_target,
+    run_action_agent_with_source,
     run_chunk_reasoning_with_source,
     run_summary_agent_with_source,
 )
@@ -148,6 +158,9 @@ class MeetingStore:
     _meeting_revisions: dict[str, int] = field(default_factory=dict)
     _final_reports: dict[str, FinalReport] = field(default_factory=dict)
     _indexed_outcomes: dict[tuple[str, str], IndexedOutcomeDocument] = field(default_factory=dict)
+    _action_recommendations: dict[tuple[str, str], ActionRecommendation] = field(
+        default_factory=dict
+    )
     _lock: Lock = field(default_factory=Lock)
 
     def reset(self) -> None:
@@ -160,6 +173,7 @@ class MeetingStore:
             self._meeting_revisions.clear()
             self._final_reports.clear()
             self._indexed_outcomes.clear()
+            self._action_recommendations.clear()
 
     def list_meetings(self) -> list[MeetingSummary]:
         with self._lock:
@@ -206,6 +220,7 @@ class MeetingStore:
             recentBlockers=[],
             recentMemoryMatches=[],
             recentOpenQuestions=[],
+            recentActionRecommendations=[],
         )
 
         with self._lock:
@@ -300,6 +315,7 @@ class MeetingStore:
             report_copy = report.model_copy(deep=True)
 
         self._sync_indexed_outcomes_to_elastic(meeting_copy, documents_to_sync)
+        self.generate_action_recommendations(meeting_id)
         return report_copy
 
     def get_meeting_state(self, meeting_id: str) -> MeetingStateSnapshot | None:
@@ -1837,6 +1853,197 @@ class MeetingStore:
             meeting.recentMemoryMatches.insert(0, memory_match)
             meeting.metrics.memoryMatchesCount += 1
         meeting.recentMemoryMatches = meeting.recentMemoryMatches[:6]
+
+    def generate_action_recommendations(self, meeting_id: str) -> list[ActionRecommendation] | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            report = self._final_reports.get(meeting_id)
+            if report is None:
+                return None
+            meeting_copy = meeting.model_copy(deep=True)
+            report_copy = report.model_copy(deep=True)
+
+        agent_inputs, source = run_action_agent_with_source(report_copy, meeting_copy.title)
+        if agent_inputs is None:
+            return []
+
+        recommendations: list[ActionRecommendation] = []
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            recorded_at = _utc_now()
+            for agent_input in agent_inputs:
+                recommendation = self._build_action_recommendation(
+                    meeting_id=meeting_id,
+                    agent_input=agent_input,
+                    recorded_at=recorded_at,
+                )
+                self._action_recommendations[(meeting_id, recommendation.id)] = recommendation
+                meeting.recentActionRecommendations.insert(0, recommendation)
+                meeting.metrics.actionRecommendationsCount += 1
+                recommendations.append(recommendation)
+            meeting.recentActionRecommendations = meeting.recentActionRecommendations[:20]
+            self._mark_meeting_updated(meeting_id)
+            return [r.model_copy(deep=True) for r in recommendations]
+
+    def list_action_recommendations(
+        self,
+        meeting_id: str,
+    ) -> list[ActionRecommendation] | None:
+        with self._lock:
+            if meeting_id not in self._meetings:
+                return None
+            recommendations = [
+                rec.model_copy(deep=True)
+                for (rec_meeting_id, _), rec in self._action_recommendations.items()
+                if rec_meeting_id == meeting_id
+            ]
+            recommendations.sort(key=lambda r: r.createdAt, reverse=True)
+            return recommendations
+
+    def approve_action(
+        self,
+        meeting_id: str,
+        recommendation_id: str,
+        request: ActionApprovalRequest,
+    ) -> ActionRecommendation | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            recommendation = self._action_recommendations.get((meeting_id, recommendation_id))
+            if recommendation is None:
+                return None
+            recommendation.status = "approved"
+            recommendation.updatedAt = _utc_now()
+            self._update_meeting_recommendation(meeting, recommendation)
+            self._mark_meeting_updated(meeting_id)
+            return recommendation.model_copy(deep=True)
+
+    def reject_action(
+        self,
+        meeting_id: str,
+        recommendation_id: str,
+        request: ActionApprovalRequest,
+    ) -> ActionRecommendation | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            recommendation = self._action_recommendations.get((meeting_id, recommendation_id))
+            if recommendation is None:
+                return None
+            recommendation.status = "rejected"
+            recommendation.updatedAt = _utc_now()
+            self._update_meeting_recommendation(meeting, recommendation)
+            self._mark_meeting_updated(meeting_id)
+            return recommendation.model_copy(deep=True)
+
+    def execute_action(
+        self,
+        meeting_id: str,
+        recommendation_id: str,
+    ) -> ActionExecutionResult | None:
+        with self._lock:
+            meeting = self._meetings.get(meeting_id)
+            if meeting is None:
+                return None
+            recommendation = self._action_recommendations.get((meeting_id, recommendation_id))
+            if recommendation is None:
+                return None
+            if recommendation.status != "approved":
+                return None
+
+        success = False
+        detail = "Unknown action type"
+        if recommendation.type.startswith("jira_"):
+            success, detail = execute_jira_action(recommendation)
+        elif recommendation.type.startswith("slack_"):
+            success, detail = execute_slack_action(recommendation)
+
+        with self._lock:
+            recommendation = self._action_recommendations.get((meeting_id, recommendation_id))
+            if recommendation is None:
+                return None
+            recommendation.status = "executed" if success else "failed"
+            recommendation.executedAt = _utc_now()
+            recommendation.executionResult = detail
+            recommendation.updatedAt = _utc_now()
+            self._update_meeting_recommendation(meeting, recommendation)
+            self._mark_meeting_updated(meeting_id)
+
+        return ActionExecutionResult(
+            recommendationId=recommendation_id,
+            status="executed" if success else "failed",
+            detail=detail,
+            executedAt=recommendation.executedAt,
+        )
+
+    def _build_action_recommendation(
+        self,
+        meeting_id: str,
+        agent_input: ActionRecommendationInput,
+        recorded_at: datetime,
+    ) -> ActionRecommendation:
+        jira_details = None
+        if agent_input.jiraDetails is not None:
+            jira_details = JiraRecommendation(
+                action=agent_input.jiraDetails.action,
+                issueType=agent_input.jiraDetails.issueType,
+                title=agent_input.jiraDetails.title,
+                description=agent_input.jiraDetails.description,
+                priority=agent_input.jiraDetails.priority,
+                ownerLabel=agent_input.jiraDetails.ownerLabel,
+                evidence=[
+                    EvidenceReference.model_validate(ref) if isinstance(ref, dict) else ref
+                    for ref in agent_input.jiraDetails.evidence
+                ],
+                confidence=agent_input.jiraDetails.confidence,
+            )
+        slack_details = None
+        if agent_input.slackDetails is not None:
+            slack_details = SlackRecommendation(
+                type=agent_input.slackDetails.type,
+                channel=agent_input.slackDetails.channel,
+                title=agent_input.slackDetails.title,
+                message=agent_input.slackDetails.message,
+                evidence=[
+                    EvidenceReference.model_validate(ref) if isinstance(ref, dict) else ref
+                    for ref in agent_input.slackDetails.evidence
+                ],
+                confidence=agent_input.slackDetails.confidence,
+            )
+        return ActionRecommendation(
+            id=f"act_{uuid4().hex[:12]}",
+            meetingId=meeting_id,
+            type=agent_input.type,
+            status="pending",
+            urgency=agent_input.urgency,
+            confidence=agent_input.confidence,
+            jiraDetails=jira_details,
+            slackDetails=slack_details,
+            evidence=[
+                EvidenceReference.model_validate(ref) if isinstance(ref, dict) else ref
+                for ref in agent_input.evidence
+            ],
+            createdAt=recorded_at,
+            updatedAt=recorded_at,
+            executedAt=None,
+            executionResult=None,
+        )
+
+    def _update_meeting_recommendation(
+        self,
+        meeting: MeetingDetail,
+        recommendation: ActionRecommendation,
+    ) -> None:
+        for i, existing in enumerate(meeting.recentActionRecommendations):
+            if existing.id == recommendation.id:
+                meeting.recentActionRecommendations[i] = recommendation.model_copy(deep=True)
+                break
 
 
 repository = MeetingStore()

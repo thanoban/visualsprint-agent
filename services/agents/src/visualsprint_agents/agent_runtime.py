@@ -7,6 +7,8 @@ from urllib import error, request
 
 from visualsprint_agents.config import settings
 from visualsprint_agents.models import (
+    ActionAgentRequest,
+    ActionAgentResponse,
     FinalReportDraft,
     ReasoningRunResponse,
     SummaryPacketRequest,
@@ -85,6 +87,43 @@ def invoke_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft | No
         return None
     try:
         return FinalReportDraft.model_validate(response_payload)
+    except ValueError:
+        return None
+
+
+def invoke_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse | None:
+    """Try the configured action-agent bridge and return validated output."""
+
+    response_payload: dict | None
+    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine":
+        if not settings.cloud_adapter_ready or not settings.action_engine_resource_name:
+            return None
+        response_payload = _query_vertex_reasoning_engine(
+            resource_name=settings.action_engine_resource_name,
+            input_payload=payload.model_dump(mode="json"),
+        )
+        if response_payload is None:
+            return None
+        output_payload = extract_vertex_structured_output(response_payload)
+        if output_payload is None:
+            return None
+        try:
+            return ActionAgentResponse.model_validate(output_payload)
+        except ValueError:
+            return None
+
+    if not settings.cloud_adapter_ready or not settings.action_agent_endpoint_url:
+        return None
+
+    response_payload = _post_json(
+        url=settings.action_agent_endpoint_url,
+        payload=payload.model_dump(mode="json"),
+        target_agent_id=settings.action_agent_id,
+    )
+    if response_payload is None:
+        return None
+    try:
+        return ActionAgentResponse.model_validate(response_payload)
     except ValueError:
         return None
 

@@ -31,6 +31,10 @@ class Settings:
     elasticsearch_api_key_secret: str | None = None
     elastic_index_outcomes: str | None = None
     elastic_mcp_server_url: str | None = None
+    jira_base_url: str | None = None
+    jira_api_token_secret: str | None = None
+    slack_bot_token_secret: str | None = None
+    slack_default_channel: str | None = None
     service_request_timeout_seconds: float = 0.5
     supported_tracks: tuple[str, ...] = (
         "arize",
@@ -95,6 +99,10 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         elasticsearch_api_key_secret=_get(source, "ELASTICSEARCH_API_KEY_SECRET"),
         elastic_index_outcomes=_get(source, "ELASTIC_INDEX_OUTCOMES"),
         elastic_mcp_server_url=_get(source, "ELASTIC_MCP_SERVER_URL"),
+        jira_base_url=_get(source, "JIRA_BASE_URL"),
+        jira_api_token_secret=_get(source, "JIRA_API_TOKEN_SECRET"),
+        slack_bot_token_secret=_get(source, "SLACK_BOT_TOKEN_SECRET"),
+        slack_default_channel=_get(source, "SLACK_DEFAULT_CHANNEL"),
         service_request_timeout_seconds=float(
             source.get("VISUALSPRINT_SERVICE_TIMEOUT_SECONDS", "0.5")
         ),

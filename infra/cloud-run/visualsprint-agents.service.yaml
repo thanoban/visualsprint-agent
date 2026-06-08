@@ -37,6 +37,8 @@ spec:
               value: projects/530780341550/locations/us-west1/reasoningEngines/REASONING_ENGINE_ID
             - name: VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME
               value: projects/530780341550/locations/us-west1/reasoningEngines/SUMMARY_ENGINE_ID
+            - name: VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME
+              value: projects/530780341550/locations/us-west1/reasoningEngines/ACTION_ENGINE_ID
             - name: VISUALSPRINT_CLOUD_RUN_SERVICE_URL
               value: https://visualsprint-agents-REPLACE.a.run.app
             - name: VISUALSPRINT_SERVICE_ACCOUNT_EMAIL
