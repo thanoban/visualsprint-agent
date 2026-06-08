@@ -1,248 +1,835 @@
 # Google Cloud Agent Builder Plan
 
-This document answers one question after analyzing the current repository:
+This document is the main setup and implementation guide for the Google Cloud agent layer in VisualSprint.
 
-What do we still need to do in Google Cloud Agent Builder for VisualSprint?
+It is written for the current repository state and for a teammate who has not used Google Agent Builder before.
 
-It is based on the code that exists today, not only on the target architecture in the root `README.md`.
+Use this document when you need to answer:
+
+- what already exists in the repo
+- what is still missing
+- what to do in Google Cloud
+- what to wire in the codebase
+- what order to do the work in
+
+For Elastic-only ownership and handoff, use [elastic-integration-handoff.md](./elastic-integration-handoff.md).
+
+This version of the guide uses the recommended Google production path:
+
+1. build the agents in `ADK`
+2. deploy them to `Vertex AI Agent Engine`
+3. register them inside the `Gemini Enterprise` app
+4. connect the existing repo adapter to those deployed runtimes
+
+## What changed after re-checking the repo
+
+After re-checking the full project structure and the current markdown files, these are the important updates to the plan:
+
+1. `services/agents` is no longer only a pure stub.
+2. The repo now already contains:
+   - Cloud Run deployment YAML in `infra/cloud-run/`
+   - cloud-facing adapter config in `services/agents/src/visualsprint_agents/config.py`
+   - runtime bridge code in `services/agents/src/visualsprint_agents/agent_runtime.py`
+   - agent smoke and audit routes in `services/api/src/visualsprint_api/routes/agents.py`
+   - agent eval fixtures and an eval smoke script in `services/agents/evals/` and `services/agents/scripts/`
+3. The old doc wording understated how far the adapter boundary has already progressed.
+4. The best next step is no longer "create everything mainly in Agent Designer." The stronger production path is now `ADK -> Agent Engine -> Gemini Enterprise registration`.
+
+So the updated plan below treats the project as:
+
+- a working local product slice
+- a partially prepared cloud-agent adapter
+- a not-yet-finished Google Agent Builder and Elastic integration
 
 ## Short answer
 
-The repo is already preparing the right inputs and outputs for an agent system, but the real Google Cloud agent layer is not wired yet.
+The repo already has the right architecture for Google Agent Builder, but the real managed agent path is not fully wired yet.
 
-Today the project has:
+Today the project already has:
 
-- a working web shell with browser capture and live dashboard surfaces
-- a deterministic API/control plane with meeting, chunk, memory, and report routes
-- stub ingest and media services
-- a local stub `services/agents` service that returns deterministic mock reasoning and summary outputs
+- a working web shell with browser capture and dashboard surfaces
+- a deterministic API control plane
+- shared contracts
+- a local agents service
+- cloud-oriented adapter configuration
+- deployment-facing Cloud Run config
+- evaluation fixtures for reasoning and summary flows
 
-What is still missing is the production Agent Builder path:
+What is still missing:
 
-1. Create the real Google Cloud agent application.
-2. Create the chunk reasoning agent.
-3. Create the meeting summary agent.
-4. Connect the Elastic MCP tool for historical memory retrieval.
-5. Connect backend action tools for output persistence and report finalization.
-6. Replace the local stub agent logic with a Cloud-hosted adapter that calls the deployed agents.
-7. Add auth, secrets, evaluation data, and deployment wiring.
+1. real coded agents built in ADK
+2. deployment of those agents to Vertex AI Agent Engine
+3. registration of those deployed agents inside the Gemini Enterprise app
+4. real runtime wiring from our agents adapter to deployed Google-managed agents
+5. real Elastic MCP integration for historical memory
+6. production secrets and Cloud Run service identity wiring
+7. end-to-end verification against deployed cloud services
 
-## What the repo already gives us
+## Current repo truth
 
-### 1. Shared contracts already exist
+This section is the source-of-truth snapshot for the current project.
 
-The project already defines the product vocabulary and payload shapes in `packages/contracts/src/domain.ts`.
+### Frontend
 
-Important existing contracts:
+- `apps/web`
+- Next.js dashboard
+- browser capture UI
+- meeting views and live surfaces
+
+### Deterministic backend
+
+- `services/api`
+- meeting lifecycle
+- capture lifecycle
+- transcript and media context assembly
+- output persistence
+- summary packet assembly
+- agent smoke routes
+
+### Agents service
+
+- `services/agents`
+- local mock fallback behavior
+- bridge-style runtime invocation support
+- Vertex AI Reasoning Engine query support
+- deployment health reporting
+- eval fixtures and smoke script
+
+### Infra
+
+- `infra/cloud-run/visualsprint-agents.service.yaml`
+
+### Docs
+
+- this file for the full Google Agent Builder plan
+- `docs/elastic-integration-handoff.md` for Elastic-only execution
+- `docs/fixes.md` for known architecture and verification risks
+
+## Important issues found while reviewing docs and structure
+
+These are the main issues that matter before cloud integration:
+
+### 1. The old doc said the agents service was only a stub
+
+That is now incomplete.
+
+The repo already includes:
+
+- `VISUALSPRINT_AGENT_MODE`
+- `VISUALSPRINT_DEPLOYMENT_TARGET`
+- `VISUALSPRINT_AGENT_RUNTIME_BACKEND`
+- Cloud Run deployment env var placeholders
+- direct runtime query support for Vertex AI Reasoning Engine
+
+So the correct description is:
+
+- the service still has local fallback behavior
+- but the adapter shape for real cloud integration is already being built
+
+### 2. Contract alignment still matters before production memory
+
+This remains true from the earlier review.
+
+Before real Elastic indexing and real managed-agent outputs, we still need to align:
+
+- stored outcome shape
+- stable IDs
+- evidence references
+- memory relation labels
+
+### 3. Verification is stronger than before, but still not complete
+
+The repo now includes:
+
+- agent eval fixtures
+- `npm run eval:agents`
+- smoke routes for agent invocation
+
+That is a good step forward.
+
+But production validation is still missing for:
+
+- real Google-managed agents
+- real Elastic retrieval
+- deployed Cloud Run identity and secret access
+
+## Recommended production shape
+
+Keep this architecture.
+
+1. `services/api` owns deterministic orchestration and persistence.
+2. `services/agents` stays the adapter boundary.
+3. Google Agent Builder and Agent Engine own reasoning and summarization behavior.
+4. Elastic owns historical memory retrieval.
+5. The web app stays unaware of cloud-agent details.
+
+This is still the safest path because the current repo already expects an agents-service seam through `VISUALSPRINT_AGENTS_SERVICE_URL`.
+
+## Google Agent Builder concepts in simple terms
+
+If you have not used Google Agent Builder before, these are the pieces that matter for VisualSprint.
+
+### Gemini Enterprise app
+
+This is the top-level Gemini web app container in Google Cloud.
+
+In the ADK-first path, you still create the app, but its main job is to:
+
+- host the user-facing Gemini Enterprise experience
+- expose Agent Gallery
+- hold the registered custom agents your team deploys elsewhere
+
+### Agent Development Kit (ADK)
+
+This is the code-first framework Google provides for building real production agents.
+
+It is a better fit for VisualSprint because this repo already has:
+
+- a Python service boundary in `services/agents`
+- Cloud Run deployment config
+- eval fixtures
+- runtime adapter code
+
+### Vertex AI Agent Engine
+
+This is the managed runtime where ADK agents are deployed.
+
+You build the agent in code, deploy it to Agent Engine, then query it through Google-managed runtime APIs.
+
+### Agent Gallery
+
+This is where custom agents are listed in the Gemini Enterprise web app.
+
+### Agent Designer
+
+This is the no-code or low-code builder used to create and edit custom agents.
+
+It supports:
+
+- prompt-first creation
+- flow-based creation
+- preview and testing
+- subagent-style multi-step designs
+
+### Why we need it
+
+VisualSprint needs Google Agent Builder because the hackathon requires a functional agent powered by Gemini and Google Cloud Agent Builder, not only a local backend with mock outputs.
+
+For this project, the strongest production path is:
+
+- build agents in `ADK`
+- deploy them to `Vertex AI Agent Engine`
+- register them in the `Gemini Enterprise` app
+
+## Which Google path should we choose
+
+For VisualSprint, choose this as the primary path:
+
+- `ADK` for the real agent implementation
+- `Vertex AI Agent Engine` for managed runtime
+- `Gemini Enterprise` for registration and discovery
+
+Treat `Agent Designer` as optional.
+
+Use it only when you want:
+
+- quick prompt exploration
+- early interaction testing
+- a rough prototype before moving the behavior into code
+
+Do not make Agent Designer the only production implementation path for this repo.
+
+## What we do not need Agent Builder to do
+
+Agent Builder should not own:
+
+- browser capture
+- chunk registration
+- media uploads
+- transcript chunk lifecycle
+- database writes
+- dashboard rendering
+
+Those remain in our repo.
+
+## What Agent Builder should own
+
+Google-managed agent infrastructure should own:
+
+- reasoning over assembled chunk context
+- use of the Elastic MCP tool for historical memory
+- meeting-close summarization
+- managed runtime execution
+
+Agent Designer can still be used for:
+
+- early prompt experiments
+- checking behavior quickly
+- comparing prototype logic against the coded ADK implementation
+
+## Recommended implementation path
+
+For VisualSprint, use this order:
+
+1. define the final reasoning and summary behavior in the repo
+2. build the agents in `ADK`
+3. deploy them to `Vertex AI Agent Engine`
+4. register them inside the `Gemini Enterprise` app
+5. connect the existing `services/agents` adapter to those deployed runtimes
+6. add Elastic MCP-backed memory
+
+This is a better fit than relying on Agent Designer alone because the current repo is already code-first.
+
+## Beginner-friendly setup path in Google Cloud
+
+This is the step-by-step path for someone starting from zero.
+
+## Phase 1. Prepare Google Cloud
+
+### Step 1. Create or select a Google Cloud project
+
+Create a dedicated Google Cloud project for VisualSprint, or use the team’s existing one.
+
+You will need:
+
+- billing enabled
+- permission to use Gemini Enterprise and Cloud Run
+
+### Step 2. Enable the required services
+
+At minimum, enable the services needed for:
+
+- Gemini Enterprise
+- Cloud Run
+- Secret Manager
+- Vertex AI
+
+If you later use more Google services for storage or ingestion, enable those separately.
+
+### Step 3. Create a Gemini Enterprise app
+
+Official reference:
+
+- https://docs.cloud.google.com/gemini/enterprise/docs/create-app
+
+High-level steps from the official flow:
+
+1. Open Google Cloud console.
+2. Go to Gemini Enterprise.
+3. Open the Apps page.
+4. Click `Create app`.
+5. Enter the app name.
+6. Choose the region or multi-region.
+7. Create the app.
+
+Recommended name:
+
+- `VisualSprint`
+
+### Step 4. Enable the web app features required for agents
+
+Official reference:
+
+- https://docs.cloud.google.com/gemini/enterprise/docs/manage-web-app-features
+
+In the Gemini Enterprise app:
+
+1. Open the app in Google Cloud console.
+2. Go to `Configurations`.
+3. Open `Feature Management`.
+4. Turn on:
+   - `Enable Agent Gallery`
+   - `Enable Agent Designer`
+
+These are required so you can create and manage custom agents in the web app.
+
+## Phase 2. Prepare the coded agent implementation
+
+### Step 5. Create the ADK agent code in the repo
+
+Create two real code-based agents:
+
+- reasoning agent
+- summary agent
+
+Recommended location in this repo:
+
+- `services/agents`
+
+The ADK path matches this repo better than a web-only builder flow.
+
+Recommended implementation shape:
+
+- keep the current FastAPI adapter in `services/agents`
+- add ADK-specific agent code under that service
+- keep the repo contracts as the source of truth
+
+One practical structure would be:
+
+- `services/agents/src/visualsprint_agents/adk/`
+- `services/agents/src/visualsprint_agents/adk/reasoning_agent.py`
+- `services/agents/src/visualsprint_agents/adk/summary_agent.py`
+- `services/agents/src/visualsprint_agents/adk/tools/`
+
+This exact folder does not exist yet. It is the recommended next implementation step.
+
+### Step 6. Build the reasoning agent in ADK
+
+The reasoning agent should be designed around the repo’s current contracts:
+
+- chunk reasoning input
+- structured reasoning output
+
+Its responsibilities should stay the same as the product contract:
+
+- inspect transcript context
+- inspect screen evidence
+- compare against running meeting state
+- call memory retrieval when needed
+- return durable structured outcomes only
+
+### Step 7. Build the summary agent in ADK
+
+The summary agent should be designed around:
+
+- summary packet input
+- final report output
+
+Its job should be:
+
+- generate the executive summary
+- consolidate decisions and commitments
+- keep unresolved blockers visible
+- include memory-backed context only when it helps
+
+### Step 8. Use the existing repo contracts as the source of truth
+
+This keeps the adapter thin and avoids double-translation.
+
+The ADK agents should map cleanly to:
 
 - `ChunkInsight`
 - `MeetingSummaryPacket`
 - `RegisterAgentOutputsRequest`
 - `FinalReport`
-- `SearchPriorOutcomesRequest`
 
-This is good news because Agent Builder work should follow these contracts instead of inventing new ones.
+### Step 9. Use Agent Designer only as an optional prototype aid
 
-### 2. The control plane is already agent-ready
+If you want fast experimentation:
 
-`services/api` already does the deterministic work that should stay outside the agent:
+1. create a temporary prototype in Agent Designer
+2. refine prompts and expected behavior
+3. move the stable logic into ADK code
 
-- meeting lifecycle
-- capture session lifecycle
-- chunk registration
-- transcript and screen-event assembly
-- meeting-state assembly
-- persistence of agent outputs
-- final report storage
+Recommended rule:
 
-That separation is the right design for Agent Builder.
+- production logic should live in code, not only in a web UI flow
 
-### 3. Agent input payloads are already assembled
-
-The API already builds the two main agent inputs:
-
-- chunk reasoning input through the chunk insight pipeline
-- end-of-meeting summary input through the summary packet pipeline
-
-This means Agent Builder should consume assembled business context, not raw media or low-level lifecycle events.
-
-### 4. The current `services/agents` service is only a stub
-
-The current agent service is not using Google Cloud Agent Builder or Gemini yet.
-
-Right now it:
-
-- exposes `/api/reasoning/chunks/run`
-- exposes `/api/summary/meetings/run`
-- returns deterministic placeholder decisions, commitments, blockers, questions, and memory matches
-
-This is useful for local UI progress, but it does not satisfy the real hackathon requirement by itself.
-
-### 5. Memory is still mocked in the repo
-
-The API already exposes a local `search-prior-outcomes` route, but the implementation is in-memory keyword matching.
-
-That is a stand-in for the real production requirement:
-
-- Elastic Serverless index
-- Elastic Agent Builder tool
-- Elastic MCP server
-- historical hybrid search with relation labeling
-
-## Important findings from the `origin/udula` docs review
-
-The `origin/udula` branch added a helpful `docs/fixes.md`. The most useful findings to carry forward into the Agent Builder and Elastic plan are:
-
-- the current output contracts still need to converge on the final agent-plus-Elastic shape
-- mock reasoning is still coupled too closely to chunk upload completion
-- verification should include a runtime smoke path, not only syntax checks
-
-That means Elastic should not be treated as a last-mile add-on. We need to align the contract and the integration seam before wiring the real memory layer.
-
-## Recommended production shape
-
-The cleanest path is not to make `services/api` talk directly to Agent Builder everywhere.
-
-Instead:
-
-1. Keep `services/api` as the deterministic orchestrator.
-2. Replace `services/agents` with a thin adapter service deployed on Cloud Run.
-3. Have that adapter call the real Google Cloud agents.
-4. Preserve the existing HTTP contract from `services/api` to `services/agents`.
-
-Why this is the safest option:
-
-- the API already expects `VISUALSPRINT_AGENTS_SERVICE_URL`
-- the current integration seam is stable
-- the web app and tests do not need a major rewrite
-- we can swap mock logic for real cloud logic with minimal repo churn
-
-## Elastic integration principles
-
-Before the step-by-step work, these are the project rules we should follow for Elastic:
-
-1. Elastic is the production memory layer, not a side cache.
-2. Elastic writes stay deterministic and backend-owned.
-3. Elastic reads for historical reasoning happen through the MCP-connected tool.
-4. The same structured outcome shape should drive the agent, the API, the UI, and the Elastic index.
-5. The adapter in `services/agents` should hide cloud-specific details from the rest of the repo.
-
-For a teammate-ready Elastic-only handoff, use [elastic-integration-handoff.md](./elastic-integration-handoff.md).
-
-## Exactly what to build in Google Cloud Agent Builder
-
-### 1. Create the top-level agent application
-
-In Google Cloud, create the VisualSprint agent application in Vertex AI Agent Builder.
-
-Use it as the home for:
-
-- agent configuration
-- model selection
-- tool definitions
-- safety settings
-- evaluation and previews
-- deployment
-
-Official docs:
-
-- Vertex AI Agent Builder docs: https://docs.cloud.google.com/agent-builder
-
-### 2. Create the chunk reasoning agent
-
-This is the most important agent in the project.
-
-Its job is to consume the existing `ChunkInsight` payload and produce structured outputs matching `RegisterAgentOutputsRequest`.
-
-Input source from this repo:
-
-- the payload returned by `GET /api/meetings/{meeting_id}/insights/chunks/{client_chunk_id}`
-
-Expected responsibilities:
-
-- inspect the transcript window
-- inspect extracted screen evidence
-- compare against running meeting state
-- decide whether signals are new, updated, resolved, or reopened
-- call memory lookup when a durable signal is detected
-- return decisions, commitments, blockers, open questions, and memory matches
-
-What the prompt/instructions must enforce:
-
-- only emit durable outcomes
-- avoid duplicates when the running state already contains the same issue
-- cite transcript or screen evidence in reasoning
-- use memory lookup before assigning relation labels like `new`, `recurring`, or `reopened`
-- return schema-valid structured output only
-
-### 3. Create the summary agent
-
-This agent should consume the existing `MeetingSummaryPacket` payload and produce the final report.
-
-Input source from this repo:
-
-- the payload returned by `GET /api/meetings/{meeting_id}/summary-packet`
-
-Expected responsibilities:
-
-- write the executive summary
-- consolidate decisions
-- consolidate commitments with owners and due hints
-- keep unresolved blockers visible
-- keep open questions visible
-- include memory-backed historical context only when it changes confidence or priority
-
-Output target:
-
-- `FinalReport`
-
-### 4. Add the Elastic MCP tool connection
-
-This is the partner-track-critical part.
-
-The reasoning agent should not use the repo's local mock memory route in production for the hackathon story. It should use the Elastic MCP-connected tool.
-
-Build or configure the following in Elastic:
-
-- Serverless index for historical outcomes
-- ELSER-backed semantic field
-- tool named `search_prior_outcomes`
-- MCP server endpoint and authentication
-
-Then connect that tool inside Agent Builder so the reasoning agent can call it during chunk analysis.
+## Phase 3. Deploy the ADK agents to Vertex AI Agent Engine
 
 Official references:
 
-- Elastic MCP server docs: https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/mcp-server/
-- Elastic hackathon resources: https://rapid-agent.devpost.com/details/elastic-resources
+- https://google.github.io/adk-docs/deploy/agent-engine/
+- https://google.github.io/adk-docs/deploy/agent-engine/deploy/
 
-### 5. Add backend action tools
+### Step 10. Prepare for Agent Engine deployment
 
-The agent needs a small set of deterministic actions.
+Before deployment, you generally need:
 
-Minimum tool surface:
+- a Google Cloud project
+- Vertex AI access
+- a staging bucket
+- the required Python environment
 
-- `register_outputs`
-- `finalize_report`
+### Step 11. Package each ADK agent for deployment
 
-Optional tool:
+ADK agents are deployed to Agent Engine as managed applications.
 
-- `get_meeting_state`
+For VisualSprint, that means:
 
-Recommended mapping to existing repo endpoints:
+- one deployed reasoning runtime
+- one deployed summary runtime
 
-- `register_outputs` -> `POST /api/meetings/{meeting_id}/outputs/register`
-- `finalize_report` -> `POST /api/meetings/{meeting_id}/final-report`
+### Step 12. Deploy the agents to Agent Engine
 
-Important note:
+After deployment, you should end up with:
 
-The repo is already designed so most context should be passed into the agent up front. Do not force the agent to fetch basic chunk context that the backend already has.
+- a reasoning engine resource name
+- a summary engine resource name
+
+These are the exact values the current repo can use through:
+
+- `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+
+Also capture:
+
+- the Google Cloud project ID
+- the Google Cloud location used for the reasoning engines
+- any deployment service account used by the agents runtime
+
+## Phase 4. Register the deployed ADK agents inside Gemini Enterprise
+
+Official references:
+
+- https://docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-an-adk-agent
+- https://docs.cloud.google.com/gemini/enterprise/docs/agents-overview
+
+### Step 13. Create the Gemini Enterprise app if it does not exist yet
+
+This is still required because the Gemini Enterprise app is the user-facing container where agents appear.
+
+### Step 14. Enable the web app features required for agents
+
+At minimum:
+
+- `Enable Agent Gallery`
+
+If you want UI-based experimentation too:
+
+- `Enable Agent Designer`
+
+### Step 15. Register each ADK agent with the Gemini Enterprise app
+
+In the Gemini Enterprise app:
+
+1. open the app
+2. go to `Agents`
+3. click `Add Agents`
+4. choose `Custom agent via Agent Engine`
+5. if your agent needs delegated authorization, add the authorization details
+6. click `Next`
+7. enter the display name and description
+8. provide the deployed Agent Engine reasoning engine resource path
+9. click `Create`
+
+Recommended display names:
+
+- `VisualSprint Reasoning Agent`
+- `VisualSprint Summary Agent`
+
+The resource path you register should be the Agent Engine path, for example:
+
+- `projects/PROJECT_ID/locations/LOCATION/reasoningEngines/RESOURCE_ID`
+
+or the fully qualified API-style path accepted by the Gemini Enterprise registration flow.
+
+### Step 16. Copy the Gemini app identifiers back into the repo config
+
+After the Gemini Enterprise app and ADK agents exist, copy these values into your deployment configuration:
+
+- Gemini Enterprise app ID -> `VISUALSPRINT_AGENT_APPLICATION_ID`
+- reasoning engine resource -> `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
+- summary engine resource -> `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+- project ID -> `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID`
+- location -> `VISUALSPRINT_GOOGLE_CLOUD_LOCATION`
+
+### Step 17. Verify the agents appear in Agent Gallery
+
+After registration:
+
+- confirm both agents appear in the Gemini Enterprise app
+- confirm they are callable as registered organizational agents
+
+## Phase 5. Optional UI prototyping in Agent Designer
+
+### Step 18. Use Agent Designer only for exploration
+
+You can still use the web app for quick experiments, but this should not replace the coded ADK path.
+
+Use Agent Designer for:
+
+- trying prompt variations
+- testing instructions quickly
+- comparing prototype behavior against deployed ADK behavior
+
+### Step 19. Do not make Agent Designer the only source of production truth
+
+For this project, the production source of truth should be:
+
+- ADK code
+- deployed Agent Engine resources
+- repo contracts
+
+## Phase 6. Add the Elastic MCP tool
+
+This part is required for the memory layer.
+
+Official references:
+
+- https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/mcp-server
+- https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/tools/mcp-tools
+
+### Step 20. Prepare the Elastic side first
+
+The Elastic owner should:
+
+1. create the Elastic Serverless project
+2. create the outcomes index
+3. create the API key with the needed privileges
+4. prepare the MCP endpoint URL
+
+The current official MCP endpoint pattern is:
+
+- `{KIBANA_URL}/api/agent_builder/mcp`
+- or `{KIBANA_URL}/s/{SPACE_NAME}/api/agent_builder/mcp`
+
+### Step 21. Prepare the Elastic MCP connector
+
+Inside Elastic Agent Builder tooling, an MCP server endpoint is used to expose tools.
+
+The important point for VisualSprint is:
+
+- Elastic exposes tools through its MCP server
+- the reasoning flow should use the `search_prior_outcomes` tool from that MCP-connected setup
+
+### Step 22. Connect the tool in the reasoning flow
+
+The reasoning agent should be configured so that:
+
+1. it identifies a durable candidate signal
+2. it calls `search_prior_outcomes`
+3. it receives ranked historical matches
+4. it uses that result plus the current meeting state to label the relation
+
+Recommended ownership boundary:
+
+- Elastic returns candidates
+- the reasoning agent decides `new`, `recurring`, `reopened`, or `resolved_previously`
+
+## Phase 7. Connect the repo adapter to the deployed runtimes
+
+This is where our codebase begins calling the real cloud setup.
+
+## Current repo pieces that already support this
+
+The repo already includes:
+
+- `services/agents/src/visualsprint_agents/config.py`
+- `services/agents/src/visualsprint_agents/agent_runtime.py`
+- `infra/cloud-run/visualsprint-agents.service.yaml`
+
+That means the document should guide setup using those existing env vars instead of speaking only in abstract terms.
+
+### Step 23. Choose the runtime mode
+
+The current agents service supports two backend modes:
+
+- `bridge`
+- `vertex_ai_reasoning_engine`
+
+Current control env vars:
+
+- `VISUALSPRINT_AGENT_MODE`
+- `VISUALSPRINT_DEPLOYMENT_TARGET`
+- `VISUALSPRINT_AGENT_RUNTIME_BACKEND`
+
+Recommended primary implementation path now:
+
+- use `configured_cloud`
+- deploy on `cloud_run`
+- prefer `vertex_ai_reasoning_engine` when the ADK agents are deployed to Agent Engine
+
+Use `bridge` only if the team deliberately wants an intermediate step.
+
+### Step 24. Configure the agents service environment
+
+The current repo already expects these values:
+
+- `VISUALSPRINT_ENV`
+- `VISUALSPRINT_TRACK`
+- `VISUALSPRINT_AGENT_MODE`
+- `VISUALSPRINT_DEPLOYMENT_TARGET`
+- `VISUALSPRINT_AGENT_RUNTIME_BACKEND`
+- `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID`
+- `VISUALSPRINT_GOOGLE_CLOUD_LOCATION`
+- `VISUALSPRINT_AGENT_APPLICATION_ID`
+- `VISUALSPRINT_REASONING_AGENT_ID`
+- `VISUALSPRINT_SUMMARY_AGENT_ID`
+- `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL`
+- `VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL`
+- `VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN`
+- `VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN`
+- `VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME`
+- `VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS`
+- `VISUALSPRINT_ELASTIC_MCP_ENDPOINT`
+- `VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME`
+- `VISUALSPRINT_SERVICE_ACCOUNT_EMAIL`
+- `VISUALSPRINT_CLOUD_RUN_SERVICE_URL`
+- `VISUALSPRINT_ALLOWED_ORIGINS`
+
+For the ADK plus Agent Engine path, the most important ones are:
+
+- `VISUALSPRINT_AGENT_MODE=configured_cloud`
+- `VISUALSPRINT_DEPLOYMENT_TARGET=cloud_run`
+- `VISUALSPRINT_AGENT_RUNTIME_BACKEND=vertex_ai_reasoning_engine`
+- `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID`
+- `VISUALSPRINT_GOOGLE_CLOUD_LOCATION`
+- `VISUALSPRINT_AGENT_APPLICATION_ID`
+- `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+
+### Step 25. Understand the two runtime paths
+
+#### Option A. Vertex AI Reasoning Engine mode
+
+This should now be the preferred production path.
+
+- the adapter calls the Vertex AI query endpoint directly
+- the repo uses:
+  - `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
+  - `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+
+The adapter calls:
+
+- `https://aiplatform.googleapis.com/v1/{resource_name}:query`
+
+Use this when:
+
+- the agents are built in ADK
+- they are deployed to Agent Engine
+- you want the cleanest production path
+
+#### Option B. Bridge mode
+
+In bridge mode:
+
+- `services/agents` calls configured external agent endpoints
+- the repo uses:
+  - `VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL`
+  - `VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL`
+
+Use this only if you intentionally want a staged or transitional integration.
+
+## Phase 8. Deploy the agents service on Cloud Run
+
+### Step 26. Use the existing Cloud Run YAML as the base
+
+The repo already has:
+
+- `infra/cloud-run/visualsprint-agents.service.yaml`
+
+That file shows the current expected deployment shape and placeholder env vars.
+
+Before deploying, replace placeholders such as:
+
+- `PROJECT_ID`
+- `VISUALSPRINT_AGENT_APP_ID`
+- `VISUALSPRINT_REASONING_AGENT_ID`
+- `VISUALSPRINT_SUMMARY_AGENT_ID`
+- runtime endpoint placeholders
+- or the Agent Engine resource names, depending on the runtime mode you choose
+
+### Step 27. Attach the service account
+
+Cloud Run should run as a service account that can:
+
+- call required Google runtime APIs
+- read needed secrets from Secret Manager
+
+### Step 28. Deploy and verify health
+
+After deployment:
+
+1. hit `/api/health`
+2. confirm the health payload reflects configured cloud mode
+3. confirm `deploymentReady` is true
+4. confirm the missing configuration list is empty for your chosen mode
+
+## Phase 9. Validate through the repo
+
+### Step 29. Run local evals first
+
+The repo already contains:
+
+- `npm run eval:agents`
+
+Run it before cloud testing so you know the local adapter and eval scaffolding still work.
+
+### Step 30. Use the smoke routes
+
+The API already provides a smoke path for the agent seam:
+
+- `POST /api/meetings/{meeting_id}/agents/smoke`
+
+Use it to test:
+
+- reasoning invocation
+- summary invocation
+- source reporting
+
+without writing a final report or mutating production behavior unnecessarily.
+
+### Step 31. Check invocation audit
+
+The agents service exposes:
+
+- `GET /api/audit/invocations`
+
+Use this to confirm:
+
+- how many runs happened
+- whether they used bridge mode, bridge fallback, or mock mode
+
+This is especially helpful while learning the platform and debugging first deployment attempts.
+
+## Full setup checklist for a first-time Google Agent Builder user
+
+Use this as the simplest practical checklist.
+
+### Google Cloud
+
+- Create the Google Cloud project
+- Enable billing
+- Enable Gemini Enterprise, Vertex AI, Cloud Run, and Secret Manager
+- Create the Gemini Enterprise app
+- Enable Agent Gallery
+- Enable Agent Designer
+
+### Google web app
+
+- Create or open the Gemini Enterprise app
+- enable Agent Gallery
+- register the deployed ADK agents
+- confirm the agents appear in the app
+- optionally use Agent Designer for experiments
+
+### Elastic
+
+- Create the Elastic Serverless project
+- create the outcomes index
+- generate the API key
+- prepare the MCP endpoint
+- define `search_prior_outcomes`
+
+### Repo wiring
+
+- configure the agents-service env vars
+- prefer `vertex_ai_reasoning_engine`
+- update Cloud Run YAML values
+- deploy the agents service
+
+### Values to bring back from Google Cloud
+
+- Gemini Enterprise app ID
+- reasoning engine resource name
+- summary engine resource name
+- deployment location
+- service account and secret names
+
+### Validation
+
+- run `npm run eval:agents`
+- check `/api/health`
+- run the API smoke route
+- check invocation audit
+- confirm the reasoning flow can use Elastic-backed memory
 
 ## Step-by-step work to integrate Elastic
 
-This is the concrete repo plan for Elastic, not just the cloud-side plan.
-
-The detailed teammate handoff version of this work lives in [elastic-integration-handoff.md](./elastic-integration-handoff.md).
+This remains the concrete repo plan for Elastic, but the teammate-ready execution version lives in [elastic-integration-handoff.md](./elastic-integration-handoff.md).
 
 ### Step 0. Align the canonical contract first
 
@@ -262,20 +849,14 @@ Target decisions:
 - make sure evidence references are part of the persisted shape
 - decide where tenant scoping lands now, even if the first runtime is still effectively single-tenant
 
-Why first:
-
-- Elastic index mapping should reflect the final shape
-- Agent Builder structured output should validate against the same shape
-- otherwise we will create avoidable translation debt
-
 ### Step 1. Create the Elastic project and credentials
 
 In Elastic:
 
 1. Create the Elasticsearch Serverless project.
 2. Create the index for historical outcomes.
-3. Create the semantic field strategy for `summary` plus key `detail`.
-4. Generate an API key for server-side access.
+3. Configure semantic search over the key outcome text fields.
+4. Generate an API key for backend access.
 5. Prepare the MCP server configuration and tool definition.
 
 In Google Cloud:
@@ -283,69 +864,19 @@ In Google Cloud:
 6. Store the Elastic API key in Secret Manager.
 7. Decide which Cloud Run services need direct Elastic access.
 
-Minimum secrets/config we should plan for:
-
-- `ELASTICSEARCH_URL`
-- `ELASTICSEARCH_API_KEY_SECRET`
-- `ELASTIC_INDEX_OUTCOMES`
-- `ELASTIC_MCP_SERVER_URL`
-
 ### Step 2. Add Elastic configuration to the repo
-
-Introduce config only at the service boundaries that need it.
 
 Primary files to extend:
 
 - `services/api/src/visualsprint_api/config.py`
 - `services/agents/src/visualsprint_agents/config.py`
 
-Recommended config split:
-
-- `services/api` owns Elastic write-back configuration
-- `services/agents` owns MCP or agent-runtime connectivity configuration
-
-Do not spread Elastic access details into the web app.
-
 ### Step 3. Implement deterministic Elastic write-back in `services/api`
-
-This is the first actual code integration slice.
 
 Current write seam already exists:
 
-- output registration in `POST /api/meetings/{meeting_id}/outputs/register`
-- final report persistence in `POST /api/meetings/{meeting_id}/final-report`
-
-Work to do:
-
-1. Add an Elastic repository/client module under `services/api`.
-2. Convert persisted outcome records into index documents.
-3. Write each finalized or updated outcome into Elastic when outputs are registered.
-4. Keep the local in-memory projection for development, but make Elastic the production historical store.
-5. Preserve deterministic retries and idempotency where possible.
-
-Primary code areas to touch:
-
-- `services/api/src/visualsprint_api/repository.py`
-- a new Elastic client module in `services/api/src/visualsprint_api/`
-
-Index fields should include at least:
-
-- `id`
-- `tenant_id`
-- `meeting_id`
-- `record_type`
-- `summary`
-- `detail`
-- `status`
-- `owner_label`
-- `speaker_label`
-- `due_hint`
-- `severity`
-- `first_seen_chunk_id`
-- `last_updated_chunk_id`
-- `created_at`
-- `updated_at`
-- `evidence`
+- `POST /api/meetings/{meeting_id}/outputs/register`
+- `POST /api/meetings/{meeting_id}/final-report`
 
 ### Step 4. Keep local mock search only as a fallback
 
@@ -353,180 +884,119 @@ The current route:
 
 - `POST /api/meetings/{meeting_id}/memory/search-prior-outcomes`
 
-should stop being presented as the main production memory layer.
-
-Recommended role after integration:
-
-- local fallback for development
-- backup diagnostic surface
-- optional smoke-test helper
-
-But for the hackathon-critical production path:
-
-- the reasoning agent should use Elastic through MCP, not this local keyword matcher
+should remain only as a development fallback or diagnostic surface.
 
 ### Step 5. Define the Elastic MCP tool contract
 
-The tool name already fits the repo language:
+Tool:
 
 - `search_prior_outcomes`
 
-Tool input should map closely to existing request types:
-
-- `recordType`
-- `summary`
-- `detail`
-- `tenantId`
-- optionally `meetingId`
-
-Tool output should support:
-
-- matched historical records
-- scores
-- enough fields for the reasoning agent to assign `new`, `recurring`, `reopened`, or `resolved_previously`
-
-Important design rule:
-
-- relation labels should be owned by one clear layer
-
-Recommended choice:
-
-- Elastic returns ranked candidates
-- the reasoning agent assigns the final relation label using the candidates plus current meeting state
-
 ### Step 6. Wire the reasoning agent to Elastic MCP
 
-Once the tool exists, update the real chunk reasoning agent so that it:
+The reasoning flow should call the tool before labeling recurring or reopened outcomes.
 
-1. inspects chunk insight input
-2. identifies durable candidate outcomes
-3. calls `search_prior_outcomes`
-4. compares matches with running state
-5. emits structured outputs plus memory matches
+### Step 7. Validate end to end
 
-This is where the partner-track value becomes real.
+Use:
 
-Verification target:
+- eval fixtures
+- smoke route
+- invocation audit
+- deployed health checks
 
-- for a blocker-like chunk, the agent should return a memory-backed result when Elastic contains a similar prior issue
+## What is still not done
 
-### Step 7. Refactor `services/agents` into the cloud adapter
+After checking the repo and docs again, these are the main unfinished areas:
 
-The current service returns deterministic placeholder data. Replace that behavior with:
+### Google Agent Builder gaps
 
-1. input validation against current repo payloads
-2. call to the deployed chunk reasoning agent
-3. call to the deployed summary agent
-4. response normalization back into repo-native schemas
-5. health reporting that reflects cloud configuration state
-
-Files to replace or extend:
-
-- `services/agents/src/visualsprint_agents/main.py`
-- `services/agents/src/visualsprint_agents/reasoning.py`
-- `services/agents/src/visualsprint_agents/summary.py`
-- `services/agents/src/visualsprint_agents/config.py`
-
-### Step 8. Split upload completion from real reasoning work
-
-This is one of the best insights from the `origin/udula` fixes review.
-
-The production flow should become:
-
-1. chunk upload completes
-2. deterministic services assemble transcript plus visual context
-3. the agent adapter runs chunk reasoning
-4. outputs are registered
-5. Elastic write-back happens on persistence
-6. the UI consumes the updated state
-
-Keep that separation clean so Elastic and Agent Builder remain integrations, not invasive rewrites.
-
-### Step 9. Add Elastic-specific verification
-
-Before deployment, add tests for:
-
-- indexing a decision into Elastic
-- indexing an updated or reopened record
-- agent response handling when Elastic returns no good matches
-- agent response handling when Elastic returns recurring matches
-- summary generation after prior memory-backed outputs were registered
-
-Recommended levels:
-
-- unit tests for document mapping
-- service tests for the API write-back seam
-- adapter tests for agent response normalization
-- one end-to-end smoke path across API -> agents -> Elastic-backed memory
-
-### Step 10. Update the submission story
-
-Once Elastic is really wired, update:
-
-- root `README.md`
-- demo script
-- Devpost copy
-
-Make sure the story clearly says:
-
-- deterministic services own capture and persistence
-- Google Agent Builder owns reasoning and summarization
-- Elastic MCP provides historical memory retrieval
-
-## What is not done yet
-
-After reviewing the full repo, these are the biggest gaps between the current codebase and the intended hackathon architecture.
-
-### Agent Builder gaps
-
-- no real Google Cloud agent has been created yet
-- no Gemini-powered reasoning call exists in the codebase
-- no Elastic MCP tool connection exists in the running implementation
-- no Responsible AI or safety configuration exists yet
-- no deployed agent resource is referenced anywhere
+- no confirmed real deployed custom agents are wired into runtime yet
+- no confirmed live managed-agent invocation path is proven end to end yet
+- no confirmed Elastic MCP-connected reasoning run is proven end to end yet
 
 ### Backend and infrastructure gaps
 
-- no real Cloud Run deployment configuration is present in `infra/`
-- no Agent Builder client or SDK integration exists in `services/agents`
-- no Secret Manager wiring exists in code
-- no Cloud SQL, GCS, Pub/Sub, or Memorystore integration exists yet
-- no real Speech-to-Text integration exists yet
-- no real Elastic write-back or retrieval implementation exists yet
+- Elastic write-back is still not implemented in `services/api`
+- real Elastic retrieval is still not implemented
+- secrets and identity wiring are not fully finalized in code and deployment
 
 ### Product gaps
 
-- the dashboard is showing mock-derived outputs, not cloud-agent outputs
-- capture upload completion does not yet upload real media to cloud storage
-- summary generation is still deterministic placeholder logic
+- the dashboard still mainly reflects local or fallback behavior
+- final report generation is not yet proven through real cloud-agent runtime
 
 ## Suggested execution order
 
-1. Align the canonical outcome contract across `packages/contracts`, `services/api`, and `services/agents`.
-2. Add Elastic project, index, secrets, and repo config.
-3. Implement deterministic Elastic write-back in `services/api`.
-4. Convert `services/agents` into a Cloud adapter instead of deleting it.
-5. Build the real chunk reasoning agent and wire Elastic MCP memory search.
-6. Verify `register_outputs` plus Elastic indexing end to end.
-7. Build the real summary agent after chunk reasoning is stable.
-8. Add Elastic-specific evaluation runs and only then do final Cloud Run deployment polish.
+1. Build the reasoning and summary agents in ADK.
+2. Deploy both to Vertex AI Agent Engine.
+3. Create the Gemini Enterprise app.
+4. Register the deployed ADK agents in the app.
+5. Prepare Elastic MCP and the `search_prior_outcomes` tool.
+6. Configure `services/agents` for `vertex_ai_reasoning_engine`.
+7. Configure Cloud Run YAML and secrets.
+8. Deploy the agents service.
+9. Run eval smoke and health checks.
+10. Add real Elastic write-back in `services/api`.
+11. Prove one end-to-end recurring-memory path.
 
-## Definition of done for Agent Builder
+## Definition of done
 
-We can say the Agent Builder work is truly done when all of this is true:
+The Google Agent Builder work is done when all of this is true:
 
-- a real deployed Google Cloud agent handles chunk reasoning
-- a real deployed Google Cloud agent handles summary generation
-- the reasoning agent uses the Elastic MCP tool during execution
-- `services/api` receives real structured outputs through the existing agent-service seam
-- the web dashboard shows agent-produced outcomes instead of stub outputs
-- the final report is generated from the real summary agent
-- at least one end-to-end meeting flow works against deployed cloud services
+- a real coded reasoning agent exists in ADK
+- a real coded summary agent exists in ADK
+- both are deployed to Vertex AI Agent Engine
+- both are registered in the Gemini Enterprise app
+- the deployed agents service is in configured cloud mode
+- the reasoning path can invoke the real managed agent
+- the summary path can invoke the real managed agent
+- the reasoning flow can use Elastic MCP-backed historical retrieval
+- the API smoke route succeeds against the configured cloud setup
+- the dashboard can surface outputs derived from the real managed path
 
 ## Bottom line
 
-The project is not starting from zero. The repo already has the correct seams, contracts, and UI surfaces for Agent Builder.
+The project is not starting from zero.
 
-The main remaining work is to replace the stub `services/agents` implementation with a real Google Cloud Agent Builder integration and to attach the Elastic MCP tool as the production memory layer.
+It already has:
 
-If we do that through the existing `services/agents` boundary, we can keep most of the rest of the repo intact and move much faster.
+- the correct deterministic backend split
+- the shared contracts
+- the adapter service shape
+- deployment-facing env var structure
+- smoke and eval scaffolding
+
+What you need now is not a brand-new architecture.
+
+What you need is:
+
+1. build the agents in ADK
+2. deploy them to Agent Engine
+3. register them in Gemini Enterprise
+4. configure the existing adapter boundary to call them
+5. finish Elastic memory integration
+6. validate the deployed path end to end
+
+## Official references
+
+- Gemini Enterprise: Create an app  
+  https://docs.cloud.google.com/gemini/enterprise/docs/create-app
+- Gemini Enterprise: Register and manage ADK agents  
+  https://docs.cloud.google.com/gemini/enterprise/docs/register-and-manage-an-adk-agent
+- Gemini Enterprise: Manage web app features  
+  https://docs.cloud.google.com/gemini/enterprise/docs/manage-web-app-features
+- Gemini Enterprise: Agent Gallery  
+  https://docs.cloud.google.com/gemini/enterprise/docs/agent-gallery
+- Gemini Enterprise: Agent Designer overview  
+  https://docs.cloud.google.com/gemini/enterprise/docs/agent-designer
+- Gemini Enterprise: Create an agent  
+  https://docs.cloud.google.com/gemini/enterprise/docs/agent-designer/create-agent
+- ADK: Agent Engine deployment  
+  https://google.github.io/adk-docs/deploy/agent-engine/
+- ADK: Standard deployment  
+  https://google.github.io/adk-docs/deploy/agent-engine/deploy/
+- Elastic Agent Builder MCP server  
+  https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/mcp-server
+- Elastic MCP tools  
+  https://www.elastic.co/docs/explore-analyze/ai-features/agent-builder/tools/mcp-tools
