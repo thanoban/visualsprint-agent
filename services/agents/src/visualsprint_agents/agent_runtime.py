@@ -27,6 +27,7 @@ def invoke_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse
         response_payload = _query_vertex_reasoning_engine(
             resource_name=settings.reasoning_engine_resource_name,
             input_payload=payload.model_dump(mode="json"),
+            query_url=settings.reasoning_query_url,
         )
         if response_payload is None:
             return None
@@ -64,6 +65,7 @@ def invoke_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft | No
         response_payload = _query_vertex_reasoning_engine(
             resource_name=settings.summary_engine_resource_name,
             input_payload=payload.model_dump(mode="json"),
+            query_url=settings.summary_query_url,
         )
         if response_payload is None:
             return None
@@ -101,6 +103,7 @@ def invoke_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse | No
         response_payload = _query_vertex_reasoning_engine(
             resource_name=settings.action_engine_resource_name,
             input_payload=payload.model_dump(mode="json"),
+            query_url=settings.action_query_url,
         )
         if response_payload is None:
             return None
@@ -167,12 +170,13 @@ def _query_vertex_reasoning_engine(
     *,
     resource_name: str,
     input_payload: dict,
+    query_url: str | None = None,
 ) -> dict | None:
     access_token = _resolve_google_access_token()
     if access_token is None:
         return None
 
-    url = f"https://aiplatform.googleapis.com/v1/{resource_name}:query"
+    url = query_url or f"https://aiplatform.googleapis.com/v1/{resource_name}:query"
     body = {
         "classMethod": "query",
         "input": input_payload,
