@@ -26,13 +26,17 @@ def test_agents_health_reasoning_and_summary():
         health_payload = health_response.json()
         assert health_payload["service"] == "visualsprint-agents"
         assert health_payload["mode"] == "mock"
+        assert health_payload["runtimeBackend"] == "bridge"
         assert health_payload["deploymentTarget"] == "local_dev"
         assert health_payload["deploymentReady"] is True
         assert health_payload["reasoningAgentConfigured"] is False
         assert health_payload["summaryAgentConfigured"] is False
+        assert health_payload["reasoningEngineResourceConfigured"] is False
+        assert health_payload["summaryEngineResourceConfigured"] is False
         assert health_payload["reasoningEndpointConfigured"] is False
         assert health_payload["summaryEndpointConfigured"] is False
         assert health_payload["bridgeAuthConfigured"] is False
+        assert health_payload["googleAccessTokenConfigured"] is False
         assert health_payload["secretManagerConfigured"] is False
         assert health_payload["cloudRunServiceConfigured"] is False
         assert health_payload["elasticMcpConfigured"] is False
@@ -126,6 +130,7 @@ def test_build_settings_supports_configured_cloud_mode():
 
     assert settings.environment == "production"
     assert settings.agent_mode == "configured_cloud"
+    assert settings.agent_runtime_backend == "bridge"
     assert settings.deployment_target == "cloud_run"
     assert settings.reasoning_agent_configured is True
     assert settings.summary_agent_configured is True
@@ -161,6 +166,107 @@ def test_build_settings_reports_missing_cloud_run_requirements():
     assert "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_CLOUD_RUN_SERVICE_URL" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL" in settings.missing_cloud_configuration
+
+
+def test_build_settings_supports_vertex_ai_runtime_backend():
+    settings = build_settings(
+        {
+            "VISUALSPRINT_AGENT_MODE": "configured_cloud",
+            "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
+            "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/reasoning123",
+            "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/summary456",
+            "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.sample-token",
+        }
+    )
+
+    assert settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+    assert settings.reasoning_engine_resource_configured is True
+    assert settings.summary_engine_resource_configured is True
+    assert settings.google_access_token_configured is True
+    assert settings.cloud_adapter_ready is True
+    assert settings.deployment_ready is True
+
+
+def test_vertex_ai_runtime_mode_records_vertex_ai_audit(monkeypatch):
+    vertex_settings = build_settings(
+        {
+            "VISUALSPRINT_AGENT_MODE": "configured_cloud",
+            "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
+            "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/reasoning123",
+            "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/summary456",
+            "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.vertex-token",
+        }
+    )
+
+    monkeypatch.setattr(reasoning_module, "settings", vertex_settings)
+    monkeypatch.setattr(summary_module, "settings", vertex_settings)
+    monkeypatch.setattr(
+        reasoning_module,
+        "invoke_reasoning_agent",
+        lambda payload: ReasoningRunResponse(
+            clientChunkId=payload.clientChunkId,
+            decisions=[],
+            commitments=[],
+            blockers=[],
+            openQuestions=[],
+            memoryMatches=[],
+            resolvedDecisionIds=[],
+            resolvedCommitmentIds=[],
+            resolvedBlockerIds=[],
+            resolvedOpenQuestionIds=[],
+        ),
+    )
+    monkeypatch.setattr(
+        summary_module,
+        "invoke_summary_agent",
+        lambda payload: FinalReportDraft(
+            meetingId=payload.meetingId,
+            generatedAt="2026-06-08T11:00:00Z",
+            executiveSummary="Vertex AI response summary.",
+            decisions=payload.decisions,
+            commitments=payload.commitments,
+            blockers=payload.blockers,
+            openQuestions=payload.openQuestions,
+            memoryHighlights=payload.memoryHighlights,
+        ),
+    )
+
+    reasoning_module.run_reasoning_agent(
+        ChunkInsightRequest(
+            meetingId="mtg_vertex_001",
+            meetingTitle="Vertex sync",
+            meetingNotes="",
+            clientChunkId="client-chunk-vertex-001",
+            focusSummary="Vertex AI path should be used first.",
+            attentionFlags=[],
+            reasoningChecklist=[],
+            focusAreas=[],
+        )
+    )
+    summary_module.run_summary_agent(
+        SummaryPacketRequest(
+            meetingId="mtg_vertex_001",
+            meetingTitle="Vertex sync",
+            meetingStatus="ended",
+            draftExecutiveSummary="Vertex summary path.",
+            decisions=[],
+            commitments=[],
+            blockers=[],
+            openQuestions=[],
+            memoryHighlights=[],
+        )
+    )
+
+    with TestClient(app) as client:
+        audit_response = client.get("/api/audit/invocations")
+        audit_payload = audit_response.json()
+        assert audit_payload["summary"]["bridgeRuns"] == 0
+        assert audit_payload["summary"]["bridgeFallbackRuns"] == 0
+        assert audit_payload["summary"]["mockRuns"] == 0
+        assert audit_payload["invocations"][0]["executionMode"] == "vertex_ai"
+        assert audit_payload["invocations"][1]["executionMode"] == "vertex_ai"
 
 
 def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monkeypatch):

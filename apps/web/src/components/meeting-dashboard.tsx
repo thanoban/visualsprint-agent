@@ -2041,7 +2041,9 @@ function formatProcessingSourceMode(
   return value === "downstream_service" ? "service" : "local";
 }
 
-function formatInvocationExecutionMode(value: "mock" | "bridge" | "bridge_fallback") {
+function formatInvocationExecutionMode(
+  value: "mock" | "bridge" | "bridge_fallback" | "vertex_ai" | "vertex_ai_fallback",
+) {
   return value.replaceAll("_", " ");
 }
 

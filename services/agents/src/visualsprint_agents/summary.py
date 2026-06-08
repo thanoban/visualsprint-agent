@@ -18,20 +18,44 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
         if cloud_response is not None:
             audit_store.record(
                 agent_kind="summary",
-                execution_mode="bridge",
+                execution_mode=(
+                    "vertex_ai"
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else "bridge"
+                ),
                 status="success",
-                target_agent_id=settings.summary_agent_id,
+                target_agent_id=(
+                    settings.summary_engine_resource_name
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else settings.summary_agent_id
+                ),
                 request_key=payload.meetingId,
-                detail="Configured bridge produced the summary response.",
+                detail=(
+                    "Configured Vertex AI runtime produced the summary response."
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else "Configured bridge produced the summary response."
+                ),
             )
             return cloud_response
         audit_store.record(
             agent_kind="summary",
-            execution_mode="bridge_fallback",
+            execution_mode=(
+                "vertex_ai_fallback"
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "bridge_fallback"
+            ),
             status="fallback",
-            target_agent_id=settings.summary_agent_id,
+            target_agent_id=(
+                settings.summary_engine_resource_name
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else settings.summary_agent_id
+            ),
             request_key=payload.meetingId,
-            detail="Configured bridge was unavailable, so deterministic summary fallback was used.",
+            detail=(
+                "Configured Vertex AI runtime was unavailable, so deterministic summary fallback was used."
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "Configured bridge was unavailable, so deterministic summary fallback was used."
+            ),
         )
         return _run_configured_summary_agent_stub(payload)
     audit_store.record(

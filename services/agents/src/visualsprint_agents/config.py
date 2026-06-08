@@ -9,6 +9,7 @@ from typing import Literal, Mapping
 
 AgentAdapterMode = Literal["mock", "configured_cloud"]
 DeploymentTarget = Literal["local_dev", "cloud_run"]
+AgentRuntimeBackend = Literal["bridge", "vertex_ai_reasoning_engine"]
 
 
 def _get(environ: Mapping[str, str], key: str) -> str | None:
@@ -41,6 +42,13 @@ def _resolve_allowed_origins(environ: Mapping[str, str]) -> tuple[str, ...]:
     )
 
 
+def _resolve_agent_runtime_backend(environ: Mapping[str, str]) -> AgentRuntimeBackend:
+    raw_value = environ.get("VISUALSPRINT_AGENT_RUNTIME_BACKEND", "").strip().lower()
+    if raw_value == "vertex_ai_reasoning_engine":
+        return "vertex_ai_reasoning_engine"
+    return "bridge"
+
+
 @dataclass(frozen=True, slots=True)
 class Settings:
     service_name: str = "visualsprint-agents"
@@ -49,13 +57,17 @@ class Settings:
     selected_track: str = "elastic"
     agent_mode: AgentAdapterMode = "mock"
     deployment_target: DeploymentTarget = "local_dev"
+    agent_runtime_backend: AgentRuntimeBackend = "bridge"
     google_cloud_project_id: str | None = None
     google_cloud_location: str | None = None
     agent_application_id: str | None = None
     reasoning_agent_id: str | None = None
     summary_agent_id: str | None = None
+    reasoning_engine_resource_name: str | None = None
+    summary_engine_resource_name: str | None = None
     reasoning_agent_endpoint_url: str | None = None
     summary_agent_endpoint_url: str | None = None
+    google_api_access_token: str | None = None
     agent_bridge_bearer_token: str | None = None
     agent_bridge_bearer_token_secret_name: str | None = None
     agent_request_timeout_seconds: float = 2.0
@@ -97,11 +109,34 @@ class Settings:
         return self.cloud_run_service_url is not None
 
     @property
+    def google_access_token_configured(self) -> bool:
+        return self.google_api_access_token is not None
+
+    @property
+    def reasoning_engine_resource_configured(self) -> bool:
+        return self.reasoning_engine_resource_name is not None
+
+    @property
+    def summary_engine_resource_configured(self) -> bool:
+        return self.summary_engine_resource_name is not None
+
+    @property
     def elastic_mcp_configured(self) -> bool:
         return bool(self.elastic_mcp_endpoint and self.elastic_api_key_secret_name)
 
     @property
     def cloud_adapter_ready(self) -> bool:
+        if self.agent_runtime_backend == "vertex_ai_reasoning_engine":
+            return (
+                self.agent_mode == "configured_cloud"
+                and self.google_cloud_project_id is not None
+                and self.reasoning_engine_resource_configured
+                and self.summary_engine_resource_configured
+                and (
+                    self.google_access_token_configured
+                    or self.deployment_target == "cloud_run"
+                )
+            )
         return (
             self.agent_mode == "configured_cloud"
             and self.reasoning_agent_configured
@@ -117,20 +152,33 @@ class Settings:
             return tuple(missing)
         if not self.google_cloud_project_id:
             missing.append("VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID")
-        if not self.reasoning_agent_id:
-            missing.append("VISUALSPRINT_REASONING_AGENT_ID")
-        if not self.summary_agent_id:
-            missing.append("VISUALSPRINT_SUMMARY_AGENT_ID")
-        if not self.reasoning_agent_endpoint_url:
-            missing.append("VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL")
-        if not self.summary_agent_endpoint_url:
-            missing.append("VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL")
+        if self.agent_runtime_backend == "vertex_ai_reasoning_engine":
+            if not self.reasoning_engine_resource_name:
+                missing.append("VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME")
+            if not self.summary_engine_resource_name:
+                missing.append("VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME")
+            if not self.google_api_access_token and self.deployment_target != "cloud_run":
+                missing.append(
+                    "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN or Cloud Run service identity"
+                )
+        else:
+            if not self.reasoning_agent_id:
+                missing.append("VISUALSPRINT_REASONING_AGENT_ID")
+            if not self.summary_agent_id:
+                missing.append("VISUALSPRINT_SUMMARY_AGENT_ID")
+            if not self.reasoning_agent_endpoint_url:
+                missing.append("VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL")
+            if not self.summary_agent_endpoint_url:
+                missing.append("VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL")
         if self.deployment_target == "cloud_run":
             if not self.cloud_run_service_url:
                 missing.append("VISUALSPRINT_CLOUD_RUN_SERVICE_URL")
             if not self.service_account_email:
                 missing.append("VISUALSPRINT_SERVICE_ACCOUNT_EMAIL")
-            if not self.bridge_auth_configured:
+            if (
+                self.agent_runtime_backend == "bridge"
+                and not self.bridge_auth_configured
+            ):
                 missing.append(
                     "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN or "
                     "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME"
@@ -149,6 +197,14 @@ class Settings:
             return (
                 "The agents service is running in deterministic mock mode while the real "
                 "Google Cloud Agent Builder adapter is still being wired."
+            )
+        if (
+            self.agent_runtime_backend == "vertex_ai_reasoning_engine"
+            and self.cloud_adapter_ready
+        ):
+            return (
+                "Vertex AI Reasoning Engine runtime configuration is present. The service "
+                "can call Agent Builder runtime query endpoints directly before falling back locally."
             )
         if self.deployment_target == "cloud_run" and self.deployment_ready:
             return (
@@ -173,13 +229,23 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         selected_track=source.get("VISUALSPRINT_TRACK", "elastic"),
         agent_mode=_resolve_agent_mode(source),
         deployment_target=_resolve_deployment_target(source),
+        agent_runtime_backend=_resolve_agent_runtime_backend(source),
         google_cloud_project_id=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID"),
         google_cloud_location=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_LOCATION"),
         agent_application_id=_get(source, "VISUALSPRINT_AGENT_APPLICATION_ID"),
         reasoning_agent_id=_get(source, "VISUALSPRINT_REASONING_AGENT_ID"),
         summary_agent_id=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ID"),
+        reasoning_engine_resource_name=_get(
+            source,
+            "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME",
+        ),
+        summary_engine_resource_name=_get(
+            source,
+            "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME",
+        ),
         reasoning_agent_endpoint_url=_get(source, "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL"),
         summary_agent_endpoint_url=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL"),
+        google_api_access_token=_get(source, "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN"),
         agent_bridge_bearer_token=_get(source, "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN"),
         agent_bridge_bearer_token_secret_name=_get(
             source,

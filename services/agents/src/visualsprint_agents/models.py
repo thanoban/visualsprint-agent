@@ -9,12 +9,19 @@ from pydantic import BaseModel, Field
 
 
 AgentAdapterMode = Literal["mock", "configured_cloud"]
+AgentRuntimeBackend = Literal["bridge", "vertex_ai_reasoning_engine"]
 BlockerSeverity = Literal["low", "medium", "high"]
 MemoryMatchStrength = Literal["related", "recurring", "critical"]
 MemoryMatchRelation = Literal["new", "recurring", "reopened", "resolved_previously"]
 ReasoningRecordType = Literal["decision", "commitment", "blocker", "open_question"]
 InvocationAgentKind = Literal["reasoning", "summary"]
-InvocationExecutionMode = Literal["mock", "bridge", "bridge_fallback"]
+InvocationExecutionMode = Literal[
+    "mock",
+    "bridge",
+    "bridge_fallback",
+    "vertex_ai",
+    "vertex_ai_fallback",
+]
 InvocationStatus = Literal["success", "fallback", "error"]
 
 
@@ -144,13 +151,17 @@ class ServiceHealth(BaseModel):
     version: str
     track: str
     mode: AgentAdapterMode
+    runtimeBackend: AgentRuntimeBackend
     deploymentTarget: Literal["local_dev", "cloud_run"]
     deploymentReady: bool
     reasoningAgentConfigured: bool
     summaryAgentConfigured: bool
+    reasoningEngineResourceConfigured: bool
+    summaryEngineResourceConfigured: bool
     reasoningEndpointConfigured: bool
     summaryEndpointConfigured: bool
     bridgeAuthConfigured: bool
+    googleAccessTokenConfigured: bool
     secretManagerConfigured: bool
     cloudRunServiceConfigured: bool
     elasticMcpConfigured: bool
