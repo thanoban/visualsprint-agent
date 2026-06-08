@@ -548,6 +548,7 @@ Current confirmed runtime values:
 - reasoning query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208:query`
 - summary query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320:query`
 - action query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472:query`
+- Agent Engine runtime service account: `service-530780341550@gcp-sa-aiplatform-re.iam.gserviceaccount.com`
 
 The repo accepts both the older `*_ENGINE_RESOURCE_NAME` env vars and the
 console-provided `*_AGENT_RESOURCE` aliases for these Agent Engine paths.
@@ -746,6 +747,7 @@ The current repo already expects these values:
 - `VISUALSPRINT_REASONING_QUERY_URL`
 - `VISUALSPRINT_SUMMARY_QUERY_URL`
 - `VISUALSPRINT_ACTION_QUERY_URL`
+- `VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT`
 - `VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL`
 - `VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL`
 - `VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN`
@@ -772,6 +774,7 @@ For the ADK plus Agent Engine path, the most important ones are:
 - `VISUALSPRINT_REASONING_AGENT_RESOURCE`
 - `VISUALSPRINT_SUMMARY_AGENT_RESOURCE`
 - `VISUALSPRINT_ACTION_AGENT_RESOURCE`
+- `VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT`
 
 Current confirmed values:
 
