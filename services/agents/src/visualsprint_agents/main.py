@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from visualsprint_agents.config import settings
 from visualsprint_agents.invocation_audit import audit_store
 from visualsprint_agents.models import (
+    ActionAgentRequest,
+    ActionAgentResponse,
     ChunkInsightRequest,
     FinalReportDraft,
     InvocationAuditEntry,
@@ -18,6 +20,7 @@ from visualsprint_agents.models import (
 )
 from visualsprint_agents.reasoning import run_reasoning_agent
 from visualsprint_agents.summary import run_summary_agent
+from visualsprint_agents.action import run_action_agent
 
 
 app = FastAPI(
@@ -39,10 +42,13 @@ def get_health() -> ServiceHealth:
         deploymentReady=settings.deployment_ready,
         reasoningAgentConfigured=settings.reasoning_agent_configured,
         summaryAgentConfigured=settings.summary_agent_configured,
+        actionAgentConfigured=settings.action_agent_configured,
         reasoningEngineResourceConfigured=settings.reasoning_engine_resource_configured,
         summaryEngineResourceConfigured=settings.summary_engine_resource_configured,
+        actionEngineResourceConfigured=settings.action_engine_resource_configured,
         reasoningEndpointConfigured=settings.reasoning_endpoint_configured,
         summaryEndpointConfigured=settings.summary_endpoint_configured,
+        actionEndpointConfigured=settings.action_endpoint_configured,
         bridgeAuthConfigured=settings.bridge_auth_configured,
         googleAccessTokenConfigured=settings.google_access_token_configured,
         secretManagerConfigured=settings.secret_manager_configured,
@@ -92,6 +98,11 @@ def run_chunk_reasoning(payload: ChunkInsightRequest) -> ReasoningRunResponse:
 @app.post("/api/summary/meetings/run", response_model=FinalReportDraft)
 def run_meeting_summary(payload: SummaryPacketRequest) -> FinalReportDraft:
     return run_summary_agent(payload)
+
+
+@app.post("/api/action/meetings/run", response_model=ActionAgentResponse)
+def run_meeting_action(payload: ActionAgentRequest) -> ActionAgentResponse:
+    return run_action_agent(payload)
 
 
 @app.get("/")

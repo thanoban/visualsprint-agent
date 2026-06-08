@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from visualsprint_api.config import settings
+from visualsprint_api.routes.actions import router as actions_router
 from visualsprint_api.routes.agents import router as agents_router
 from visualsprint_api.routes.capture import router as capture_router
 from visualsprint_api.routes.health import router as health_router
@@ -39,6 +40,7 @@ app.include_router(capture_router, prefix="/api")
 app.include_router(insights_router, prefix="/api")
 app.include_router(memory_router, prefix="/api")
 app.include_router(outputs_router, prefix="/api")
+app.include_router(actions_router, prefix="/api")
 
 
 @app.get("/")

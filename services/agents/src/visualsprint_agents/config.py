@@ -63,10 +63,13 @@ class Settings:
     agent_application_id: str | None = None
     reasoning_agent_id: str | None = None
     summary_agent_id: str | None = None
+    action_agent_id: str | None = None
     reasoning_engine_resource_name: str | None = None
     summary_engine_resource_name: str | None = None
+    action_engine_resource_name: str | None = None
     reasoning_agent_endpoint_url: str | None = None
     summary_agent_endpoint_url: str | None = None
+    action_agent_endpoint_url: str | None = None
     google_api_access_token: str | None = None
     agent_bridge_bearer_token: str | None = None
     agent_bridge_bearer_token_secret_name: str | None = None
@@ -87,12 +90,20 @@ class Settings:
         return bool(self.google_cloud_project_id and self.summary_agent_id)
 
     @property
+    def action_agent_configured(self) -> bool:
+        return bool(self.google_cloud_project_id and self.action_agent_id)
+
+    @property
     def reasoning_endpoint_configured(self) -> bool:
         return self.reasoning_agent_endpoint_url is not None
 
     @property
     def summary_endpoint_configured(self) -> bool:
         return self.summary_agent_endpoint_url is not None
+
+    @property
+    def action_endpoint_configured(self) -> bool:
+        return self.action_agent_endpoint_url is not None
 
     @property
     def bridge_auth_configured(self) -> bool:
@@ -122,6 +133,10 @@ class Settings:
         return self.summary_engine_resource_name is not None
 
     @property
+    def action_engine_resource_configured(self) -> bool:
+        return self.action_engine_resource_name is not None
+
+    @property
     def elastic_mcp_configured(self) -> bool:
         return bool(
             self.elastic_mcp_endpoint
@@ -136,6 +151,7 @@ class Settings:
                 and self.google_cloud_project_id is not None
                 and self.reasoning_engine_resource_configured
                 and self.summary_engine_resource_configured
+                and self.action_engine_resource_configured
                 and (
                     self.google_access_token_configured
                     or self.deployment_target == "cloud_run"
@@ -145,8 +161,10 @@ class Settings:
             self.agent_mode == "configured_cloud"
             and self.reasoning_agent_configured
             and self.summary_agent_configured
+            and self.action_agent_configured
             and self.reasoning_endpoint_configured
             and self.summary_endpoint_configured
+            and self.action_endpoint_configured
         )
 
     @property
@@ -161,6 +179,8 @@ class Settings:
                 missing.append("VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME")
             if not self.summary_engine_resource_name:
                 missing.append("VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME")
+            if not self.action_engine_resource_name:
+                missing.append("VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME")
             if not self.google_api_access_token and self.deployment_target != "cloud_run":
                 missing.append(
                     "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN or Cloud Run service identity"
@@ -170,10 +190,14 @@ class Settings:
                 missing.append("VISUALSPRINT_REASONING_AGENT_ID")
             if not self.summary_agent_id:
                 missing.append("VISUALSPRINT_SUMMARY_AGENT_ID")
+            if not self.action_agent_id:
+                missing.append("VISUALSPRINT_ACTION_AGENT_ID")
             if not self.reasoning_agent_endpoint_url:
                 missing.append("VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL")
             if not self.summary_agent_endpoint_url:
                 missing.append("VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL")
+            if not self.action_agent_endpoint_url:
+                missing.append("VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL")
         if self.deployment_target == "cloud_run":
             if not self.cloud_run_service_url:
                 missing.append("VISUALSPRINT_CLOUD_RUN_SERVICE_URL")
@@ -239,6 +263,7 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         agent_application_id=_get(source, "VISUALSPRINT_AGENT_APPLICATION_ID"),
         reasoning_agent_id=_get(source, "VISUALSPRINT_REASONING_AGENT_ID"),
         summary_agent_id=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ID"),
+        action_agent_id=_get(source, "VISUALSPRINT_ACTION_AGENT_ID"),
         reasoning_engine_resource_name=_get(
             source,
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME",
@@ -247,8 +272,13 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
             source,
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME",
         ),
+        action_engine_resource_name=_get(
+            source,
+            "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME",
+        ),
         reasoning_agent_endpoint_url=_get(source, "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL"),
         summary_agent_endpoint_url=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL"),
+        action_agent_endpoint_url=_get(source, "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL"),
         google_api_access_token=_get(source, "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN"),
         agent_bridge_bearer_token=_get(source, "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN"),
         agent_bridge_bearer_token_secret_name=_get(

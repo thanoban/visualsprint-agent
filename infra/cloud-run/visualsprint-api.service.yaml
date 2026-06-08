@@ -1,0 +1,49 @@
+apiVersion: serving.knative.dev/v1
+kind: Service
+metadata:
+  name: visualsprint-api
+  annotations:
+    run.googleapis.com/ingress: all
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.knative.dev/minScale: "0"
+        autoscaling.knative.dev/maxScale: "5"
+    spec:
+      serviceAccountName: visualsprint-api@visualsprint-agent.iam.gserviceaccount.com
+      containers:
+        - image: REGION-docker.pkg.dev/visualsprint-agent/visualsprint/api:latest
+          ports:
+            - containerPort: 8000
+          env:
+            - name: VISUALSPRINT_ENV
+              value: production
+            - name: VISUALSPRINT_TRACK
+              value: elastic
+            - name: VISUALSPRINT_AGENTS_SERVICE_URL
+              value: https://visualsprint-agents-REPLACE.a.run.app
+            - name: VISUALSPRINT_INGEST_SERVICE_URL
+              value: ""
+            - name: VISUALSPRINT_MEDIA_SERVICE_URL
+              value: ""
+            - name: ELASTICSEARCH_URL
+              value: ""
+            - name: ELASTICSEARCH_API_KEY_SECRET
+              value: ""
+            - name: ELASTIC_INDEX_OUTCOMES
+              value: visualsprint-outcomes
+            - name: ELASTIC_MCP_SERVER_URL
+              value: ""
+            - name: JIRA_BASE_URL
+              value: ""
+            - name: JIRA_API_TOKEN_SECRET
+              value: ""
+            - name: SLACK_BOT_TOKEN_SECRET
+              value: ""
+            - name: SLACK_DEFAULT_CHANNEL
+              value: "#general"
+            - name: VISUALSPRINT_ALLOWED_ORIGINS
+              value: https://app.visualsprint.dev
+            - name: VISUALSPRINT_SERVICE_TIMEOUT_SECONDS
+              value: "0.5"

@@ -1,4 +1,8 @@
 import type {
+  ActionApprovalRequest,
+  ActionExecutionResult,
+  ActionRecommendationsResponse,
+  ActionRecommendationResponse,
   AgentInvocationAuditResponse,
   AgentSmokeResponse,
   ChunkInsightResponse,
@@ -180,6 +184,58 @@ export function runCaptureChunkReasoning(meetingId: string, clientChunkId: strin
 export function completeCaptureSession(meetingId: string) {
   return request<CaptureSessionResponse>(
     `/api/meetings/${meetingId}/capture-sessions/complete`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function generateActionRecommendations(meetingId: string) {
+  return request<ActionRecommendationsResponse>(
+    `/api/meetings/${meetingId}/actions/recommendations`,
+    {
+      method: "POST",
+    },
+  );
+}
+
+export function getActionRecommendations(meetingId: string) {
+  return request<ActionRecommendationsResponse>(
+    `/api/meetings/${meetingId}/actions/recommendations`,
+  );
+}
+
+export function approveActionRecommendation(
+  meetingId: string,
+  recommendationId: string,
+  payload: ActionApprovalRequest,
+) {
+  return request<ActionRecommendationResponse>(
+    `/api/meetings/${meetingId}/actions/recommendations/${recommendationId}/approve`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function rejectActionRecommendation(
+  meetingId: string,
+  recommendationId: string,
+  payload: ActionApprovalRequest,
+) {
+  return request<ActionRecommendationResponse>(
+    `/api/meetings/${meetingId}/actions/recommendations/${recommendationId}/reject`,
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+  );
+}
+
+export function executeActionRecommendation(meetingId: string, recommendationId: string) {
+  return request<ActionExecutionResult>(
+    `/api/meetings/${meetingId}/actions/recommendations/${recommendationId}/execute`,
     {
       method: "POST",
     },
