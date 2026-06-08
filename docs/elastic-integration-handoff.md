@@ -38,21 +38,23 @@ They do not need to own:
 
 ## Current repo status
 
-The repo already has the right seam, but Elastic is still mocked.
+The repo already has the right seam, and the first Elastic code path now exists.
 
 What exists now:
 
 - `services/api` persists meeting outputs in memory
 - `services/api` exposes `POST /api/meetings/{meeting_id}/memory/search-prior-outcomes`
-- local memory search is keyword-based mock logic
-- `services/agents` is still a stub service
+- `services/api` can now attempt Elastic write-back on output registration and final-report persistence when Elastic config is present
+- `services/api` now prefers Elastic-backed memory search when configured, with local fallback for development
+- `services/agents` is no longer only a stub service
+- `services/agents` now includes an Elastic MCP client and an ADK-side `search_prior_outcomes` tool path
 
 What is missing:
 
-- real Elastic write-back
-- real Elastic retrieval
-- real MCP-connected memory tool
-- real agent-time memory usage
+- real Secret Manager-backed API key resolution instead of env-value-only shortcuts
+- tenant propagation instead of the current default tenant placeholder
+- real deployed MCP validation against the target Elastic project
+- real managed-agent-time memory usage proven end to end
 
 ## Architecture decisions to keep
 
@@ -71,9 +73,9 @@ The Elastic work should be done in this order:
 1. align the canonical outcome contract
 2. create Elastic project, index, and API key
 3. add repo config and secrets wiring
-4. implement backend write-back in `services/api`
-5. define the MCP tool contract
-6. wire the reasoning agent to call the tool
+4. complete backend write-back hardening in `services/api`
+5. harden the MCP tool contract and config path
+6. prove the reasoning agent calls the tool in the real managed path
 7. add verification and smoke tests
 
 ## 1. Contract alignment before coding
@@ -143,12 +145,14 @@ Recommended env vars for the repo:
 
 - `ELASTICSEARCH_URL`
 - `ELASTICSEARCH_API_KEY_SECRET`
+- `ELASTICSEARCH_API_KEY`
 - `ELASTIC_INDEX_OUTCOMES`
+- `ELASTICSEARCH_INDEX`
 - `ELASTIC_MCP_SERVER_URL`
 
 Recommended placement:
 
-- `services/api` uses `ELASTICSEARCH_URL`, `ELASTICSEARCH_API_KEY_SECRET`, and `ELASTIC_INDEX_OUTCOMES`
+- `services/api` uses `ELASTICSEARCH_URL`, `ELASTICSEARCH_API_KEY_SECRET` or `ELASTICSEARCH_API_KEY`, and `ELASTIC_INDEX_OUTCOMES` or `ELASTICSEARCH_INDEX`
 - `services/agents` uses `ELASTIC_MCP_SERVER_URL` and any agent-runtime-specific settings
 
 ## 4. Repo files the Elastic owner should change
@@ -175,12 +179,20 @@ This is the main code ownership for the Elastic teammate.
 
 ### Task A. Add Elastic config
 
-Extend [config.py](/d:/PROJECTS/Startup/VisualSprint/services/api/src/visualsprint_api/config.py:1) with:
+Extend [config.py](../services/api/src/visualsprint_api/config.py) with:
 
 - Elastic URL
 - Elastic index name
 - Elastic secret or API key setting
 - optional enable/disable flag for local fallback
+
+The initial config pass already exists.
+
+The remaining work is to:
+
+- add a clean direct-key path for local development where needed
+- resolve secret-name inputs through deployment-time secret injection or Secret Manager
+- keep the API and agents config naming aligned
 
 ### Task B. Add a small Elastic client
 
@@ -219,6 +231,11 @@ When outputs are registered:
 3. write or upsert those documents into Elastic
 
 This keeps persistence deterministic and backend-owned.
+
+The first implementation of this already exists in the repo.
+
+The remaining work is to verify it against the real Elastic project and remove
+the misleading "secret name as raw key" assumption.
 
 ### Task E. Keep local behavior usable for development
 

@@ -17,6 +17,14 @@ def _get(environ: Mapping[str, str], key: str) -> str | None:
     return value.strip() if value and value.strip() else None
 
 
+def _get_any(environ: Mapping[str, str], *keys: str) -> str | None:
+    for key in keys:
+        value = _get(environ, key)
+        if value is not None:
+            return value
+    return None
+
+
 def _resolve_agent_mode(environ: Mapping[str, str]) -> AgentAdapterMode:
     raw_value = environ.get("VISUALSPRINT_AGENT_MODE", "").strip().lower()
     if raw_value == "configured_cloud":
@@ -59,6 +67,7 @@ class Settings:
     deployment_target: DeploymentTarget = "local_dev"
     agent_runtime_backend: AgentRuntimeBackend = "bridge"
     google_cloud_project_id: str | None = None
+    google_cloud_project_number: str | None = None
     google_cloud_location: str | None = None
     agent_application_id: str | None = None
     reasoning_agent_id: str | None = None
@@ -70,9 +79,13 @@ class Settings:
     reasoning_agent_endpoint_url: str | None = None
     summary_agent_endpoint_url: str | None = None
     action_agent_endpoint_url: str | None = None
+    reasoning_query_url: str | None = None
+    summary_query_url: str | None = None
+    action_query_url: str | None = None
     google_api_access_token: str | None = None
     agent_bridge_bearer_token: str | None = None
     agent_bridge_bearer_token_secret_name: str | None = None
+    agent_runtime_service_account: str | None = None
     agent_request_timeout_seconds: float = 2.0
     elastic_mcp_endpoint: str | None = None
     elastic_api_key: str | None = None
@@ -259,36 +272,48 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         deployment_target=_resolve_deployment_target(source),
         agent_runtime_backend=_resolve_agent_runtime_backend(source),
         google_cloud_project_id=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID"),
+        google_cloud_project_number=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER"),
         google_cloud_location=_get(source, "VISUALSPRINT_GOOGLE_CLOUD_LOCATION"),
         agent_application_id=_get(source, "VISUALSPRINT_AGENT_APPLICATION_ID"),
         reasoning_agent_id=_get(source, "VISUALSPRINT_REASONING_AGENT_ID"),
         summary_agent_id=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ID"),
         action_agent_id=_get(source, "VISUALSPRINT_ACTION_AGENT_ID"),
-        reasoning_engine_resource_name=_get(
+        reasoning_engine_resource_name=_get_any(
             source,
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME",
+            "VISUALSPRINT_REASONING_AGENT_RESOURCE",
         ),
-        summary_engine_resource_name=_get(
+        summary_engine_resource_name=_get_any(
             source,
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME",
+            "VISUALSPRINT_SUMMARY_AGENT_RESOURCE",
         ),
-        action_engine_resource_name=_get(
+        action_engine_resource_name=_get_any(
             source,
             "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME",
+            "VISUALSPRINT_ACTION_AGENT_RESOURCE",
         ),
         reasoning_agent_endpoint_url=_get(source, "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL"),
         summary_agent_endpoint_url=_get(source, "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL"),
         action_agent_endpoint_url=_get(source, "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL"),
+        reasoning_query_url=_get(source, "VISUALSPRINT_REASONING_QUERY_URL"),
+        summary_query_url=_get(source, "VISUALSPRINT_SUMMARY_QUERY_URL"),
+        action_query_url=_get(source, "VISUALSPRINT_ACTION_QUERY_URL"),
         google_api_access_token=_get(source, "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN"),
         agent_bridge_bearer_token=_get(source, "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN"),
         agent_bridge_bearer_token_secret_name=_get(
             source,
             "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME",
         ),
+        agent_runtime_service_account=_get(source, "VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT"),
         agent_request_timeout_seconds=float(
             source.get("VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS", "2.0")
         ),
-        elastic_mcp_endpoint=_get(source, "VISUALSPRINT_ELASTIC_MCP_ENDPOINT"),
+        elastic_mcp_endpoint=_get_any(
+            source,
+            "VISUALSPRINT_MCP_ENDPOINT",
+            "VISUALSPRINT_ELASTIC_MCP_ENDPOINT",
+        ),
         elastic_api_key=_get(source, "VISUALSPRINT_ELASTIC_API_KEY"),
         elastic_api_key_secret_name=_get(source, "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME"),
         service_account_email=_get(source, "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL"),
