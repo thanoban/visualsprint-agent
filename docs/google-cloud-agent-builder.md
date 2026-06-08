@@ -743,6 +743,11 @@ For the ADK plus Agent Engine path, the most important ones are:
 - `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
 - `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
 
+Current confirmed values:
+
+- project ID: `visualsprint-agent`
+- location: `us-west1`
+
 ### Step 25. Understand the two runtime paths
 
 #### Option A. Vertex AI Reasoning Engine mode
