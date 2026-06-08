@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+import visualsprint_agents.elastic_mcp_client as elastic_mcp_module
 import visualsprint_agents.reasoning as reasoning_module
 import visualsprint_agents.summary as summary_module
 from visualsprint_agents.models import (
@@ -135,6 +136,7 @@ def test_build_settings_supports_configured_cloud_mode():
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
             "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME": "agents-bridge-token",
             "VISUALSPRINT_ELASTIC_MCP_ENDPOINT": "https://elastic.example/mcp",
+            "VISUALSPRINT_ELASTIC_API_KEY": "elastic-api-key-value",
             "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME": "elastic-api-key",
             "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL": "svc@demo-project.iam.gserviceaccount.com",
             "VISUALSPRINT_CLOUD_RUN_SERVICE_URL": "https://visualsprint-agents-abc.a.run.app",
@@ -267,6 +269,87 @@ def test_adk_placeholder_tools_expose_expected_contract_notes():
     assert register_result["acceptedKeys"] == ["blockers", "decisions"]
     assert finalize_result["status"] == "deferred"
     assert finalize_result["acceptedKeys"] == ["executiveSummary"]
+
+
+def test_elastic_mcp_tool_returns_not_configured_without_runtime_endpoint(monkeypatch):
+    monkeypatch.setattr(
+        elastic_mcp_module,
+        "settings",
+        build_settings({}),
+    )
+
+    result = search_prior_outcomes(
+        recordType="blocker",
+        summary="Release risk",
+        detail="A dependency is slipping.",
+    )
+
+    assert result["status"] == "not_configured"
+    assert result["matches"] == []
+
+
+def test_elastic_mcp_tool_can_parse_structured_content_response(monkeypatch):
+    monkeypatch.setattr(
+        elastic_mcp_module,
+        "settings",
+        build_settings(
+            {
+                "VISUALSPRINT_ELASTIC_MCP_ENDPOINT": "https://elastic.example/mcp",
+                "VISUALSPRINT_ELASTIC_API_KEY": "elastic-api-key-value",
+            }
+        ),
+    )
+    responses = iter(
+        [
+            {
+                "jsonrpc": "2.0",
+                "id": 1,
+                "result": {
+                    "capabilities": {"tools": {"listChanged": True}},
+                    "protocolVersion": "2024-11-05",
+                    "serverInfo": {"name": "elastic-mcp-server", "version": "0.0.1"},
+                },
+            },
+            {
+                "jsonrpc": "2.0",
+                "id": 2,
+                "result": {
+                    "structuredContent": {
+                        "matches": [
+                            {
+                                "sourceMeetingId": "mtg_hist_auth_01",
+                                "summary": "A prior auth blocker was found.",
+                                "sourceMeetingTitle": "Sprint 21 release review",
+                                "strength": "recurring",
+                                "relation": "recurring",
+                                "score": 0.91,
+                                "snippet": "Auth drift blocked the same release path earlier.",
+                            }
+                        ],
+                        "note": "Elastic MCP returned a recurring match.",
+                    }
+                },
+            },
+        ]
+    )
+    monkeypatch.setattr(
+        elastic_mcp_module,
+        "_mcp_request",
+        lambda **kwargs: next(responses),
+    )
+
+    result = search_prior_outcomes(
+        recordType="blocker",
+        summary="Auth drift is still blocking release",
+        detail="The same release path is affected again.",
+        tenantId="default",
+        meetingId="mtg_current_001",
+    )
+
+    assert result["status"] == "ok"
+    assert result["matches"][0]["sourceMeetingId"] == "mtg_hist_auth_01"
+    assert result["matches"][0]["relation"] == "recurring"
+    assert "Elastic MCP returned" in result["note"]
 
 
 def test_vertex_normalization_handles_multiple_response_shapes():

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from visualsprint_agents.elastic_mcp_client import call_search_prior_outcomes_tool
+
 
 def search_prior_outcomes(
     recordType: str,
@@ -14,21 +16,15 @@ def search_prior_outcomes(
 ) -> dict[str, Any]:
     """Return ranked historical outcome candidates for the current signal.
 
-    This tool is intentionally a scaffold in the `thanoban` branch. The production
-    Elastic MCP implementation is owned by a separate teammate and should replace
-    this placeholder during cloud deployment wiring.
+    When Elastic MCP runtime configuration is available, this tool calls the
+    configured Elastic Agent Builder MCP endpoint using the standard MCP JSON-RPC
+    flow. If the endpoint or runtime API key is missing, it degrades safely to
+    the existing non-configured placeholder response.
     """
-
-    return {
-        "status": "not_configured",
-        "recordType": recordType,
-        "summary": summary,
-        "detail": detail,
-        "tenantId": tenantId,
-        "meetingId": meetingId,
-        "matches": [],
-        "note": (
-            "Elastic MCP retrieval is not wired in this branch yet. Treat the current "
-            "response as an empty memory result."
-        ),
-    }
+    return call_search_prior_outcomes_tool(
+        record_type=recordType,
+        summary=summary,
+        detail=detail,
+        tenant_id=tenantId,
+        meeting_id=meetingId,
+    )

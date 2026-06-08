@@ -72,6 +72,7 @@ class Settings:
     agent_bridge_bearer_token_secret_name: str | None = None
     agent_request_timeout_seconds: float = 2.0
     elastic_mcp_endpoint: str | None = None
+    elastic_api_key: str | None = None
     elastic_api_key_secret_name: str | None = None
     service_account_email: str | None = None
     cloud_run_service_url: str | None = None
@@ -122,7 +123,10 @@ class Settings:
 
     @property
     def elastic_mcp_configured(self) -> bool:
-        return bool(self.elastic_mcp_endpoint and self.elastic_api_key_secret_name)
+        return bool(
+            self.elastic_mcp_endpoint
+            and (self.elastic_api_key is not None or self.elastic_api_key_secret_name is not None)
+        )
 
     @property
     def cloud_adapter_ready(self) -> bool:
@@ -255,6 +259,7 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
             source.get("VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS", "2.0")
         ),
         elastic_mcp_endpoint=_get(source, "VISUALSPRINT_ELASTIC_MCP_ENDPOINT"),
+        elastic_api_key=_get(source, "VISUALSPRINT_ELASTIC_API_KEY"),
         elastic_api_key_secret_name=_get(source, "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME"),
         service_account_email=_get(source, "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL"),
         cloud_run_service_url=_get(source, "VISUALSPRINT_CLOUD_RUN_SERVICE_URL"),

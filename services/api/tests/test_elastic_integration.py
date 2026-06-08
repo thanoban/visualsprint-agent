@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+from datetime import UTC, datetime
+
+from visualsprint_api.config import build_settings
+from visualsprint_api.elastic_mapping import (
+    build_elasticsearch_document_body,
+    map_elastic_document_to_memory_match,
+    map_indexed_outcome_to_elastic_document,
+)
+from visualsprint_api.models import EvidenceReference, IndexedOutcomeDocument, MemoryMatch
+
+
+def test_indexed_outcome_mapping_builds_elastic_document():
+    outcome = IndexedOutcomeDocument(
+        id="dec_123",
+        meetingId="mtg_123",
+        recordType="decision",
+        summary="Freeze the release path",
+        detail="The team agreed to pause net-new work until auth stabilizes.",
+        status="updated",
+        ownerLabel=None,
+        speakerLabel="Jordan",
+        dueHint=None,
+        severity=None,
+        firstSeenChunkId="client-chunk-1234",
+        lastUpdatedChunkId="client-chunk-1234",
+        createdAt=datetime(2026, 6, 8, 10, 0, tzinfo=UTC),
+        updatedAt=datetime(2026, 6, 8, 10, 5, tzinfo=UTC),
+        evidence=[
+            EvidenceReference(
+                chunkId="chk_123",
+                clientChunkId="client-chunk-1234",
+                tStartMs=0,
+                tEndMs=900,
+                transcriptRef="trn_123",
+                frameRef=None,
+                note="Jordan: Freeze the release path until the auth issue is fixed.",
+            )
+        ],
+    )
+
+    document = map_indexed_outcome_to_elastic_document(
+        meeting_title="Release planning",
+        outcome=outcome,
+    )
+    body = build_elasticsearch_document_body(document)
+
+    assert document.document_id == "default:mtg_123:dec_123"
+    assert body["meeting_title"] == "Release planning"
+    assert body["record_type"] == "decision"
+    assert body["speaker_label"] == "Jordan"
+    assert body["evidence"][0]["transcriptRef"] == "trn_123"
+
+
+def test_elastic_document_mapping_can_build_memory_match():
+    document = map_indexed_outcome_to_elastic_document(
+        meeting_title="Release planning",
+        outcome=IndexedOutcomeDocument(
+            id="blk_123",
+            meetingId="mtg_123",
+            recordType="blocker",
+            summary="Auth config drift is still blocking release",
+            detail="Severity high; owner Avery.",
+            status="resolved",
+            ownerLabel="Avery",
+            speakerLabel=None,
+            dueHint=None,
+            severity="high",
+            firstSeenChunkId="client-chunk-1234",
+            lastUpdatedChunkId="client-chunk-1235",
+            createdAt=datetime(2026, 6, 8, 10, 0, tzinfo=UTC),
+            updatedAt=datetime(2026, 6, 8, 10, 5, tzinfo=UTC),
+            evidence=[],
+        ),
+    )
+
+    match = map_elastic_document_to_memory_match(
+        document=document,
+        score=0.84,
+        recorded_at=datetime(2026, 6, 8, 10, 10, tzinfo=UTC),
+    )
+
+    assert isinstance(match, MemoryMatch)
+    assert match.sourceMeetingId == "mtg_123"
+    assert match.sourceMeetingTitle == "Release planning"
+    assert match.relation == "resolved_previously"
+    assert match.strength == "recurring"
