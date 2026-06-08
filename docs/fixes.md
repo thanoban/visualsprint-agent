@@ -204,3 +204,24 @@ How to fix:
 
 - standardize on one model id and reflect it consistently across the README, the ADK
   scaffolds, and the demo script.
+
+## Status update — udula finalize (2026-06-08)
+
+Finalized on `udula` (rebased onto the latest `main`, which now also includes the
+action agent + Jira/Slack work). Resolution of the 7 review items:
+
+| # | Issue | Status |
+| --- | --- | --- |
+| 1 | ADK persistence tools were `deferred` | **Fixed** — `adk/tools/persistence.py` POSTs to `/outputs/register` and `/final-report` when `VISUALSPRINT_CONTROL_PLANE_URL` is set; stays `deferred` otherwise. Covered by `tests/test_persistence_tools.py`. |
+| 2 | Two parallel agent paths | **Documented** — `.env.example` + `deploy.sh` default to `vertex_ai_reasoning_engine`; bridge kept as the labeled alternative. |
+| 3 | Elastic key / Secret Manager | **Addressed** — `main` now accepts `ELASTICSEARCH_API_KEY` directly; `deploy.sh` injects keys from Secret Manager via `--set-secrets`. |
+| 4 | Tenant hard-coded `"default"` | **Still open** — safe for a single-tenant demo. |
+| 5 | Machine-local absolute doc links | **Fixed on `main`** (links are now repo-relative). |
+| 6 | `agent-creation-chatgpt-prompts.md` naming | **Still open** — optional rename. |
+| 7 | Model name vs story | **Fixed** — `VISUALSPRINT_{REASONING,SUMMARY,ACTION}_MODEL` env overrides (default unchanged). |
+
+Deploy assets added (canonical deploy path; the `infra/cloud-run/*.yaml` manifests
+remain reference): `.env.example`, `services/api/Dockerfile`,
+`services/agents/Dockerfile`, `deploy.sh`, and [DEPLOY.md](./DEPLOY.md).
+Regions reflect the live config: agents/Cloud Run in **us-west1**, Elasticsearch in
+**us-central1**. Secrets stay out of git (`.env` is gitignored).
