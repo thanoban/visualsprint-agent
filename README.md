@@ -20,7 +20,7 @@ Every hard requirement from the official [rules](https://rapid-agent.devpost.com
 
 | Mandatory rule | How VisualSprint complies |
 | --- | --- |
-| Functional agent **powered by Gemini and Google Cloud Agent Builder** | Orchestrator/Reasoning Agent and Summary Agent built in Google Agent Builder, reasoning on **Gemini 3**. |
+| Functional agent **powered by Gemini and Google Cloud Agent Builder** | Orchestrator/Reasoning Agent and Summary Agent built in Google Agent Builder, reasoning on **Gemini 3**, with an optional approval-based action review layer for downstream suggestions. |
 | Integrates a **partner MCP server** | Memory retrieval runs through the **Elastic MCP server** (Elastic Agent Builder tools), authenticated by Elasticsearch API key. |
 | **Reasoning, planning, action** beyond chat | Per-chunk multimodal reasoning, memory-grounded relation labeling, tool-driven persistence, and end-of-meeting synthesis — a multi-step agent, not a chatbot. |
 | **One** official partner track selected | **Elastic.** |
@@ -73,6 +73,17 @@ The foundational product code (web shell, shared contracts, FastAPI control plan
 * render a live dashboard during the meeting
 * generate a structured final report immediately after the meeting ends
 
+### Capture support note
+
+VisualSprint is currently a web app, so browser security rules matter:
+
+* browser-based meetings are the cleanest supported path
+* another browser tab can only be captured if the user explicitly shares that tab
+* an external desktop app such as Zoom can only be observed if the user explicitly shares that window or the whole screen
+* the product should not depend on hidden access to desktop apps
+
+See [capture-constraints-and-plan.md](./docs/capture-constraints-and-plan.md) for the detailed support model and roadmap.
+
 ---
 
 ## Architecture Principles
@@ -103,14 +114,15 @@ The foundational product code (web shell, shared contracts, FastAPI control plan
 
 ### Agent layer (Google Agent Builder + Gemini 3)
 
-Only **two true agents** live in Agent Builder. Everything earlier drafts called an "agent" is either a deterministic service (transcription, extraction) or a single reasoning step (the per-chunk Insight call).
+The production core is **two main agents** plus one optional high-value review layer. Everything earlier drafts called an "agent" is either a deterministic service (transcription, extraction) or a focused reasoning step.
 
 | Agent | When it runs | Responsibility |
 | --- | --- | --- |
 | **Orchestrator / Reasoning Agent** | per chunk | Receives assembled chunk context as input, performs the Gemini 3 multimodal Insight reasoning, calls the **Elastic MCP** memory tool, and calls backend tools to persist outputs. This is the agent that satisfies the Gemini + Agent Builder + partner-MCP requirement. |
 | **Summary Agent** | at meeting close | Composes the final evidence-backed report from all accumulated structured outputs, visual context, reasoning results, and historical matches. |
+| **Action Recommendation / Escalation Review** | after reasoning or after summary, before external actions | Reviews structured outputs, ranks urgency and confidence, and produces approval-based suggestions for Jira, Slack, escalation, or manual review. It does not send externally without human approval. |
 
-> **Why not five subagents?** Splitting transcript, vision, and reasoning into separate agents adds latency, cost, and failure surface without adding capability — for one chunk the reasoning task is one thing: *given this transcript window + these frames + current meeting state, what changed?* That is one multimodal call. Multi-agent separation only earns its keep where the task is genuinely different (tool-calling memory, end-of-meeting synthesis).
+> **Why not five subagents?** Splitting transcript, vision, and reasoning into separate agents adds latency and failure surface without adding capability — for one chunk the reasoning task is one thing: *given this transcript window + these frames + current meeting state, what changed?* That is one multimodal call. The extra layer only earns its keep where the task is genuinely different: approval-based action recommendation and escalation review.
 
 ---
 
@@ -139,6 +151,12 @@ capture ──► chunk ──► [Speech-to-Text]   ─┐
                               ┌─────────────────────────┘
                               ▼ (on meeting close)
                        Summary Agent ──► final report
+                              │
+                              ▼
+            Action Recommendation / Escalation Review
+                              │
+                              ▼
+             portal suggestions ──► human approval ──► Jira / Slack send
 ```
 
 ### Data-flow rules
@@ -259,6 +277,8 @@ Every historical lookup is tenant-scoped.
 * `recording_upload` — future
 * `document_link` — future
 
+The first-class connector path should stay browser-tab-first. Desktop app scenarios such as Zoom are supported through user-approved window or full-screen sharing, not hidden app access.
+
 All connectors normalize into the same downstream pipeline so transcript analysis, visual reasoning, memory lookup, and reporting do not need per-source architectures.
 
 ---
@@ -279,6 +299,7 @@ All connectors normalize into the same downstream pipeline so transcript analysi
 ### What lives in Agent Builder vs. our repo
 
 **Google Agent Builder (portal):** the Orchestrator/Reasoning Agent and Summary Agent; Gemini 3 model selection per step; instructions, guardrails, Responsible-AI safety settings; the Elastic MCP tool connection; connections to our backend tool endpoints; preview, iteration, deployment.
+The same layer can optionally host an approval-based Action Recommendation / Escalation Review subflow for high-confidence Jira or Slack suggestions.
 
 **Our repository:** browser capture (`apps/web`); control plane and tool endpoints (`services/api`); ingestion + Speech-to-Text and media/frame extraction; Elastic indexing/write-back; state persistence, uploads, retries, SSE transport; domain contracts, report shaping, product UI.
 
@@ -289,6 +310,8 @@ Kept minimal and deterministic — the agent is handed chunk context as input; t
 * `register_outputs` — persist decisions/commitments/blockers/open questions for a chunk (and index to Elastic)
 * `get_meeting_state` — fetch current running state (only when not already in the prompt)
 * `finalize_report` — trigger/persist the final report at meeting close
+* `create_action_suggestions` — optional deterministic endpoint to persist portal-facing Jira, Slack, escalation, or manual-review suggestions
+* `approve_and_send_action` — optional deterministic endpoint that sends approved actions to Jira or Slack
 * (memory search is the **Elastic MCP** tool, not a backend endpoint)
 
 ---
@@ -313,10 +336,11 @@ Verified against the official [resources](https://rapid-agent.devpost.com/resour
 6. Create the Gemini Enterprise app (top-level agent container).
 7. Build the **Orchestrator/Reasoning Agent**: select Gemini 3; instructions cover chunk-by-chunk analysis, the required output schema, running-state updates, and tool-calling rules.
 8. Build the **Summary Agent** for end-of-meeting report synthesis.
-9. **Point Google Agent Builder at the Elastic MCP server endpoint** (authenticated by the Elasticsearch API key); require a memory lookup before any output is labeled `new`, `recurring`, or `resolved`.
-10. Connect backend tools (`register_outputs`, `get_meeting_state`, `finalize_report`).
-11. Preview in the Agent Builder playground with sample meeting inputs; verify tool selection and output stability; configure Responsible-AI safety settings.
-12. Deploy; connect the agent to the product UI. The web app and backend drive meeting creation, capture, and display; the agent provides intelligence outputs.
+9. Optionally add the **Action Recommendation / Escalation Review** layer for high-value downstream suggestions and approval gating.
+10. **Point Google Agent Builder at the Elastic MCP server endpoint** (authenticated by the Elasticsearch API key); require a memory lookup before any output is labeled `new`, `recurring`, or `resolved`.
+11. Connect backend tools (`register_outputs`, `get_meeting_state`, `finalize_report`, and optional approval-gated action endpoints).
+12. Preview in the Agent Builder playground with sample meeting inputs; verify tool selection and output stability; configure Responsible-AI safety settings.
+13. Deploy; connect the agent to the product UI. The web app and backend drive meeting creation, capture, and display; the agent provides intelligence outputs.
 
 ---
 
@@ -340,8 +364,9 @@ The four official criteria are equally weighted. VisualSprint targets each direc
 3. **Transcript and vision pipeline** — Speech-to-Text service, frame extraction service, structured intermediate records.
 4. **Reasoning + memory** — per-chunk Gemini 3 Insight call; Elasticsearch index + ELSER; the `search_prior_outcomes` MCP tool; relation labeling.
 5. **Agent layer** — Orchestrator/Reasoning Agent and Summary Agent in Agent Builder; wire Elastic MCP and backend tools.
-6. **Dashboard and report** — SSE transport, live panels, final report view with evidence linking.
-7. **Submission** — hosted Cloud Run URL, public repo, 3-min video, Devpost entry.
+6. **Action review layer** — approval-based Jira, Slack, escalation, and manual-review suggestions.
+7. **Dashboard and report** — SSE transport, live panels, final report view with evidence linking.
+8. **Submission** — hosted Cloud Run URL, public repo, 3-min video, Devpost entry.
 
 ---
 

@@ -65,6 +65,78 @@ What is still missing:
 6. production secrets and Cloud Run service identity wiring
 7. end-to-end verification against deployed cloud services
 
+## Capture constraint to keep in mind
+
+VisualSprint is still a web app, so capture behavior is limited by browser security rules.
+
+That means:
+
+- browser meeting tabs are the best supported capture target
+- another browser tab can only be captured if the user explicitly shares it
+- an external desktop app such as Zoom can only be seen if the user explicitly shares that window or the full screen
+- the Google agents should never assume hidden access to desktop apps
+
+For the detailed product and UX plan, use [capture-constraints-and-plan.md](./capture-constraints-and-plan.md).
+
+## Recommended agent set
+
+For the best performance-oriented production design, create these first:
+
+1. `VisualSprint Reasoning Agent`
+2. `VisualSprint Summary Agent`
+
+Then add one more focused layer for high-value action handling:
+
+3. `Action Recommendation / Escalation Review` subflow
+
+This third layer does not need to be a fully separate autonomous agent on day one. It can start as:
+
+- a dedicated subflow inside the reasoning or summary path
+- a review stage in the portal
+- or a later standalone agent if the workflow grows
+
+## Why add one more action-focused layer
+
+If performance matters more than cost, this extra layer is useful because it separates:
+
+- factual extraction
+- meeting summarization
+- actionability and escalation decisions
+
+That improves quality in critical situations because the system does not have to do all of these jobs inside one overloaded reasoning pass.
+
+The benefits are:
+
+- better prioritization of critical blockers and risky commitments
+- cleaner approval-based suggestions for Jira or Slack
+- less chance of sending weak or noisy actions downstream
+- easier evaluation because extraction quality and escalation quality can be tested separately
+
+## What that extra layer should do
+
+The action recommendation or escalation review layer should:
+
+- inspect the outputs from the reasoning and summary stages
+- identify items worth surfacing to the portal
+- group items into:
+  - `suggest_for_jira`
+  - `suggest_for_slack`
+  - `suggest_for_manual_review`
+  - `suggest_for_escalation`
+- rank urgency and confidence
+- explain why an item should be suggested
+- wait for human approval before any external send action
+
+## What it should not do
+
+This extra layer should not:
+
+- replace the reasoning agent
+- replace the summary agent
+- directly send to Jira or Slack without approval
+- re-parse raw transcript or browser capture
+- invent new records that were not produced by the earlier stages
+
 ## Current repo truth
 
 This section is the source-of-truth snapshot for the current project.
