@@ -11,12 +11,17 @@ from visualsprint_agents.models import (
     SummaryPacketRequest,
 )
 from visualsprint_agents.config import build_settings
+from visualsprint_agents.adk import (
+    build_reasoning_agent_blueprint,
+    build_summary_agent_blueprint,
+)
 from visualsprint_agents.evals import (
     load_reasoning_eval_fixtures,
     load_summary_eval_fixtures,
     run_agent_eval_smoke,
 )
 from visualsprint_agents.main import app
+from visualsprint_agents.vertex_normalization import extract_vertex_structured_output
 
 
 def test_agents_health_reasoning_and_summary():
@@ -186,6 +191,47 @@ def test_build_settings_supports_vertex_ai_runtime_backend():
     assert settings.google_access_token_configured is True
     assert settings.cloud_adapter_ready is True
     assert settings.deployment_ready is True
+
+
+def test_adk_blueprints_match_repo_contracts():
+    reasoning_blueprint = build_reasoning_agent_blueprint()
+    summary_blueprint = build_summary_agent_blueprint()
+
+    assert reasoning_blueprint.input_contract == "ChunkInsight"
+    assert reasoning_blueprint.output_contract == "RegisterAgentOutputsRequest"
+    assert len(reasoning_blueprint.tools) == 2
+    assert summary_blueprint.input_contract == "MeetingSummaryPacket"
+    assert summary_blueprint.output_contract == "FinalReport"
+    assert len(summary_blueprint.tools) == 1
+
+
+def test_vertex_normalization_handles_multiple_response_shapes():
+    direct = extract_vertex_structured_output(
+        {"output": {"clientChunkId": "chunk-1", "decisions": []}}
+    )
+    assert direct == {"clientChunkId": "chunk-1", "decisions": []}
+
+    stringified = extract_vertex_structured_output(
+        {"output": "{\"clientChunkId\":\"chunk-2\",\"decisions\":[]}"}
+    )
+    assert stringified == {"clientChunkId": "chunk-2", "decisions": []}
+
+    content_parts = extract_vertex_structured_output(
+        {
+            "response": {
+                "output": {
+                    "content": {
+                        "parts": [
+                            {
+                                "text": "{\"clientChunkId\":\"chunk-3\",\"decisions\":[]}"
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+    )
+    assert content_parts == {"clientChunkId": "chunk-3", "decisions": []}
 
 
 def test_vertex_ai_runtime_mode_records_vertex_ai_audit(monkeypatch):

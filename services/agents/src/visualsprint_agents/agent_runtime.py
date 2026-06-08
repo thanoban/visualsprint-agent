@@ -12,6 +12,7 @@ from visualsprint_agents.models import (
     SummaryPacketRequest,
     ChunkInsightRequest,
 )
+from visualsprint_agents.vertex_normalization import extract_vertex_structured_output
 
 
 def invoke_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse | None:
@@ -27,8 +28,8 @@ def invoke_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse
         )
         if response_payload is None:
             return None
-        output_payload = response_payload.get("output")
-        if not isinstance(output_payload, dict):
+        output_payload = extract_vertex_structured_output(response_payload)
+        if output_payload is None:
             return None
         try:
             return ReasoningRunResponse.model_validate(output_payload)
@@ -64,8 +65,8 @@ def invoke_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft | No
         )
         if response_payload is None:
             return None
-        output_payload = response_payload.get("output")
-        if not isinstance(output_payload, dict):
+        output_payload = extract_vertex_structured_output(response_payload)
+        if output_payload is None:
             return None
         try:
             return FinalReportDraft.model_validate(output_payload)
