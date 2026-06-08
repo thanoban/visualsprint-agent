@@ -6,11 +6,16 @@ This document captures repo issues that affect the VisualSprint implementation p
 
 The `origin/udula` docs branch had one especially useful document: `docs/fixes.md`.
 
-The most important findings from that analysis are still relevant:
+The most important findings from that analysis break into two groups:
+
+Still relevant:
 
 1. Runtime bugs can slip through `compileall`.
-2. The implemented contracts are still more UI-shaped than final-agent-shaped.
-3. Mock reasoning is still coupled to the upload-complete request path.
+2. The implemented contracts still need to converge on the final agent-plus-Elastic shape.
+
+Historical but still useful as an anti-regression note:
+
+3. Mock reasoning used to be coupled to the upload-complete request path.
 
 ## Findings that matter for Elastic integration
 
@@ -32,15 +37,26 @@ Why this matters:
 - Agent Builder output validation should use the same shape.
 - The dashboard should render the same shape that Elastic stores and the agent emits.
 
-### 2. Mock processing is still synchronous inside upload completion
+### 2. Historical finding: mock processing used to be synchronous inside upload completion
 
-Today the repo still lets chunk upload completion trigger local transcript/media/reasoning behavior directly in the same request path.
+This finding was accurate in the earlier `origin/udula` review, but it is no
+longer true on the current `main` / `thanoban` code line.
+
+Today the repo has already split:
+
+- upload completion
+- explicit chunk reasoning execution
+
+The current routes are:
+
+- `POST /api/meetings/{meeting_id}/capture-sessions/chunk/upload-complete`
+- `POST /api/meetings/{meeting_id}/capture-sessions/chunks/{client_chunk_id}/reasoning/run`
 
 Why this matters:
 
-- the production flow should split deterministic lifecycle handling from managed-agent reasoning
-- Elastic write-back and lookup should hang off the clean post-processing seam
-- this is easier to replace now than after more product code builds on the mock path
+- the repo has the right seam now, so future work should preserve it
+- Elastic write-back and lookup should continue to hang off the clean post-processing seam
+- this should stay a regression watch item rather than a current architecture blocker
 
 ### 3. Verification is weaker than the final system needs
 
@@ -146,7 +162,7 @@ How to fix:
 
 ### 5. Docs contain machine-local absolute links
 
-`docs/agent-creation-chatgpt-prompts.md` and `docs/elastic-integration-handoff.md`
+`docs/agent-creation-chatgpt-prompts.md` and `docs/capture-constraints-and-plan.md`
 link with paths like `/d:/PROJECTS/Startup/VisualSprint/docs/...`.
 
 Why it matters:

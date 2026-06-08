@@ -4,8 +4,8 @@ This document gives paste-ready prompts you can use in ChatGPT while creating Vi
 
 Use this together with:
 
-- [Google Cloud Agent Builder plan](/d:/PROJECTS/Startup/VisualSprint/docs/google-cloud-agent-builder.md)
-- [Elastic integration handoff](/d:/PROJECTS/Startup/VisualSprint/docs/elastic-integration-handoff.md)
+- [Google Cloud Agent Builder plan](./google-cloud-agent-builder.md)
+- [Elastic integration handoff](./elastic-integration-handoff.md)
 
 ## Why this file exists
 

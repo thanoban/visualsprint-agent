@@ -132,8 +132,10 @@ def test_build_settings_supports_configured_cloud_mode():
             "VISUALSPRINT_AGENT_APPLICATION_ID": "agents-app",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME": "agents-bridge-token",
             "VISUALSPRINT_ELASTIC_MCP_ENDPOINT": "https://elastic.example/mcp",
             "VISUALSPRINT_ELASTIC_API_KEY": "elastic-api-key-value",
@@ -190,6 +192,7 @@ def test_build_settings_supports_vertex_ai_runtime_backend():
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/action789",
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/reasoning123",
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/summary456",
             "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.sample-token",
@@ -387,6 +390,7 @@ def test_vertex_ai_runtime_mode_records_vertex_ai_audit(monkeypatch):
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/action789",
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/reasoning123",
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/summary456",
             "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.vertex-token",
@@ -467,8 +471,10 @@ def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monke
         {
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
         }
@@ -550,8 +556,10 @@ def test_configured_cloud_falls_back_when_bridge_returns_none(monkeypatch):
         {
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
         }

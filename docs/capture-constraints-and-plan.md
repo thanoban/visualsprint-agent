@@ -6,8 +6,8 @@ How much can a web app really capture from browser meetings like Google Meet or 
 
 Use this together with:
 
-- [Google Cloud Agent Builder plan](/d:/PROJECTS/Startup/VisualSprint/docs/google-cloud-agent-builder.md)
-- [Elastic integration handoff](/d:/PROJECTS/Startup/VisualSprint/docs/elastic-integration-handoff.md)
+- [Google Cloud Agent Builder plan](./google-cloud-agent-builder.md)
+- [Elastic integration handoff](./elastic-integration-handoff.md)
 
 ## Short answer
 

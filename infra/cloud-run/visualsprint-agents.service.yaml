@@ -29,6 +29,8 @@ spec:
               value: vertex_ai_reasoning_engine
             - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID
               value: visualsprint-agent
+            - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER
+              value: "530780341550"
             - name: VISUALSPRINT_GOOGLE_CLOUD_LOCATION
               value: us-west1
             - name: VISUALSPRINT_AGENT_APPLICATION_ID
@@ -39,6 +41,24 @@ spec:
               value: projects/530780341550/locations/us-west1/reasoningEngines/SUMMARY_ENGINE_ID
             - name: VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME
               value: projects/530780341550/locations/us-west1/reasoningEngines/ACTION_ENGINE_ID
+            - name: VISUALSPRINT_REASONING_AGENT_ID
+              value: "554162656492126208"
+            - name: VISUALSPRINT_SUMMARY_AGENT_ID
+              value: "6620511354560184320"
+            - name: VISUALSPRINT_ACTION_AGENT_ID
+              value: "7293799498852073472"
+            - name: VISUALSPRINT_REASONING_AGENT_RESOURCE
+              value: projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208
+            - name: VISUALSPRINT_SUMMARY_AGENT_RESOURCE
+              value: projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320
+            - name: VISUALSPRINT_ACTION_AGENT_RESOURCE
+              value: projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472
+            - name: VISUALSPRINT_REASONING_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208:query
+            - name: VISUALSPRINT_SUMMARY_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320:query
+            - name: VISUALSPRINT_ACTION_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472:query
             - name: VISUALSPRINT_CLOUD_RUN_SERVICE_URL
               value: https://visualsprint-agents-REPLACE.a.run.app
             - name: VISUALSPRINT_SERVICE_ACCOUNT_EMAIL
