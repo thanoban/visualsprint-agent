@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  type AgentSmokeResponse,
   type AgentInvocationAuditResponse,
   captureStages,
   dashboardModules,
@@ -44,6 +45,7 @@ import {
   getMeeting,
   listMeetings,
   registerCaptureChunk,
+  runAgentSmoke,
   runCaptureChunkReasoning,
   startCaptureSession,
   startMeeting,
@@ -88,6 +90,7 @@ export function MeetingDashboard() {
   const [indexedOutcomes, setIndexedOutcomes] = useState<IndexedOutcomeDocument[]>([]);
   const [platformMeta, setPlatformMeta] = useState<PlatformMetaResponse | null>(null);
   const [agentInvocationAudit, setAgentInvocationAudit] = useState<AgentInvocationAuditResponse | null>(null);
+  const [agentSmokeResult, setAgentSmokeResult] = useState<AgentSmokeResponse | null>(null);
   const isClient = useSyncExternalStore(
     subscribeToBrowserAvailability,
     () => true,
@@ -380,6 +383,35 @@ export function MeetingDashboard() {
       await refreshMeetings();
     } catch (actionError) {
       setError(getErrorMessage(actionError));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  async function handleAgentSmoke() {
+    if (!selectedMeeting) {
+      return;
+    }
+
+    setIsBusy(true);
+    setError(null);
+    try {
+      const latestProcessedChunk = selectedMeeting.recentCaptureChunks.find(
+        (chunk) => chunk.processingStatus === "processed",
+      );
+      const response = await runAgentSmoke(
+        selectedMeeting.id,
+        latestProcessedChunk?.clientChunkId,
+      );
+      startTransition(() => {
+        setAgentSmokeResult(response);
+      });
+      const auditResponse = await getAgentInvocationAudit();
+      startTransition(() => {
+        setAgentInvocationAudit(auditResponse);
+      });
+    } catch (smokeError) {
+      setError(getErrorMessage(smokeError));
     } finally {
       setIsBusy(false);
     }
@@ -894,6 +926,16 @@ export function MeetingDashboard() {
                     >
                       {selectedMeeting.status === "ended" ? "Meeting ended" : "End meeting"}
                     </button>
+                    <button
+                      className={secondaryLightButtonClassName}
+                      disabled={isBusy}
+                      onClick={() => {
+                        void handleAgentSmoke();
+                      }}
+                      type="button"
+                    >
+                      Run agent smoke
+                    </button>
                   </div>
                 </div>
               ) : (
@@ -901,6 +943,78 @@ export function MeetingDashboard() {
                   bodyClassName="text-slate-300"
                   title="No meeting selected"
                   body="Create or choose a meeting to inspect the live session state."
+                />
+              )}
+            </Card>
+
+            <Card title="Agent smoke check" eyebrow="Hosted runtime seam">
+              {selectedMeeting ? (
+                agentSmokeResult ? (
+                  <div className="space-y-4">
+                    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                      <InfoTile
+                        label="Reasoning source"
+                        value={formatProcessingSourceMode(agentSmokeResult.reasoning.source)}
+                      />
+                      <InfoTile
+                        label="Summary source"
+                        value={formatProcessingSourceMode(agentSmokeResult.summary.source)}
+                      />
+                      <InfoTile
+                        label="Reasoning attempted"
+                        value={agentSmokeResult.reasoning.attempted ? "Yes" : "No"}
+                      />
+                      <InfoTile
+                        label="Summary attempted"
+                        value={agentSmokeResult.summary.attempted ? "Yes" : "No"}
+                      />
+                      <InfoTile
+                        label="Reasoning outputs"
+                        value={String(
+                          agentSmokeResult.reasoning.decisionCount +
+                            agentSmokeResult.reasoning.commitmentCount +
+                            agentSmokeResult.reasoning.blockerCount +
+                            agentSmokeResult.reasoning.openQuestionCount,
+                        )}
+                      />
+                      <InfoTile
+                        label="Summary length"
+                        value={String(agentSmokeResult.summary.executiveSummaryLength)}
+                      />
+                    </div>
+                    <div className="space-y-3">
+                      <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Reasoning smoke
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {agentSmokeResult.reasoning.note}
+                        </p>
+                        <p className="mt-2 text-xs text-slate-500">
+                          chunk {agentSmokeResult.reasoning.selectedChunkId ?? "not selected"} · memory matches{" "}
+                          {agentSmokeResult.reasoning.memoryMatchCount}
+                        </p>
+                      </article>
+                      <article className="rounded-[1.2rem] border border-slate-900/10 bg-white p-4">
+                        <p className="text-sm font-semibold text-slate-900">
+                          Summary smoke
+                        </p>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {agentSmokeResult.summary.note}
+                        </p>
+                      </article>
+                    </div>
+                  </div>
+                ) : (
+                  <EmptyState
+                    title="No smoke run yet"
+                    body="Use Run agent smoke to exercise the current control-plane to agents seam without mutating meeting state."
+                  />
+                )
+              ) : (
+                <EmptyState
+                  title="No meeting selected"
+                  body="Choose a meeting before running the adapter smoke check."
                 />
               )}
             </Card>
