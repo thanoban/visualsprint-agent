@@ -17,6 +17,24 @@ from visualsprint_agents.models import (
 def invoke_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse | None:
     """Try the configured reasoning-agent bridge and return validated output."""
 
+    response_payload: dict | None
+    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine":
+        if not settings.cloud_adapter_ready or not settings.reasoning_engine_resource_name:
+            return None
+        response_payload = _query_vertex_reasoning_engine(
+            resource_name=settings.reasoning_engine_resource_name,
+            input_payload=payload.model_dump(mode="json"),
+        )
+        if response_payload is None:
+            return None
+        output_payload = response_payload.get("output")
+        if not isinstance(output_payload, dict):
+            return None
+        try:
+            return ReasoningRunResponse.model_validate(output_payload)
+        except ValueError:
+            return None
+
     if not settings.cloud_adapter_ready or not settings.reasoning_agent_endpoint_url:
         return None
 
@@ -35,6 +53,24 @@ def invoke_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse
 
 def invoke_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft | None:
     """Try the configured summary-agent bridge and return validated output."""
+
+    response_payload: dict | None
+    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine":
+        if not settings.cloud_adapter_ready or not settings.summary_engine_resource_name:
+            return None
+        response_payload = _query_vertex_reasoning_engine(
+            resource_name=settings.summary_engine_resource_name,
+            input_payload=payload.model_dump(mode="json"),
+        )
+        if response_payload is None:
+            return None
+        output_payload = response_payload.get("output")
+        if not isinstance(output_payload, dict):
+            return None
+        try:
+            return FinalReportDraft.model_validate(output_payload)
+        except ValueError:
+            return None
 
     if not settings.cloud_adapter_ready or not settings.summary_agent_endpoint_url:
         return None
@@ -83,5 +119,61 @@ def _post_json(
             timeout=settings.agent_request_timeout_seconds,
         )
         return json.loads(response.read().decode("utf-8"))
+    except (error.URLError, error.HTTPError, json.JSONDecodeError):
+        return None
+
+
+def _query_vertex_reasoning_engine(
+    *,
+    resource_name: str,
+    input_payload: dict,
+) -> dict | None:
+    access_token = _resolve_google_access_token()
+    if access_token is None:
+        return None
+
+    url = f"https://aiplatform.googleapis.com/v1/{resource_name}:query"
+    body = {
+        "classMethod": "query",
+        "input": input_payload,
+    }
+    try:
+        response = request.urlopen(
+            request.Request(
+                url=url,
+                data=json.dumps(body).encode("utf-8"),
+                headers={
+                    "Content-Type": "application/json",
+                    "Authorization": f"Bearer {access_token}",
+                },
+                method="POST",
+            ),
+            timeout=settings.agent_request_timeout_seconds,
+        )
+        return json.loads(response.read().decode("utf-8"))
+    except (error.URLError, error.HTTPError, json.JSONDecodeError):
+        return None
+
+
+def _resolve_google_access_token() -> str | None:
+    if settings.google_api_access_token is not None:
+        return settings.google_api_access_token
+    if settings.deployment_target != "cloud_run":
+        return None
+    try:
+        response = request.urlopen(
+            request.Request(
+                url=(
+                    "http://metadata.google.internal/computeMetadata/v1/"
+                    "instance/service-accounts/default/token"
+                ),
+                headers={"Metadata-Flavor": "Google"},
+                method="GET",
+            ),
+            timeout=settings.agent_request_timeout_seconds,
+        )
+        payload = json.loads(response.read().decode("utf-8"))
+        access_token = payload.get("access_token")
+        return access_token if isinstance(access_token, str) and access_token else None
     except (error.URLError, error.HTTPError, json.JSONDecodeError):
         return None

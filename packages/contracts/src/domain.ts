@@ -116,7 +116,12 @@ export interface PlatformMetaResponse {
 export interface AgentInvocationAuditEntry {
   invokedAt: string;
   agentKind: "reasoning" | "summary";
-  executionMode: "mock" | "bridge" | "bridge_fallback";
+  executionMode:
+    | "mock"
+    | "bridge"
+    | "bridge_fallback"
+    | "vertex_ai"
+    | "vertex_ai_fallback";
   status: "success" | "fallback" | "error";
   targetAgentId: null | string;
   requestKey: string;

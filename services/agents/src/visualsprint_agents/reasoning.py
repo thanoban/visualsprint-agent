@@ -24,20 +24,44 @@ def run_reasoning_agent(payload: ChunkInsightRequest) -> ReasoningRunResponse:
         if cloud_response is not None:
             audit_store.record(
                 agent_kind="reasoning",
-                execution_mode="bridge",
+                execution_mode=(
+                    "vertex_ai"
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else "bridge"
+                ),
                 status="success",
-                target_agent_id=settings.reasoning_agent_id,
+                target_agent_id=(
+                    settings.reasoning_engine_resource_name
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else settings.reasoning_agent_id
+                ),
                 request_key=payload.clientChunkId,
-                detail="Configured bridge produced the reasoning response.",
+                detail=(
+                    "Configured Vertex AI runtime produced the reasoning response."
+                    if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                    else "Configured bridge produced the reasoning response."
+                ),
             )
             return cloud_response
         audit_store.record(
             agent_kind="reasoning",
-            execution_mode="bridge_fallback",
+            execution_mode=(
+                "vertex_ai_fallback"
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "bridge_fallback"
+            ),
             status="fallback",
-            target_agent_id=settings.reasoning_agent_id,
+            target_agent_id=(
+                settings.reasoning_engine_resource_name
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else settings.reasoning_agent_id
+            ),
             request_key=payload.clientChunkId,
-            detail="Configured bridge was unavailable, so deterministic reasoning fallback was used.",
+            detail=(
+                "Configured Vertex AI runtime was unavailable, so deterministic reasoning fallback was used."
+                if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "Configured bridge was unavailable, so deterministic reasoning fallback was used."
+            ),
         )
         return _run_configured_reasoning_agent_stub(payload)
     audit_store.record(

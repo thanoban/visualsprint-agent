@@ -101,7 +101,13 @@ class PlatformMetaResponse(BaseModel):
 class AgentInvocationAuditEntry(BaseModel):
     invokedAt: datetime
     agentKind: Literal["reasoning", "summary"]
-    executionMode: Literal["mock", "bridge", "bridge_fallback"]
+    executionMode: Literal[
+        "mock",
+        "bridge",
+        "bridge_fallback",
+        "vertex_ai",
+        "vertex_ai_fallback",
+    ]
     status: Literal["success", "fallback", "error"]
     targetAgentId: str | None = None
     requestKey: str = Field(min_length=4, max_length=160)
