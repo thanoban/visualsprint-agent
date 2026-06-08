@@ -38,11 +38,13 @@ function Join-EnvVars {
 Require-Command "gcloud"
 Require-Command "docker"
 
-$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-Set-Location $repoRoot
-
 $agentsImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/agents:$ImageTag"
 $apiImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/api:$ImageTag"
+
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$agentsContext = Join-Path $repoRoot "services/agents"
+$apiContext = Join-Path $repoRoot "services/api"
+Set-Location $repoRoot
 
 $reasoningResource = "projects/$ProjectNumber/locations/$Region/reasoningEngines/$ReasoningAgentId"
 $summaryResource = "projects/$ProjectNumber/locations/$Region/reasoningEngines/$SummaryAgentId"
@@ -55,10 +57,10 @@ $actionQueryUrl = "https://$Region-aiplatform.googleapis.com/v1/${actionResource
 gcloud config set project $ProjectId | Out-Null
 gcloud auth configure-docker "$Region-docker.pkg.dev" --quiet | Out-Null
 
-docker build -f services/agents/Dockerfile -t $agentsImage .
+docker build -t $agentsImage $agentsContext
 docker push $agentsImage
 
-docker build -f services/api/Dockerfile -t $apiImage .
+docker build -t $apiImage $apiContext
 docker push $apiImage
 
 $agentsEnvVars = Join-EnvVars @(
