@@ -10,6 +10,7 @@ from visualsprint_agents.adk.tool_contracts import (
     SEARCH_PRIOR_OUTCOMES_TOOL,
 )
 from visualsprint_agents.adk.tools import register_outputs, search_prior_outcomes
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import ChunkInsightRequest, ReasoningRunResponse
 
 
@@ -46,7 +47,7 @@ def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
             "Reason over assembled chunk context and emit durable structured outcomes "
             "for the VisualSprint control plane."
         ),
-        model="gemini-flash-latest",
+        model=settings.reasoning_model,
         instruction=render_instruction_text(
             blueprint,
             input_contract=blueprint.input_contract,

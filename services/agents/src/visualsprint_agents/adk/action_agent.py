@@ -7,6 +7,7 @@ from visualsprint_agents.adk.runtime import AdkAgentScaffold, create_root_agent
 from visualsprint_agents.adk.shared import AgentBlueprint
 from visualsprint_agents.adk.tool_contracts import CREATE_ACTION_RECOMMENDATIONS_TOOL
 from visualsprint_agents.adk.tools.actions import create_action_recommendations
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import ActionAgentRequest, ActionAgentResponse, AgentActionRecommendationInput
 
 
@@ -46,7 +47,7 @@ def build_action_agent_scaffold() -> AdkAgentScaffold:
             "Turn a final meeting report into durable, approval-based Jira and Slack "
             "action recommendations for the VisualSprint control plane."
         ),
-        model="gemini-flash-latest",
+        model=settings.action_model,
         instruction=render_instruction_text(
             blueprint,
             input_contract=blueprint.input_contract,

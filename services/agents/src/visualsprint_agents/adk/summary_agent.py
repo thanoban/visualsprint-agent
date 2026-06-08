@@ -7,6 +7,7 @@ from visualsprint_agents.adk.runtime import AdkAgentScaffold, create_root_agent
 from visualsprint_agents.adk.shared import AgentBlueprint
 from visualsprint_agents.adk.tool_contracts import FINALIZE_REPORT_TOOL
 from visualsprint_agents.adk.tools import finalize_report
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
 
@@ -40,7 +41,7 @@ def build_summary_agent_scaffold() -> AdkAgentScaffold:
             "Turn the assembled meeting summary packet into a durable final report for "
             "the VisualSprint control plane."
         ),
-        model="gemini-flash-latest",
+        model=settings.summary_model,
         instruction=render_instruction_text(
             blueprint,
             input_contract=blueprint.input_contract,
