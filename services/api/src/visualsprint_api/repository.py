@@ -9,6 +9,10 @@ from typing import Callable
 from uuid import uuid4
 
 from visualsprint_api.config import settings
+from visualsprint_api.elastic_client import (
+    search_prior_outcomes_in_elasticsearch,
+    upsert_indexed_outcomes_to_elasticsearch,
+)
 from visualsprint_api.insight_pipeline import build_chunk_insight
 from visualsprint_api.models import (
     AgentBlockerInput,
@@ -275,6 +279,8 @@ class MeetingStore:
             return meeting.model_copy(deep=True)
 
     def finalize_report(self, meeting_id: str) -> FinalReport | None:
+        meeting_copy: MeetingDetail | None = None
+        documents_to_sync: list[IndexedOutcomeDocument] = []
         with self._lock:
             meeting = self._meetings.get(meeting_id)
             if meeting is None:
@@ -289,7 +295,12 @@ class MeetingStore:
             report.summarySource = summary_source
             self._final_reports[meeting_id] = report
             self._mark_meeting_updated(meeting_id)
-            return report.model_copy(deep=True)
+            meeting_copy = meeting.model_copy(deep=True)
+            documents_to_sync = self._copy_indexed_outcomes_for_meeting(meeting_id)
+            report_copy = report.model_copy(deep=True)
+
+        self._sync_indexed_outcomes_to_elastic(meeting_copy, documents_to_sync)
+        return report_copy
 
     def get_meeting_state(self, meeting_id: str) -> MeetingStateSnapshot | None:
         with self._lock:
@@ -338,57 +349,59 @@ class MeetingStore:
             meeting = self._meetings.get(meeting_id)
             if meeting is None:
                 return None
+            meeting_copy = meeting.model_copy(deep=True)
 
-            normalized_text = f"{payload.summary} {payload.detail}".lower()
-            matches: list[MemoryMatch] = []
+        elastic_matches = search_prior_outcomes_in_elasticsearch(
+            config=settings,
+            meeting=meeting_copy,
+            payload=payload,
+        )
+        if elastic_matches is not None:
+            if len(elastic_matches) > 0:
+                return [match.model_copy(deep=True) for match in elastic_matches[:3]]
+            return [self._build_empty_memory_match(meeting_copy)]
 
-            for (
-                source_meeting_id,
-                summary,
-                source_meeting_title,
-                strength,
-                relation,
-                score,
-                snippet,
-            ) in MEMORY_TEMPLATES:
-                keywords = _keywords_for_memory_template(source_meeting_id)
-                if any(keyword in normalized_text for keyword in keywords):
-                    matches.append(
-                        MemoryMatch(
-                            id=f"mem_{uuid4().hex[:12]}",
-                            sourceMeetingId=source_meeting_id,
-                            summary=summary,
-                            sourceMeetingTitle=source_meeting_title,
-                            strength=strength,
-                            relation=relation,
-                            score=score,
-                            snippet=snippet,
-                            recordedAt=_utc_now(),
-                        )
-                    )
+        normalized_text = f"{payload.summary} {payload.detail}".lower()
+        matches: list[MemoryMatch] = []
 
-            if len(matches) == 0:
+        for (
+            source_meeting_id,
+            summary,
+            source_meeting_title,
+            strength,
+            relation,
+            score,
+            snippet,
+        ) in MEMORY_TEMPLATES:
+            keywords = _keywords_for_memory_template(source_meeting_id)
+            if any(keyword in normalized_text for keyword in keywords):
                 matches.append(
                     MemoryMatch(
                         id=f"mem_{uuid4().hex[:12]}",
-                        sourceMeetingId=f"{meeting_id}_new_signal",
-                        summary="No strong historical match was found for this candidate outcome.",
-                        sourceMeetingTitle=meeting.title,
-                        strength="related",
-                        relation="new",
-                        score=0.12,
-                        snippet="The current development memory layer did not return a strong historical precedent.",
+                        sourceMeetingId=source_meeting_id,
+                        summary=summary,
+                        sourceMeetingTitle=source_meeting_title,
+                        strength=strength,
+                        relation=relation,
+                        score=score,
+                        snippet=snippet,
                         recordedAt=_utc_now(),
                     )
                 )
 
-            return [match.model_copy(deep=True) for match in matches[:3]]
+        if len(matches) == 0:
+            matches.append(self._build_empty_memory_match(meeting_copy))
+
+        return [match.model_copy(deep=True) for match in matches[:3]]
 
     def register_outputs(
         self,
         meeting_id: str,
         payload: RegisterAgentOutputsRequest,
     ) -> tuple[MeetingDetail, MeetingStateSnapshot] | None:
+        meeting_copy: MeetingDetail | None = None
+        meeting_state: MeetingStateSnapshot | None = None
+        documents_to_sync: list[IndexedOutcomeDocument] = []
         with self._lock:
             meeting = self._meetings.get(meeting_id)
             if meeting is None:
@@ -492,7 +505,12 @@ class MeetingStore:
             )
             meeting.latestEvents = meeting.latestEvents[:12]
             self._mark_meeting_updated(meeting_id)
-            return meeting.model_copy(deep=True), self._build_meeting_state(meeting)
+            meeting_copy = meeting.model_copy(deep=True)
+            meeting_state = self._build_meeting_state(meeting)
+            documents_to_sync = self._copy_indexed_outcomes_for_meeting(meeting_id)
+
+        self._sync_indexed_outcomes_to_elastic(meeting_copy, documents_to_sync)
+        return meeting_copy, meeting_state
 
     def end_meeting(self, meeting_id: str) -> MeetingDetail | None:
         with self._lock:
@@ -1656,6 +1674,47 @@ class MeetingStore:
         evidence_refs: list[EvidenceReference],
     ) -> list[EvidenceReference]:
         return [reference.model_copy(deep=True) for reference in evidence_refs]
+
+    def _copy_indexed_outcomes_for_meeting(
+        self,
+        meeting_id: str,
+    ) -> list[IndexedOutcomeDocument]:
+        documents = [
+            document.model_copy(deep=True)
+            for (document_meeting_id, _), document in self._indexed_outcomes.items()
+            if document_meeting_id == meeting_id
+        ]
+        documents.sort(key=lambda document: document.updatedAt, reverse=True)
+        return documents
+
+    def _sync_indexed_outcomes_to_elastic(
+        self,
+        meeting: MeetingDetail | None,
+        documents: list[IndexedOutcomeDocument],
+    ) -> None:
+        if meeting is None or len(documents) == 0:
+            return
+        upsert_indexed_outcomes_to_elasticsearch(
+            config=settings,
+            meeting=meeting,
+            documents=documents,
+        )
+
+    def _build_empty_memory_match(
+        self,
+        meeting: MeetingDetail,
+    ) -> MemoryMatch:
+        return MemoryMatch(
+            id=f"mem_{uuid4().hex[:12]}",
+            sourceMeetingId=f"{meeting.id}_new_signal",
+            summary="No strong historical match was found for this candidate outcome.",
+            sourceMeetingTitle=meeting.title,
+            strength="related",
+            relation="new",
+            score=0.12,
+            snippet="The current development memory layer did not return a strong historical precedent.",
+            recordedAt=_utc_now(),
+        )
 
     def _index_decision(self, meeting_id: str, record: DecisionRecord) -> None:
         self._indexed_outcomes[(meeting_id, record.id)] = IndexedOutcomeDocument(
