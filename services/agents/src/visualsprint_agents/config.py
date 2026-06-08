@@ -212,10 +212,6 @@ class Settings:
             if not self.action_agent_endpoint_url:
                 missing.append("VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL")
         if self.deployment_target == "cloud_run":
-            if not self.cloud_run_service_url:
-                missing.append("VISUALSPRINT_CLOUD_RUN_SERVICE_URL")
-            if not self.service_account_email:
-                missing.append("VISUALSPRINT_SERVICE_ACCOUNT_EMAIL")
             if (
                 self.agent_runtime_backend == "bridge"
                 and not self.bridge_auth_configured

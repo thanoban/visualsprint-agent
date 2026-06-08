@@ -183,8 +183,6 @@ def test_build_settings_reports_missing_cloud_run_requirements():
     assert "VISUALSPRINT_SUMMARY_AGENT_ID" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
-    assert "VISUALSPRINT_CLOUD_RUN_SERVICE_URL" in settings.missing_cloud_configuration
-    assert "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL" in settings.missing_cloud_configuration
 
 
 def test_build_settings_supports_vertex_ai_runtime_backend():
