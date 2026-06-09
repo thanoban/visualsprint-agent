@@ -113,8 +113,8 @@ def _resolve_project_key() -> str:
     project_key = getattr(settings, "jira_project_key", None)
     if project_key:
         return project_key
-    # Fallback: try to infer from base URL or use a default
-    return "VS"
+    # Fallback to the confirmed project from testing
+    return "SCRUM"
 
 
 def _execute_jira_stub(jira_details: JiraRecommendation) -> tuple[bool, str]:

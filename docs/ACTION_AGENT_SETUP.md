@@ -147,16 +147,38 @@ The Action Agent **never** executes directly. All actions pass through:
 
 ---
 
+## Testing results (verified)
+
+Both integrations were tested with real credentials and confirmed working:
+
+| Integration | Test | Result | Evidence |
+|-------------|------|--------|----------|
+| **Jira** | Create issue via REST API | ✅ Success | Issue **SCRUM-6** created |
+| **Slack** | Post message via `chat.postMessage` | ✅ Success | Message posted to `#general-visualsprint-agent` |
+
+### Verified credentials
+
+| Variable | Verified value |
+|----------|---------------|
+| `JIRA_BASE_URL` | `https://visualsprint.atlassian.net` |
+| `JIRA_EMAIL` | `general202015@gmail.com` |
+| `JIRA_PROJECT_KEY` | `SCRUM` |
+| `SLACK_DEFAULT_CHANNEL` | `general-visualsprint-agent` |
+
+---
+
 ## Production wiring
 
-To make Jira and Slack real (not stubs):
+The Jira and Slack executors are **already making real API calls**. No additional code changes are needed — just ensure the environment variables are configured:
 
-1. Fill `JIRA_BASE_URL` and `JIRA_API_TOKEN_SECRET`
-2. Fill `SLACK_BOT_TOKEN_SECRET` and `SLACK_DEFAULT_CHANNEL`
-3. Update `services/api/src/visualsprint_api/action_executors/jira_client.py` to call the Jira REST API
-4. Update `services/api/src/visualsprint_api/action_executors/slack_client.py` to call `slack-sdk`
+1. `JIRA_BASE_URL` — your Jira instance URL
+2. `JIRA_API_TOKEN_SECRET` — your Atlassian API token
+3. `JIRA_EMAIL` — the email of your Atlassian account
+4. `JIRA_PROJECT_KEY` — the project key where issues will be created
+5. `SLACK_BOT_TOKEN_SECRET` — your Slack Bot User OAuth Token
+6. `SLACK_DEFAULT_CHANNEL` — the default channel for Slack messages
 
-The stub architecture is intentionally ready for this — just replace `_execute_jira_stub` and `_execute_slack_stub` with real HTTP calls.
+> The executors automatically fall back to stub mode if any of these credentials are missing, making local development safe.
 
 ---
 
