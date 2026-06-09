@@ -21,6 +21,33 @@ That means:
 - it cannot silently inspect other tabs or external desktop apps
 - it cannot automatically read a desktop Zoom app without user-approved screen or window sharing
 
+## Current implementation status
+
+The current repo is already beyond pure planning for capture.
+
+Built now:
+
+- browser-first capture in `apps/web` using `getDisplayMedia`
+- incremental chunk recording with `MediaRecorder`
+- optional microphone merge when the browser allows it
+- explicit chunk flow through the API:
+  - register chunk
+  - mark upload complete
+  - run chunk reasoning
+- capture readiness UX in the meeting setup and live views
+
+Partial:
+
+- user-approved window or full-screen capture works only through the browser share picker
+- desktop Zoom can be observed only if the user explicitly shares that window or the full screen
+- browser and OS audio support still varies and is not normalized by a native helper
+
+Not built yet:
+
+- a native desktop helper or extension
+- a fully productionized cloud media pipeline for every capture mode
+- guaranteed desktop-app-specific UX beyond the standard browser share flow
+
 ## What works well today
 
 These are the cases a browser-first VisualSprint flow can support well.
@@ -128,6 +155,10 @@ This is the best phased plan for VisualSprint as a web-first system.
 
 ### Phase 1. Browser-tab-first support
 
+Status today:
+
+- mostly built
+
 Make the primary supported path:
 
 - Google Meet in browser tab
@@ -148,6 +179,10 @@ Why this first:
 
 ### Phase 2. User-approved window and full-screen support
 
+Status today:
+
+- partially built through the browser picker, but not polished as a dedicated desktop-app flow
+
 Expand the capture UX so users can choose:
 
 - meeting tab
@@ -165,6 +200,10 @@ Important rule:
 
 ### Phase 3. Better desktop-app support later
 
+Status today:
+
+- not built
+
 If the product later needs stronger desktop integration, consider:
 
 - a browser extension
@@ -179,6 +218,15 @@ This would only be needed if the team wants:
 - deeper OS-aware capture flows
 
 That is not required for the first production story.
+
+## What is still missing for capture
+
+The current gaps are not the basic browser APIs. They are production hardening gaps:
+
+- more explicit UX for tab vs window vs full-screen choices
+- validation across more browser and OS combinations
+- a real cloud ingest/transcription/media path behind the browser chunks
+- a decision on whether a desktop helper is actually needed after browser-first validation
 
 ## UX guidance
 
@@ -218,6 +266,12 @@ We can say capture support is in a good first production state when all of this 
 - the agents continue to operate only on assembled context
 - the product never depends on hidden access to external apps
 
+Current repo assessment:
+
+- browser-tab-first capture is already implemented
+- window/full-screen support is available through browser-native sharing
+- the main remaining work is production hardening, not basic feasibility
+
 ## Bottom line
 
 A web app can support both browser meetings and external meeting apps, but the access model is different.
@@ -230,4 +284,7 @@ For external desktop apps:
 
 - only user-approved window or full-screen sharing works
 
-VisualSprint should therefore be designed browser-tab-first, with explicit window or full-screen fallback for desktop Zoom.
+VisualSprint should therefore stay browser-tab-first, with explicit window or
+full-screen fallback for desktop Zoom. The repo already implements that
+direction, and the remaining work is to harden the pipeline behind it rather
+than to redesign the capture model.
