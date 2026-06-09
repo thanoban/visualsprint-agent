@@ -8,6 +8,7 @@
   ],
   "scripts": {
     "dev:web": "npm run dev --workspace @visualsprint/web",
+    "start:web": "npm run start --workspace @visualsprint/web",
     "build:web": "npm run build --workspace @visualsprint/web",
     "lint:web": "npm run lint --workspace @visualsprint/web",
     "typecheck:web": "npm run typecheck --workspace @visualsprint/web",

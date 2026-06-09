@@ -92,6 +92,11 @@ class Settings:
     elastic_api_key_secret_name: str | None = None
     service_account_email: str | None = None
     cloud_run_service_url: str | None = None
+    control_plane_url: str | None = None
+    control_plane_bearer_token: str | None = None
+    reasoning_model: str = "gemini-flash-latest"
+    summary_model: str = "gemini-flash-latest"
+    action_model: str = "gemini-flash-latest"
     allowed_origins: tuple[str, ...] = ()
 
     @property
@@ -132,6 +137,10 @@ class Settings:
     @property
     def cloud_run_service_configured(self) -> bool:
         return self.cloud_run_service_url is not None
+
+    @property
+    def control_plane_configured(self) -> bool:
+        return self.control_plane_url is not None
 
     @property
     def google_access_token_configured(self) -> bool:
@@ -212,10 +221,6 @@ class Settings:
             if not self.action_agent_endpoint_url:
                 missing.append("VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL")
         if self.deployment_target == "cloud_run":
-            if not self.cloud_run_service_url:
-                missing.append("VISUALSPRINT_CLOUD_RUN_SERVICE_URL")
-            if not self.service_account_email:
-                missing.append("VISUALSPRINT_SERVICE_ACCOUNT_EMAIL")
             if (
                 self.agent_runtime_backend == "bridge"
                 and not self.bridge_auth_configured
@@ -318,6 +323,11 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         elastic_api_key_secret_name=_get(source, "VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME"),
         service_account_email=_get(source, "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL"),
         cloud_run_service_url=_get(source, "VISUALSPRINT_CLOUD_RUN_SERVICE_URL"),
+        control_plane_url=_get(source, "VISUALSPRINT_CONTROL_PLANE_URL"),
+        control_plane_bearer_token=_get(source, "VISUALSPRINT_CONTROL_PLANE_BEARER_TOKEN"),
+        reasoning_model=(source.get("VISUALSPRINT_REASONING_MODEL", "").strip() or "gemini-flash-latest"),
+        summary_model=(source.get("VISUALSPRINT_SUMMARY_MODEL", "").strip() or "gemini-flash-latest"),
+        action_model=(source.get("VISUALSPRINT_ACTION_MODEL", "").strip() or "gemini-flash-latest"),
         allowed_origins=_resolve_allowed_origins(source),
     )
 

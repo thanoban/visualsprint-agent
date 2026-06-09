@@ -2,8 +2,92 @@
 
 :root {
   color-scheme: dark;
+
   --font-sans:
     "Inter Variable", "Segoe UI", BlinkMacSystemFont, system-ui, sans-serif;
+
+  /* Ink surfaces */
+  --ink-bg: #0b1118;
+  --ink-bg-elevated: #111a24;
+  --ink-surface: #161f2b;
+  --ink-surface-muted: #1c2836;
+  --ink-border: rgba(255, 255, 255, 0.08);
+  --ink-fg: #e8edf4;
+  --ink-fg-muted: #94a3b8;
+  --ink-fg-subtle: #64748b;
+
+  /* Parchment surfaces */
+  --paper-bg: #f7f4ee;
+  --paper-surface: #ffffff;
+  --paper-surface-muted: #f0ebe3;
+  --paper-border: rgba(26, 35, 50, 0.1);
+  --paper-fg: #1a2332;
+  --paper-fg-muted: #5c6b7e;
+
+  /* Brand */
+  --brand: #2dd4a8;
+  --brand-hover: #5eead4;
+  --brand-fg: #052e1a;
+  --accent: #38bdf8;
+  --accent-memory: #a78bfa;
+
+  /* Semantic */
+  --status-live: #34d399;
+  --status-draft: #fbbf24;
+  --status-ended: #94a3b8;
+  --status-processing: #38bdf8;
+  --status-error: #f87171;
+  --status-success: #4ade80;
+
+  /* Active theme aliases (default ink) */
+  --bg: var(--ink-bg);
+  --bg-elevated: var(--ink-bg-elevated);
+  --surface: var(--ink-surface);
+  --surface-muted: var(--ink-surface-muted);
+  --border: var(--ink-border);
+  --fg: var(--ink-fg);
+  --fg-muted: var(--ink-fg-muted);
+  --fg-subtle: var(--ink-fg-subtle);
+}
+
+[data-theme="ink"] {
+  color-scheme: dark;
+  --bg: var(--ink-bg);
+  --bg-elevated: var(--ink-bg-elevated);
+  --surface: var(--ink-surface);
+  --surface-muted: var(--ink-surface-muted);
+  --border: var(--ink-border);
+  --fg: var(--ink-fg);
+  --fg-muted: var(--ink-fg-muted);
+  --fg-subtle: var(--ink-fg-subtle);
+}
+
+[data-theme="paper"] {
+  color-scheme: light;
+  --bg: var(--paper-bg);
+  --bg-elevated: var(--paper-surface);
+  --surface: var(--paper-surface);
+  --surface-muted: var(--paper-surface-muted);
+  --border: var(--paper-border);
+  --fg: var(--paper-fg);
+  --fg-muted: var(--paper-fg-muted);
+  --fg-subtle: #94a3b8;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-fg: var(--brand-fg);
+  --color-accent: var(--accent);
+  --color-accent-memory: var(--accent-memory);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--fg);
+  --color-foreground-muted: var(--fg-muted);
+  --color-border: var(--border);
+  --color-background: var(--bg);
+  --color-status-live: var(--status-live);
+  --color-status-error: var(--status-error);
 }
 
 html {
@@ -13,6 +97,8 @@ html {
 body {
   margin: 0;
   min-height: 100vh;
+  background: var(--bg);
+  color: var(--fg);
 }
 
 * {
@@ -24,7 +110,57 @@ a {
   text-decoration: none;
 }
 
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
 ::selection {
   background: rgba(56, 189, 248, 0.35);
   color: white;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: #1a2332;
+  }
+
+  .report-document section,
+  .report-document article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-document {
+    gap: 1.5rem;
+  }
 }

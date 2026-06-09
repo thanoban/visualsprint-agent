@@ -25,24 +25,65 @@ import type {
   StartCaptureSessionRequest,
 } from "@visualsprint/contracts";
 
-const defaultApiBaseUrl = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+import { getPublicApiBaseUrl } from "./env";
+
+const defaultApiBaseUrl = getPublicApiBaseUrl();
+
+class ApiError extends Error {
+  status: number;
+
+  constructor(status: number, detail: string) {
+    super(detail || `Request failed with ${status}`);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
+function sleep(ms: number) {
+  return new Promise<void>((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function shouldRetry(method: string, attempt: number, error: unknown) {
+  if (method !== "GET" || attempt >= 2) {
+    return false;
+  }
+  if (error instanceof ApiError) {
+    return [408, 425, 429, 500, 502, 503, 504].includes(error.status);
+  }
+  return error instanceof TypeError;
+}
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${defaultApiBaseUrl}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-    cache: "no-store",
-  });
+  const method = (init?.method ?? "GET").toUpperCase();
 
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(detail || `Request failed with ${response.status}`);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const response = await fetch(`${defaultApiBaseUrl}${path}`, {
+        ...init,
+        headers: {
+          "Content-Type": "application/json",
+          ...(init?.headers ?? {}),
+        },
+        cache: "no-store",
+      });
+
+      if (!response.ok) {
+        const detail = await response.text();
+        throw new ApiError(response.status, detail);
+      }
+
+      return (await response.json()) as T;
+    } catch (error) {
+      if (!shouldRetry(method, attempt, error)) {
+        throw error;
+      }
+      await sleep(300 * (attempt + 1));
+    }
   }
 
-  return (await response.json()) as T;
+  throw new Error("Request failed after retries.");
 }
 
 export function getApiBaseUrl() {
