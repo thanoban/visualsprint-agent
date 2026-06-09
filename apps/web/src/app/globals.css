@@ -124,3 +124,26 @@ a {
     transition-duration: 0.01ms !important;
   }
 }
+
+@media print {
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background: white;
+    color: #1a2332;
+  }
+
+  .report-document section,
+  .report-document article {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-document {
+    gap: 1.5rem;
+  }
+}

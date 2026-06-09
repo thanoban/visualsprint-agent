@@ -3,6 +3,7 @@ import type {
   CaptureChunkSummary,
   CommitmentRecord,
   DecisionRecord,
+  EvidenceReference,
   FinalReport,
   MemoryMatch,
   OpenQuestionRecord,
@@ -38,7 +39,13 @@ export function SourceModeBadge({
   );
 }
 
-export function DecisionCard({ decision }: { decision: DecisionRecord }) {
+export function DecisionCard({
+  decision,
+  onEvidenceSelect,
+}: {
+  decision: DecisionRecord;
+  onEvidenceSelect?: (reference: EvidenceReference) => void;
+}) {
   return (
     <article className="rounded-2xl border border-border bg-surface-muted p-4">
       <div className="flex items-start justify-between gap-3">
@@ -46,7 +53,7 @@ export function DecisionCard({ decision }: { decision: DecisionRecord }) {
         <RecordStatusBadge status={decision.status} />
       </div>
       <p className="mt-2 text-sm leading-6 text-foreground-muted">{decision.rationale}</p>
-      <EvidenceList evidence={decision.evidence} />
+      <EvidenceList evidence={decision.evidence} onSelect={onEvidenceSelect} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-foreground-muted">
         {decision.speakerLabel} · {decision.firstSeenChunkId} {"->"} {decision.lastUpdatedChunkId}
       </p>
@@ -55,7 +62,13 @@ export function DecisionCard({ decision }: { decision: DecisionRecord }) {
   );
 }
 
-export function CommitmentCard({ commitment }: { commitment: CommitmentRecord }) {
+export function CommitmentCard({
+  commitment,
+  onEvidenceSelect,
+}: {
+  commitment: CommitmentRecord;
+  onEvidenceSelect?: (reference: EvidenceReference) => void;
+}) {
   return (
     <article className="rounded-2xl border border-border bg-surface-muted p-4">
       <div className="flex items-start justify-between gap-3">
@@ -63,7 +76,7 @@ export function CommitmentCard({ commitment }: { commitment: CommitmentRecord })
         <RecordStatusBadge status={commitment.status} />
       </div>
       <p className="mt-2 text-sm leading-6 text-foreground-muted">{commitment.action}</p>
-      <EvidenceList evidence={commitment.evidence} />
+      <EvidenceList evidence={commitment.evidence} onSelect={onEvidenceSelect} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-foreground-muted">
         Due {commitment.dueHint} · {commitment.firstSeenChunkId} {"->"} {commitment.lastUpdatedChunkId}
       </p>
@@ -72,7 +85,13 @@ export function CommitmentCard({ commitment }: { commitment: CommitmentRecord })
   );
 }
 
-export function BlockerCard({ blocker }: { blocker: BlockerRecord }) {
+export function BlockerCard({
+  blocker,
+  onEvidenceSelect,
+}: {
+  blocker: BlockerRecord;
+  onEvidenceSelect?: (reference: EvidenceReference) => void;
+}) {
   return (
     <article className="rounded-2xl border border-border bg-surface-muted p-4">
       <div className="flex items-start justify-between gap-3">
@@ -84,7 +103,7 @@ export function BlockerCard({ blocker }: { blocker: BlockerRecord }) {
           <RecordStatusBadge status={blocker.status} />
         </div>
       </div>
-      <EvidenceList evidence={blocker.evidence} />
+      <EvidenceList evidence={blocker.evidence} onSelect={onEvidenceSelect} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-foreground-muted">
         Owner {blocker.ownerLabel} · {blocker.firstSeenChunkId} {"->"} {blocker.lastUpdatedChunkId}
       </p>
@@ -120,14 +139,20 @@ export function MemoryMatchCard({ memoryMatch }: { memoryMatch: MemoryMatch }) {
   );
 }
 
-export function OpenQuestionCard({ openQuestion }: { openQuestion: OpenQuestionRecord }) {
+export function OpenQuestionCard({
+  openQuestion,
+  onEvidenceSelect,
+}: {
+  openQuestion: OpenQuestionRecord;
+  onEvidenceSelect?: (reference: EvidenceReference) => void;
+}) {
   return (
     <article className="rounded-2xl border border-border bg-surface-muted p-4">
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-foreground">{openQuestion.question}</p>
         <RecordStatusBadge status={openQuestion.status} />
       </div>
-      <EvidenceList evidence={openQuestion.evidence} />
+      <EvidenceList evidence={openQuestion.evidence} onSelect={onEvidenceSelect} />
       <p className="mt-3 text-xs uppercase tracking-[0.16em] text-foreground-muted">
         {openQuestion.speakerLabel} · {openQuestion.firstSeenChunkId} {"->"} {openQuestion.lastUpdatedChunkId}
       </p>

@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { ErrorBanner } from "../../components/shared/error-banner";
 import { EmptyState } from "../../components/ui/empty-state";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { useMeetingSession } from "../meeting-session/context/meeting-session-provider";
 import { FinalReportView } from "./components/final-report-view";
 
@@ -11,11 +12,7 @@ export function MeetingReportPage() {
   const { meeting, finalReport, error, actionRecommendations } = useMeetingSession();
 
   if (!meeting) {
-    return (
-      <div className="mx-auto max-w-7xl px-6 py-10 sm:px-10">
-        <EmptyState title="Loading report" body="Fetching meeting report…" />
-      </div>
-    );
+    return <PageSkeleton />;
   }
 
   const reportReady =

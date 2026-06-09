@@ -46,3 +46,9 @@ apps/web/src/
 - **paper** — setup, meeting list, report, actions
 
 Tokens live in `app/globals.css` (`--brand`, `--surface`, etc.).
+
+## Evidence linking
+
+- `lib/evidence-linking.ts` — time-window and reference-based joins between transcript and visual events.
+- `features/live/components/linked-evidence-feed.tsx` — interactive transcript ↔ visual panel.
+- Clicking evidence on decision/commitment/blocker cards highlights linked transcript and frame rows.

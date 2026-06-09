@@ -1,22 +1,41 @@
 "use client";
 
+import type { EvidenceReference } from "@visualsprint/contracts";
 import { dashboardModules } from "@visualsprint/contracts";
+import { useCallback, useState } from "react";
 
 import {
   BlockerCard,
   CommitmentCard,
   DecisionCard,
-  ScreenEventCard,
-  TranscriptCard,
 } from "../../../components/domain/record-cards";
 import { SignalColumn } from "../../../components/domain/signal-column";
 import { Card } from "../../../components/ui/card";
-import { EmptyState } from "../../../components/ui/empty-state";
+import { resolveEvidenceTargets } from "../../../lib/evidence-linking";
 import { useMeetingSession } from "../../meeting-session/context/meeting-session-provider";
+import { LinkedEvidenceFeed } from "./linked-evidence-feed";
 import { MemoryStrip } from "./memory-strip";
 
 export function ReasoningPanels() {
   const { meeting } = useMeetingSession();
+  const [highlightedTranscriptIds, setHighlightedTranscriptIds] = useState<string[]>([]);
+  const [highlightedScreenEventIds, setHighlightedScreenEventIds] = useState<string[]>([]);
+
+  const handleEvidenceSelect = useCallback(
+    (reference: EvidenceReference) => {
+      if (!meeting) {
+        return;
+      }
+      const targets = resolveEvidenceTargets(
+        reference,
+        meeting.recentTranscriptSegments,
+        meeting.recentScreenEvents,
+      );
+      setHighlightedTranscriptIds(targets.transcriptIds);
+      setHighlightedScreenEventIds(targets.screenEventIds);
+    },
+    [meeting],
+  );
 
   if (!meeting) {
     return null;
@@ -33,37 +52,12 @@ export function ReasoningPanels() {
         <MemoryStrip matches={meeting.recentMemoryMatches} />
       </Card>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card title="Transcript feed" eyebrow="Live processing">
-          <div className="space-y-3">
-            {meeting.recentTranscriptSegments.length === 0 ? (
-              <EmptyState
-                title="No transcript yet"
-                body="Transcript segments appear as capture chunks are processed."
-              />
-            ) : (
-              meeting.recentTranscriptSegments.map((segment) => (
-                <TranscriptCard key={segment.id} segment={segment} />
-              ))
-            )}
-          </div>
-        </Card>
-
-        <Card title="Visual evidence" eyebrow="Frame extraction">
-          <div className="space-y-3">
-            {meeting.recentScreenEvents.length === 0 ? (
-              <EmptyState
-                title="No visual evidence yet"
-                body="Screen events appear when chunks are processed."
-              />
-            ) : (
-              meeting.recentScreenEvents.map((screenEvent) => (
-                <ScreenEventCard key={screenEvent.id} screenEvent={screenEvent} />
-              ))
-            )}
-          </div>
-        </Card>
-      </div>
+      <LinkedEvidenceFeed
+        highlightedScreenEventIds={highlightedScreenEventIds}
+        highlightedTranscriptIds={highlightedTranscriptIds}
+        screenEvents={meeting.recentScreenEvents}
+        segments={meeting.recentTranscriptSegments}
+      />
 
       <Card
         title={moduleMap.decisions?.label ?? "Decisions with evidence"}
@@ -76,7 +70,11 @@ export function ReasoningPanels() {
             emptyBody="Decisions with evidence references will appear here."
           >
             {meeting.recentDecisions.map((decision) => (
-              <DecisionCard key={decision.id} decision={decision} />
+              <DecisionCard
+                key={decision.id}
+                decision={decision}
+                onEvidenceSelect={handleEvidenceSelect}
+              />
             ))}
           </SignalColumn>
 
@@ -86,7 +84,11 @@ export function ReasoningPanels() {
             emptyBody="Commitment records will appear as they are extracted."
           >
             {meeting.recentCommitments.map((commitment) => (
-              <CommitmentCard key={commitment.id} commitment={commitment} />
+              <CommitmentCard
+                key={commitment.id}
+                commitment={commitment}
+                onEvidenceSelect={handleEvidenceSelect}
+              />
             ))}
           </SignalColumn>
         </div>
@@ -99,7 +101,11 @@ export function ReasoningPanels() {
           emptyBody="Blockers with severity flags will surface here."
         >
           {meeting.recentBlockers.map((blocker) => (
-            <BlockerCard key={blocker.id} blocker={blocker} />
+            <BlockerCard
+              key={blocker.id}
+              blocker={blocker}
+              onEvidenceSelect={handleEvidenceSelect}
+            />
           ))}
         </SignalColumn>
       </Card>
