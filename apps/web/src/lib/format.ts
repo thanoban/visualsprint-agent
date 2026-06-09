@@ -49,9 +49,7 @@ export function formatRecorderMimeType(value: string) {
   return value === "browser-default" ? "browser default" : value;
 }
 
-export function formatProcessingSourceMode(
-  value: "local_mock" | "downstream_service",
-) {
+export function formatProcessingSourceMode(value: string) {
   return value === "downstream_service" ? "service" : "local";
 }
 

@@ -4,7 +4,7 @@ import { ThemeWrapper } from "../../../components/layout/theme-wrapper";
 export default function NewMeetingPage() {
   return (
     <ThemeWrapper theme="paper">
-      <MeetingWorkspace view="full" />
+      <MeetingWorkspace view="setup" />
     </ThemeWrapper>
   );
 }

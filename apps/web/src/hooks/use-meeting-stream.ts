@@ -10,7 +10,10 @@ import { toMeetingSummary, upsertMeetingSummary } from "../lib/meeting";
 
 export type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 
-export function useMeetingStream(meetingId: string | undefined) {
+export function useMeetingStream(
+  meetingId: string | undefined,
+  onMeetingUpdated?: (meeting: MeetingDetail) => void,
+) {
   const queryClient = useQueryClient();
   const [streamStatus, setStreamStatus] = useState<StreamStatus>("idle");
 
@@ -33,6 +36,7 @@ export function useMeetingStream(meetingId: string | undefined) {
         const summary = toMeetingSummary(payload.meeting);
         return { meetings: upsertMeetingSummary(current.meetings, summary) };
       });
+      onMeetingUpdated?.(payload.meeting);
       setStreamStatus("live");
     };
 
@@ -49,7 +53,7 @@ export function useMeetingStream(meetingId: string | undefined) {
       eventSource.close();
       setStreamStatus("idle");
     };
-  }, [meetingId, queryClient]);
+  }, [meetingId, onMeetingUpdated, queryClient]);
 
   return streamStatus;
 }
