@@ -21,6 +21,8 @@ Run in **us-west1**; Elasticsearch project in **us-central1**.
 - [x] `npm run verify` green (45 tests).
 - [x] Elastic portal: outcomes index, semantic field, `search_prior_outcomes` tool,
       MCP endpoint, API keys.
+- [x] Action Agent + approval portal: Jira/Slack integration with real REST API calls
+      (creates issues in `SCRUM` project, posts to `#general-visualsprint-agent`).
 
 ---
 
@@ -54,8 +56,9 @@ Run in **us-west1**; Elasticsearch project in **us-central1**.
       thread a real tenant id when multi-tenant is needed.
 - [ ] **Pick one agent runtime path as primary** (`vertex_ai_reasoning_engine`) and
       clearly label `bridge` as the optional fallback.
-- [ ] **Jira/Slack action executors** — confirm whether they're real or stubs; set
-      `JIRA_*` / `SLACK_*` secrets if the demo includes the action agent.
+- [x] **Jira/Slack action executors** — confirmed real (not stubs); tested live:
+      creates Jira issues (SCRUM-5, SCRUM-6) and posts Slack messages. Secrets set
+      in `.env` and documented in `ACTION_AGENT_SETUP.md`.
 - [ ] **Optional:** rename `agent-creation-chatgpt-prompts.md` to a provider-neutral title.
 
 ---
