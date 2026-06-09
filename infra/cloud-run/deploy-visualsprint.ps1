@@ -15,6 +15,8 @@ param(
     [string]$ElasticIndex = "visualsprint-meeting-events",
     [string]$ElasticApiKeySecret = "ELASTICSEARCH_API_KEY",
     [string]$ElasticMcpApiKeySecret = "elastic-mcp-server",
+    [string]$JiraApiTokenSecret = "",
+    [string]$SlackBotTokenSecret = "SLACK_BOT_TOKEN_SECRET",
     [string]$AllowedOrigins = "https://app.visualsprint.dev",
     [string]$ImageTag = "latest"
 )
@@ -30,6 +32,12 @@ function Require-Command {
 }
 
 function Join-EnvVars {
+    param([string[]]$Pairs)
+
+    return ($Pairs | Where-Object { $_ -and $_.Trim() }) -join ","
+}
+
+function Join-Secrets {
     param([string[]]$Pairs)
 
     return ($Pairs | Where-Object { $_ -and $_.Trim() }) -join ","
@@ -122,6 +130,12 @@ $apiEnvVars = Join-EnvVars @(
     "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=0.5"
 )
 
+$apiSecrets = Join-Secrets @(
+    "ELASTICSEARCH_API_KEY=$ElasticApiKeySecret:latest",
+    $(if ($JiraApiTokenSecret) { "JIRA_API_TOKEN_SECRET=$JiraApiTokenSecret:latest" }),
+    $(if ($SlackBotTokenSecret) { "SLACK_BOT_TOKEN_SECRET=$SlackBotTokenSecret:latest" })
+)
+
 gcloud run deploy $ApiServiceName `
     --project $ProjectId `
     --region $Region `
@@ -129,7 +143,7 @@ gcloud run deploy $ApiServiceName `
     --service-account $ApiServiceAccount `
     --allow-unauthenticated `
     --set-env-vars $apiEnvVars `
-    --set-secrets "ELASTICSEARCH_API_KEY=$ElasticApiKeySecret:latest"
+    --set-secrets $apiSecrets
 
 $apiUrl = gcloud run services describe $ApiServiceName `
     --project $ProjectId `

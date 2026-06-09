@@ -59,9 +59,9 @@ register `search_prior_outcomes` → test a blocker input returns a memory match
 ```bash
 printf '%s' 'ENCODED_BACKEND_KEY' | gcloud secrets create elastic-backend-key --data-file=-
 printf '%s' 'ENCODED_MCP_KEY'     | gcloud secrets create elastic-mcp-key     --data-file=-
-# optional (action executors are stubs today):
+# optional (action executors are stubs today, but deploy.sh can inject them):
 # printf '%s' 'JIRA_TOKEN'  | gcloud secrets create jira-api-token --data-file=-
-# printf '%s' 'SLACK_TOKEN' | gcloud secrets create slack-bot-token --data-file=-
+# printf '%s' 'SLACK_TOKEN' | gcloud secrets create SLACK_BOT_TOKEN_SECRET --data-file=-
 
 gcloud iam service-accounts create visualsprint-agents
 SA_AG=visualsprint-agents@visualsprint-agent.iam.gserviceaccount.com
@@ -92,8 +92,10 @@ npm run dev:api
 bash deploy.sh
 ```
 `deploy.sh` deploys the api, then the agents (with `VISUALSPRINT_CONTROL_PLANE_URL`
-= the api URL), then points the api at the agents URL — keys injected from Secret
-Manager. Region comes from `REGION` in `.env` (us-west1).
+= the api URL), then points the api at the agents URL. If `SLACK_TOKEN_SECRET`
+or `JIRA_TOKEN_SECRET` are set in `.env`, those secrets are also injected into
+the API service with Cloud Run `--set-secrets`. Region comes from `REGION` in
+`.env` (us-west1).
 
 ## 8. Validate the seam
 ```bash
@@ -114,6 +116,7 @@ Register a blocker in one meeting (→ Elastic), then a similar blocker in anoth
 | --- | --- | --- | --- |
 | Elastic write-back/search key | api | `ELASTICSEARCH_API_KEY` (used directly as `ApiKey`) | secret `elastic-backend-key` |
 | Elastic MCP key | agents | `VISUALSPRINT_ELASTIC_API_KEY` (used directly as `ApiKey`) | secret `elastic-mcp-key` |
+| Slack bot token | api | `SLACK_BOT_TOKEN_SECRET` | secret `SLACK_BOT_TOKEN_SECRET` |
 | MCP endpoint | agents | `VISUALSPRINT_ELASTIC_MCP_ENDPOINT` | Kibana `/api/agent_builder/mcp` |
 | Control plane for ADK persistence | agents | `VISUALSPRINT_CONTROL_PLANE_URL` | deployed api URL (set by deploy.sh) |
 | Agents service for control plane | api | `VISUALSPRINT_AGENTS_SERVICE_URL` | deployed agents URL (set by deploy.sh) |

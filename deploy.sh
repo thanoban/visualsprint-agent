@@ -26,6 +26,16 @@ set +a
 : "${REGION:?set REGION in .env}"
 ELASTIC_BACKEND_SECRET="${ELASTIC_BACKEND_SECRET:-elastic-backend-key}"
 ELASTIC_MCP_SECRET="${ELASTIC_MCP_SECRET:-elastic-mcp-key}"
+JIRA_TOKEN_SECRET="${JIRA_TOKEN_SECRET:-}"
+SLACK_TOKEN_SECRET="${SLACK_TOKEN_SECRET:-}"
+
+API_SECRETS="ELASTICSEARCH_API_KEY=${ELASTIC_BACKEND_SECRET}:latest"
+if [[ -n "${JIRA_TOKEN_SECRET}" ]]; then
+  API_SECRETS="${API_SECRETS},JIRA_API_TOKEN_SECRET=${JIRA_TOKEN_SECRET}:latest"
+fi
+if [[ -n "${SLACK_TOKEN_SECRET}" ]]; then
+  API_SECRETS="${API_SECRETS},SLACK_BOT_TOKEN_SECRET=${SLACK_TOKEN_SECRET}:latest"
+fi
 
 echo ">> [1/3] Deploying visualsprint-api ..."
 gcloud run deploy visualsprint-api \
@@ -33,7 +43,7 @@ gcloud run deploy visualsprint-api \
   --project "${PROJECT_ID}" --region "${REGION}" \
   --allow-unauthenticated \
   --set-env-vars "^##^VISUALSPRINT_ENV=${VISUALSPRINT_ENV}##VISUALSPRINT_TRACK=${VISUALSPRINT_TRACK}##ELASTICSEARCH_URL=${ELASTICSEARCH_URL}##ELASTIC_INDEX_OUTCOMES=${ELASTIC_INDEX_OUTCOMES}##ELASTIC_MCP_SERVER_URL=${ELASTIC_MCP_SERVER_URL}##JIRA_BASE_URL=${JIRA_BASE_URL}##SLACK_DEFAULT_CHANNEL=${SLACK_DEFAULT_CHANNEL}##VISUALSPRINT_ALLOWED_ORIGINS=${VISUALSPRINT_ALLOWED_ORIGINS}" \
-  --set-secrets "ELASTICSEARCH_API_KEY=${ELASTIC_BACKEND_SECRET}:latest"
+  --set-secrets "${API_SECRETS}"
 
 API_URL="$(gcloud run services describe visualsprint-api --project "${PROJECT_ID}" --region "${REGION}" --format='value(status.url)')"
 echo ">> control plane: ${API_URL}"
