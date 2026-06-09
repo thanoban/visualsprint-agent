@@ -48,6 +48,7 @@ What exists now:
 - `services/api` now prefers Elastic-backed memory search when configured, with local fallback for development
 - `services/agents` is no longer only a stub service
 - `services/agents` now includes an Elastic MCP client and an ADK-side `search_prior_outcomes` tool path
+- deployment docs and a launch checklist already assume the first Elastic code path is in place
 
 What is missing:
 
@@ -55,6 +56,7 @@ What is missing:
 - tenant propagation instead of the current default tenant placeholder
 - real deployed MCP validation against the target Elastic project
 - real managed-agent-time memory usage proven end to end
+- full operational proof that the hosted reasoning path uses Elastic during the demo flow
 
 ## Architecture decisions to keep
 

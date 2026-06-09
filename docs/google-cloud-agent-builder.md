@@ -32,8 +32,13 @@ After re-checking the full project structure and the current markdown files, the
    - runtime bridge code in `services/agents/src/visualsprint_agents/agent_runtime.py`
    - agent smoke and audit routes in `services/api/src/visualsprint_api/routes/agents.py`
    - agent eval fixtures and an eval smoke script in `services/agents/evals/` and `services/agents/scripts/`
-3. The old doc wording understated how far the adapter boundary has already progressed.
-4. The best next step is no longer "create everything mainly in Agent Designer." The stronger production path is now `ADK -> Agent Engine -> Gemini Enterprise registration`.
+   - ADK reasoning, summary, and action agents under `services/agents/src/visualsprint_agents/adk/`
+   - ADK persistence tools that can now call the control plane when configured
+   - Elastic write-back and search in `services/api`
+   - an agents-side Elastic MCP client and `search_prior_outcomes` tool path
+   - Dockerfiles, deployment docs, and a launch checklist
+3. The old doc wording understated how far the adapter, Elastic, and action-review layers have already progressed.
+4. The best next step is no longer "create the scaffolding." The stronger next step is to prove the real deployed path end to end and harden secrets, tenant scoping, and service identity.
 
 So the updated plan below treats the project as:
 
@@ -51,19 +56,21 @@ Today the project already has:
 - a deterministic API control plane
 - shared contracts
 - a local agents service
+- ADK agent scaffolds and deployable app folders
 - cloud-oriented adapter configuration
 - deployment-facing Cloud Run config
+- Elastic write-back and Elastic-backed search fallback
+- an Elastic MCP client path on the agents side
+- an approval-based action review layer in the product
 - evaluation fixtures for reasoning and summary flows
 
 What is still missing:
 
-1. real coded agents built in ADK
-2. deployment of those agents to Vertex AI Agent Engine
-3. registration of those deployed agents inside the Gemini Enterprise app
-4. real runtime wiring from our agents adapter to deployed Google-managed agents
-5. real Elastic MCP integration for historical memory
-6. production secrets and Cloud Run service identity wiring
-7. end-to-end verification against deployed cloud services
+1. confirmed live deployed Agent Engine plus Gemini Enterprise proof through the real hosted path
+2. confirmed live Elastic MCP use during a managed reasoning run
+3. final Secret Manager and Cloud Run service-identity hardening
+4. tenant-aware memory scoping instead of the current default placeholder
+5. end-to-end verification against deployed cloud services
 
 ## Capture constraint to keep in mind
 
@@ -146,7 +153,8 @@ This section is the source-of-truth snapshot for the current project.
 - `apps/web`
 - Next.js dashboard
 - browser capture UI
-- meeting views and live surfaces
+- live, report, action, and dev views
+- approval portal surfaces for downstream action review
 
 ### Deterministic backend
 
@@ -157,6 +165,8 @@ This section is the source-of-truth snapshot for the current project.
 - output persistence
 - summary packet assembly
 - agent smoke routes
+- action recommendation persistence and execution endpoints
+- Elastic write-back and Elastic-backed retrieval fallback
 
 ### Agents service
 
@@ -164,18 +174,26 @@ This section is the source-of-truth snapshot for the current project.
 - local mock fallback behavior
 - bridge-style runtime invocation support
 - Vertex AI Reasoning Engine query support
+- reasoning, summary, and action agent entrypoints
+- ADK scaffolds and deployable app folders
+- Elastic MCP client path
+- control-plane-backed persistence tools for ADK execution
 - deployment health reporting
 - eval fixtures and smoke script
 
 ### Infra
 
 - `infra/cloud-run/visualsprint-agents.service.yaml`
+- `infra/cloud-run/visualsprint-api.service.yaml`
+- Dockerfiles and deployment scripts
 
 ### Docs
 
 - this file for the full Google Agent Builder plan
 - `docs/elastic-integration-handoff.md` for Elastic-only execution
 - `docs/fixes.md` for known architecture and verification risks
+- `docs/DEPLOY.md` for operational deployment steps
+- `docs/REMAINING_TASKS.md` for the current launch checklist
 
 ## Important issues found while reviewing docs and structure
 
@@ -196,7 +214,7 @@ The repo already includes:
 So the correct description is:
 
 - the service still has local fallback behavior
-- but the adapter shape for real cloud integration is already being built
+- but the adapter shape for real cloud integration is already built much further than the old wording suggested
 
 ### 2. Contract alignment still matters before production memory
 
@@ -216,6 +234,7 @@ The repo now includes:
 - agent eval fixtures
 - `npm run eval:agents`
 - smoke routes for agent invocation
+- deployment docs and launch checklist docs
 
 That is a good step forward.
 
@@ -419,10 +438,11 @@ These are required so you can create and manage custom agents in the web app.
 
 ### Step 5. Create the ADK agent code in the repo
 
-Create two real code-based agents:
+Create the real code-based agents:
 
 - reasoning agent
 - summary agent
+- action agent for approval-based downstream suggestions
 
 Recommended location in this repo:
 
@@ -436,14 +456,15 @@ Recommended implementation shape:
 - add ADK-specific agent code under that service
 - keep the repo contracts as the source of truth
 
-One practical structure would be:
+The current repo already uses this shape:
 
 - `services/agents/src/visualsprint_agents/adk/`
 - `services/agents/src/visualsprint_agents/adk/reasoning_agent.py`
 - `services/agents/src/visualsprint_agents/adk/summary_agent.py`
+- `services/agents/src/visualsprint_agents/adk/action_agent.py`
 - `services/agents/src/visualsprint_agents/adk/tools/`
 
-This folder now exists as an initial scaffold. The remaining work is to mature it into the real deployed ADK implementation and replace placeholder tools with production integrations.
+The remaining work is to keep maturing these into the live deployed ADK implementation and to finish proving the hosted runtime path end to end.
 
 ### Step 6. Build the reasoning agent in ADK
 
@@ -755,9 +776,16 @@ The current repo already expects these values:
 - `VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME`
 - `VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS`
 - `VISUALSPRINT_ELASTIC_MCP_ENDPOINT`
+- `VISUALSPRINT_MCP_ENDPOINT`
+- `VISUALSPRINT_ELASTIC_API_KEY`
 - `VISUALSPRINT_ELASTIC_API_KEY_SECRET_NAME`
 - `VISUALSPRINT_SERVICE_ACCOUNT_EMAIL`
 - `VISUALSPRINT_CLOUD_RUN_SERVICE_URL`
+- `VISUALSPRINT_CONTROL_PLANE_URL`
+- `VISUALSPRINT_CONTROL_PLANE_BEARER_TOKEN`
+- `VISUALSPRINT_REASONING_MODEL`
+- `VISUALSPRINT_SUMMARY_MODEL`
+- `VISUALSPRINT_ACTION_MODEL`
 - `VISUALSPRINT_ALLOWED_ORIGINS`
 
 For the ADK plus Agent Engine path, the most important ones are:
@@ -855,6 +883,8 @@ After deployment:
 The repo already contains:
 
 - `npm run eval:agents`
+- `docs/DEPLOY.md`
+- `docs/REMAINING_TASKS.md`
 
 Run it before cloud testing so you know the local adapter and eval scaffolding still work.
 
@@ -1040,35 +1070,32 @@ After checking the repo and docs again, these are the main unfinished areas:
 
 ### Google Agent Builder gaps
 
-- no confirmed real deployed custom agents are wired into runtime yet
-- no confirmed live managed-agent invocation path is proven end to end yet
-- no confirmed Elastic MCP-connected reasoning run is proven end to end yet
+- no confirmed live managed-agent invocation path is proven end to end through the hosted Google path yet
+- no confirmed Gemini Enterprise registration proof is captured in the repo docs yet
+- no confirmed Elastic MCP-connected reasoning run is proven end to end in the hosted managed runtime yet
 
 ### Backend and infrastructure gaps
 
 - Elastic write-back and retrieval now exist in code, but still need real Secret Manager resolution, tenant propagation, and deployed validation
 - the agents-side Elastic MCP client exists, but the live managed-agent reasoning path has not yet been proven end to end against the real Elastic project
 - secrets and identity wiring are not fully finalized in code and deployment
+- the real ingest/media/transcription production path is still separate follow-up work outside the core agent seam
 
 ### Product gaps
 
-- the dashboard still mainly reflects local or fallback behavior
+- the dashboard still needs full deployed-path validation against the managed runtime
 - final report generation is not yet proven through real cloud-agent runtime
+- the action-review layer exists, but the real Jira and Slack execution path still needs final validation if it is part of the demo
 
 ## Suggested execution order
 
-1. Build the reasoning and summary agents in ADK.
-2. Implement the real ADK persistence-tool wiring for `register_outputs` and `finalize_report`.
-3. Deploy both to Vertex AI Agent Engine.
-4. Create the Gemini Enterprise app.
-5. Register the deployed ADK agents in the app.
-6. Prepare Elastic MCP and the `search_prior_outcomes` tool.
-7. Complete Elastic secret handling and tenant propagation.
-8. Configure `services/agents` for `vertex_ai_reasoning_engine`.
-9. Configure Cloud Run YAML and secrets.
-10. Deploy the agents service.
-11. Run eval smoke and health checks.
-12. Prove one end-to-end recurring-memory path.
+1. Validate Elastic locally against the real backend write-back and search path.
+2. Connect the Elastic MCP tool inside the hosted Google reasoning agent.
+3. Complete Secret Manager wiring, service accounts, and tenant-scoping follow-ups.
+4. Fill the final deployed env values, including control-plane and runtime settings.
+5. Deploy or refresh the API and agents services on Cloud Run.
+6. Run eval smoke, health checks, agent smoke, and invocation audit validation.
+7. Prove one end-to-end recurring-memory path through the hosted managed runtime.
 
 ## Definition of done
 
@@ -1096,17 +1123,17 @@ It already has:
 - the adapter service shape
 - deployment-facing env var structure
 - smoke and eval scaffolding
+- ADK agents and Elastic code paths
+- browser-first capture and approval-based action review surfaces
 
 What you need now is not a brand-new architecture.
 
 What you need is:
 
-1. build the agents in ADK
-2. deploy them to Agent Engine
-3. register them in Gemini Enterprise
-4. configure the existing adapter boundary to call them
-5. finish Elastic memory integration
-6. validate the deployed path end to end
+1. validate the hosted Google path end to end
+2. finish Elastic runtime hardening
+3. finalize secrets, service identity, and tenant scoping
+4. prove the recurring-memory demo path against deployed services
 
 ## Official references
 
