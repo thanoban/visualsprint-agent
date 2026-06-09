@@ -61,6 +61,7 @@ class ChunkInsightRequest(BaseModel):
     attentionFlags: list[str] = Field(default_factory=list)
     reasoningChecklist: list[str] = Field(default_factory=list)
     focusAreas: list[ChunkInsightFocus] = Field(default_factory=list)
+    memoryMatches: list[AgentMemoryMatchInput] = Field(default_factory=list)
 
 
 class AgentDecisionInput(BaseModel):
@@ -259,3 +260,6 @@ class InvocationAuditSummary(BaseModel):
 class InvocationAuditResponse(BaseModel):
     summary: InvocationAuditSummary
     invocations: list[InvocationAuditEntry] = Field(default_factory=list)
+
+
+ChunkInsightRequest.model_rebuild()

@@ -18,6 +18,14 @@ def _get(environ: Mapping[str, str], key: str) -> str | None:
     return value.strip() if value and value.strip() else None
 
 
+def _get_any(environ: Mapping[str, str], *keys: str) -> str | None:
+    for key in keys:
+        value = _get(environ, key)
+        if value is not None:
+            return value
+    return None
+
+
 @dataclass(frozen=True)
 class Settings:
     service_name: str = "visualsprint-api"
@@ -98,8 +106,16 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         ingest_service_url=_get(source, "VISUALSPRINT_INGEST_SERVICE_URL"),
         media_service_url=_get(source, "VISUALSPRINT_MEDIA_SERVICE_URL"),
         elasticsearch_url=_get(source, "ELASTICSEARCH_URL"),
-        elasticsearch_api_key_secret=_get(source, "ELASTICSEARCH_API_KEY_SECRET"),
-        elastic_index_outcomes=_get(source, "ELASTIC_INDEX_OUTCOMES"),
+        elasticsearch_api_key_secret=_get_any(
+            source,
+            "ELASTICSEARCH_API_KEY_SECRET",
+            "ELASTICSEARCH_API_KEY",
+        ),
+        elastic_index_outcomes=_get_any(
+            source,
+            "ELASTIC_INDEX_OUTCOMES",
+            "ELASTICSEARCH_INDEX",
+        ),
         elastic_mcp_server_url=_get(source, "ELASTIC_MCP_SERVER_URL"),
         jira_base_url=_get(source, "JIRA_BASE_URL"),
         jira_api_token_secret=_get(source, "JIRA_API_TOKEN_SECRET"),

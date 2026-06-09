@@ -11,9 +11,9 @@ spec:
         autoscaling.knative.dev/minScale: "0"
         autoscaling.knative.dev/maxScale: "5"
     spec:
-      serviceAccountName: VISUALSPRINT_SERVICE_ACCOUNT_NAME
+      serviceAccountName: visualsprint-agents@visualsprint-agent.iam.gserviceaccount.com
       containers:
-        - image: REGION-docker.pkg.dev/visualsprint-agent/visualsprint/agents:latest
+        - image: us-west1-docker.pkg.dev/visualsprint-agent/visualsprint/agents:latest
           ports:
             - containerPort: 8080
           env:
@@ -29,20 +29,37 @@ spec:
               value: vertex_ai_reasoning_engine
             - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID
               value: visualsprint-agent
+            - name: VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER
+              value: "530780341550"
             - name: VISUALSPRINT_GOOGLE_CLOUD_LOCATION
               value: us-west1
-            - name: VISUALSPRINT_AGENT_APPLICATION_ID
-              value: VISUALSPRINT_AGENT_APP_ID
             - name: VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME
-              value: projects/530780341550/locations/us-west1/reasoningEngines/REASONING_ENGINE_ID
+              value: projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208
             - name: VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME
-              value: projects/530780341550/locations/us-west1/reasoningEngines/SUMMARY_ENGINE_ID
+              value: projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320
             - name: VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME
-              value: projects/530780341550/locations/us-west1/reasoningEngines/ACTION_ENGINE_ID
-            - name: VISUALSPRINT_CLOUD_RUN_SERVICE_URL
-              value: https://visualsprint-agents-REPLACE.a.run.app
-            - name: VISUALSPRINT_SERVICE_ACCOUNT_EMAIL
-              value: visualsprint-agents@visualsprint-agent.iam.gserviceaccount.com
+              value: projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472
+            - name: VISUALSPRINT_REASONING_AGENT_ID
+              value: "554162656492126208"
+            - name: VISUALSPRINT_SUMMARY_AGENT_ID
+              value: "6620511354560184320"
+            - name: VISUALSPRINT_ACTION_AGENT_ID
+              value: "7293799498852073472"
+            - name: VISUALSPRINT_REASONING_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208:query
+            - name: VISUALSPRINT_SUMMARY_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320:query
+            - name: VISUALSPRINT_ACTION_QUERY_URL
+              value: https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472:query
+            - name: VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT
+              value: service-530780341550@gcp-sa-aiplatform-re.iam.gserviceaccount.com
+            - name: VISUALSPRINT_MCP_ENDPOINT
+              value: https://my-elasticsearch-project-ad6723.kb.us-central1.gcp.elastic.cloud/api/agent_builder/mcp
+            - name: VISUALSPRINT_ELASTIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: elastic-mcp-server
+                  key: latest
             - name: VISUALSPRINT_ALLOWED_ORIGINS
               value: https://app.visualsprint.dev
             - name: VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS

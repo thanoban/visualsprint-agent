@@ -13,9 +13,9 @@ spec:
     spec:
       serviceAccountName: visualsprint-api@visualsprint-agent.iam.gserviceaccount.com
       containers:
-        - image: REGION-docker.pkg.dev/visualsprint-agent/visualsprint/api:latest
+        - image: us-west1-docker.pkg.dev/visualsprint-agent/visualsprint/api:latest
           ports:
-            - containerPort: 8000
+            - containerPort: 8080
           env:
             - name: VISUALSPRINT_ENV
               value: production
@@ -28,13 +28,16 @@ spec:
             - name: VISUALSPRINT_MEDIA_SERVICE_URL
               value: ""
             - name: ELASTICSEARCH_URL
-              value: ""
-            - name: ELASTICSEARCH_API_KEY_SECRET
-              value: ""
+              value: https://my-elasticsearch-project-ad6723.es.us-central1.gcp.elastic.cloud
+            - name: ELASTICSEARCH_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ELASTICSEARCH_API_KEY
+                  key: latest
             - name: ELASTIC_INDEX_OUTCOMES
-              value: visualsprint-outcomes
+              value: visualsprint-meeting-events
             - name: ELASTIC_MCP_SERVER_URL
-              value: ""
+              value: https://my-elasticsearch-project-ad6723.kb.us-central1.gcp.elastic.cloud/api/agent_builder/mcp
             - name: JIRA_BASE_URL
               value: ""
             - name: JIRA_API_TOKEN_SECRET

@@ -10,6 +10,7 @@ from visualsprint_agents.adk.tool_contracts import (
     SEARCH_PRIOR_OUTCOMES_TOOL,
 )
 from visualsprint_agents.adk.tools import register_outputs, search_prior_outcomes
+from visualsprint_agents.config import settings
 from visualsprint_agents.models import ChunkInsightRequest, ReasoningRunResponse
 
 
@@ -27,6 +28,7 @@ def build_reasoning_agent_blueprint() -> AgentBlueprint:
             "Read transcript and screen evidence together before deciding whether a signal is durable.",
             "Prefer updates, resolutions, or reopen events over duplicate net-new records when the running state already contains the issue.",
             "Use historical retrieval before assigning recurring or reopened memory relations.",
+            "Treat backend-injected memoryMatches as pre-searched historical context and only call search_prior_outcomes when you need additional comparison depth.",
             "Return schema-valid structured outputs only.",
             "Do not invent evidence that is not present in the supplied chunk context.",
         ),
@@ -46,7 +48,7 @@ def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
             "Reason over assembled chunk context and emit durable structured outcomes "
             "for the VisualSprint control plane."
         ),
-        model="gemini-flash-latest",
+        model=settings.reasoning_model,
         instruction=render_instruction_text(
             blueprint,
             input_contract=blueprint.input_contract,

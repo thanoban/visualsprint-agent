@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi.testclient import TestClient
 
 import visualsprint_agents.elastic_mcp_client as elastic_mcp_module
+import visualsprint_agents.agent_runtime as agent_runtime_module
 import visualsprint_agents.reasoning as reasoning_module
 import visualsprint_agents.summary as summary_module
 from visualsprint_agents.models import (
@@ -132,8 +133,10 @@ def test_build_settings_supports_configured_cloud_mode():
             "VISUALSPRINT_AGENT_APPLICATION_ID": "agents-app",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_AGENT_BRIDGE_BEARER_TOKEN_SECRET_NAME": "agents-bridge-token",
             "VISUALSPRINT_ELASTIC_MCP_ENDPOINT": "https://elastic.example/mcp",
             "VISUALSPRINT_ELASTIC_API_KEY": "elastic-api-key-value",
@@ -180,8 +183,6 @@ def test_build_settings_reports_missing_cloud_run_requirements():
     assert "VISUALSPRINT_SUMMARY_AGENT_ID" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
     assert "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL" in settings.missing_cloud_configuration
-    assert "VISUALSPRINT_CLOUD_RUN_SERVICE_URL" in settings.missing_cloud_configuration
-    assert "VISUALSPRINT_SERVICE_ACCOUNT_EMAIL" in settings.missing_cloud_configuration
 
 
 def test_build_settings_supports_vertex_ai_runtime_backend():
@@ -190,6 +191,7 @@ def test_build_settings_supports_vertex_ai_runtime_backend():
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/action789",
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/reasoning123",
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo-project/locations/us-central1/reasoningEngines/summary456",
             "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.sample-token",
@@ -202,6 +204,76 @@ def test_build_settings_supports_vertex_ai_runtime_backend():
     assert settings.google_access_token_configured is True
     assert settings.cloud_adapter_ready is True
     assert settings.deployment_ready is True
+
+
+def test_vertex_runtime_prefers_explicit_query_urls(monkeypatch):
+    monkeypatch.setattr(
+        agent_runtime_module,
+        "settings",
+        build_settings(
+            {
+                "VISUALSPRINT_AGENT_MODE": "configured_cloud",
+                "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
+                "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "visualsprint-agent",
+                "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208",
+                "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320",
+                "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME": "projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472",
+                "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.sample-token",
+                "VISUALSPRINT_REASONING_QUERY_URL": "https://custom.example/reasoning-query",
+            }
+        ),
+    )
+
+    captured: dict[str, str | None] = {}
+
+    def fake_query(*, resource_name, input_payload, query_url=None):
+        captured["resource_name"] = resource_name
+        captured["query_url"] = query_url
+        return {
+            "structuredContent": {
+                "clientChunkId": input_payload["clientChunkId"],
+                "decisions": [],
+                "commitments": [],
+                "blockers": [],
+                "openQuestions": [],
+                "memoryMatches": [],
+                "resolvedDecisionIds": [],
+                "resolvedCommitmentIds": [],
+                "resolvedBlockerIds": [],
+                "resolvedOpenQuestionIds": [],
+            }
+        }
+
+    monkeypatch.setattr(agent_runtime_module, "_query_vertex_reasoning_engine", fake_query)
+    monkeypatch.setattr(
+        agent_runtime_module,
+        "extract_vertex_structured_output",
+        lambda response: response["structuredContent"],
+    )
+
+    result = agent_runtime_module.invoke_reasoning_agent(
+        ChunkInsightRequest(
+            meetingId="mtg_agent_runtime_001",
+            meetingTitle="Planning sync",
+            meetingNotes="Track delivery risk.",
+            clientChunkId="client-chunk-agent-runtime-001",
+            focusSummary="Chunk 1 centers on release stability.",
+            attentionFlags=["Flag"],
+            reasoningChecklist=["Checklist"],
+            focusAreas=[
+                {
+                    "recordType": "decision",
+                    "summary": "Release stability",
+                    "detail": "The team needs a concrete decision.",
+                    "evidence": ["Jordan: We should decide today."],
+                }
+            ],
+        )
+    )
+
+    assert result is not None
+    assert captured["resource_name"].endswith("/554162656492126208")
+    assert captured["query_url"] == "https://custom.example/reasoning-query"
 
 
 def test_adk_blueprints_match_repo_contracts():
@@ -387,6 +459,7 @@ def test_vertex_ai_runtime_mode_records_vertex_ai_audit(monkeypatch):
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_AGENT_RUNTIME_BACKEND": "vertex_ai_reasoning_engine",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/action789",
             "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/reasoning123",
             "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME": "projects/demo/locations/us-central1/reasoningEngines/summary456",
             "VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN": "ya29.vertex-token",
@@ -467,8 +540,10 @@ def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monke
         {
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
         }
@@ -550,8 +625,10 @@ def test_configured_cloud_falls_back_when_bridge_returns_none(monkeypatch):
         {
             "VISUALSPRINT_AGENT_MODE": "configured_cloud",
             "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": "demo-project",
+            "VISUALSPRINT_ACTION_AGENT_ID": "action-agent",
             "VISUALSPRINT_REASONING_AGENT_ID": "reasoning-agent",
             "VISUALSPRINT_SUMMARY_AGENT_ID": "summary-agent",
+            "VISUALSPRINT_ACTION_AGENT_ENDPOINT_URL": "https://agents.example/action",
             "VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL": "https://agents.example/reasoning",
             "VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL": "https://agents.example/summary",
         }

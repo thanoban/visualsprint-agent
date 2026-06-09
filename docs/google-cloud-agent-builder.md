@@ -534,6 +534,25 @@ These are the exact values the current repo can use through:
 - `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
 - `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
 
+Current confirmed runtime values:
+
+- project ID: `visualsprint-agent`
+- project number: `530780341550`
+- location: `us-west1`
+- reasoning agent ID: `554162656492126208`
+- summary agent ID: `6620511354560184320`
+- action agent ID: `7293799498852073472`
+- reasoning resource: `projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208`
+- summary resource: `projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320`
+- action resource: `projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472`
+- reasoning query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/554162656492126208:query`
+- summary query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/6620511354560184320:query`
+- action query URL: `https://us-west1-aiplatform.googleapis.com/v1/projects/530780341550/locations/us-west1/reasoningEngines/7293799498852073472:query`
+- Agent Engine runtime service account: `service-530780341550@gcp-sa-aiplatform-re.iam.gserviceaccount.com`
+
+The repo accepts both the older `*_ENGINE_RESOURCE_NAME` env vars and the
+console-provided `*_AGENT_RESOURCE` aliases for these Agent Engine paths.
+
 Also capture:
 
 - the Google Cloud project ID
@@ -714,12 +733,21 @@ The current repo already expects these values:
 - `VISUALSPRINT_DEPLOYMENT_TARGET`
 - `VISUALSPRINT_AGENT_RUNTIME_BACKEND`
 - `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID`
+- `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER`
 - `VISUALSPRINT_GOOGLE_CLOUD_LOCATION`
 - `VISUALSPRINT_AGENT_APPLICATION_ID`
 - `VISUALSPRINT_REASONING_AGENT_ID`
 - `VISUALSPRINT_SUMMARY_AGENT_ID`
+- `VISUALSPRINT_ACTION_AGENT_ID`
 - `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
 - `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_REASONING_AGENT_RESOURCE`
+- `VISUALSPRINT_SUMMARY_AGENT_RESOURCE`
+- `VISUALSPRINT_ACTION_AGENT_RESOURCE`
+- `VISUALSPRINT_REASONING_QUERY_URL`
+- `VISUALSPRINT_SUMMARY_QUERY_URL`
+- `VISUALSPRINT_ACTION_QUERY_URL`
+- `VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT`
 - `VISUALSPRINT_REASONING_AGENT_ENDPOINT_URL`
 - `VISUALSPRINT_SUMMARY_AGENT_ENDPOINT_URL`
 - `VISUALSPRINT_GOOGLE_API_ACCESS_TOKEN`
@@ -738,10 +766,15 @@ For the ADK plus Agent Engine path, the most important ones are:
 - `VISUALSPRINT_DEPLOYMENT_TARGET=cloud_run`
 - `VISUALSPRINT_AGENT_RUNTIME_BACKEND=vertex_ai_reasoning_engine`
 - `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID`
+- `VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER`
 - `VISUALSPRINT_GOOGLE_CLOUD_LOCATION`
 - `VISUALSPRINT_AGENT_APPLICATION_ID`
 - `VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME`
 - `VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME`
+- `VISUALSPRINT_REASONING_AGENT_RESOURCE`
+- `VISUALSPRINT_SUMMARY_AGENT_RESOURCE`
+- `VISUALSPRINT_ACTION_AGENT_RESOURCE`
+- `VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT`
 
 Current confirmed values:
 
@@ -948,12 +981,28 @@ Primary files to extend:
 - `services/api/src/visualsprint_api/config.py`
 - `services/agents/src/visualsprint_agents/config.py`
 
-### Step 3. Implement deterministic Elastic write-back in `services/api`
+The repo already has the first Elastic config pass in those files.
+
+The remaining work is to:
+
+- resolve real Secret Manager-backed API keys cleanly
+- align local direct-key support with deployment-time secret injection
+- thread tenant-aware settings through both the API and agents paths
+
+### Step 3. Complete deterministic Elastic write-back in `services/api`
 
 Current write seam already exists:
 
 - `POST /api/meetings/{meeting_id}/outputs/register`
 - `POST /api/meetings/{meeting_id}/final-report`
+
+The repo now already contains a first write-back implementation in `services/api`.
+
+The remaining work is to:
+
+- harden secret handling
+- add tenant propagation
+- verify deployed write-back against the real Elastic project
 
 ### Step 4. Keep local mock search only as a fallback
 
@@ -961,7 +1010,10 @@ The current route:
 
 - `POST /api/meetings/{meeting_id}/memory/search-prior-outcomes`
 
-should remain only as a development fallback or diagnostic surface.
+already prefers Elastic search when configured and falls back to the local
+development path otherwise.
+
+That local fallback should remain only as a development or diagnostic surface.
 
 ### Step 5. Define the Elastic MCP tool contract
 
@@ -994,8 +1046,8 @@ After checking the repo and docs again, these are the main unfinished areas:
 
 ### Backend and infrastructure gaps
 
-- Elastic write-back is still not implemented in `services/api`
-- real Elastic retrieval is still not implemented
+- Elastic write-back and retrieval now exist in code, but still need real Secret Manager resolution, tenant propagation, and deployed validation
+- the agents-side Elastic MCP client exists, but the live managed-agent reasoning path has not yet been proven end to end against the real Elastic project
 - secrets and identity wiring are not fully finalized in code and deployment
 
 ### Product gaps
@@ -1006,16 +1058,17 @@ After checking the repo and docs again, these are the main unfinished areas:
 ## Suggested execution order
 
 1. Build the reasoning and summary agents in ADK.
-2. Deploy both to Vertex AI Agent Engine.
-3. Create the Gemini Enterprise app.
-4. Register the deployed ADK agents in the app.
-5. Prepare Elastic MCP and the `search_prior_outcomes` tool.
-6. Configure `services/agents` for `vertex_ai_reasoning_engine`.
-7. Configure Cloud Run YAML and secrets.
-8. Deploy the agents service.
-9. Run eval smoke and health checks.
-10. Add real Elastic write-back in `services/api`.
-11. Prove one end-to-end recurring-memory path.
+2. Implement the real ADK persistence-tool wiring for `register_outputs` and `finalize_report`.
+3. Deploy both to Vertex AI Agent Engine.
+4. Create the Gemini Enterprise app.
+5. Register the deployed ADK agents in the app.
+6. Prepare Elastic MCP and the `search_prior_outcomes` tool.
+7. Complete Elastic secret handling and tenant propagation.
+8. Configure `services/agents` for `vertex_ai_reasoning_engine`.
+9. Configure Cloud Run YAML and secrets.
+10. Deploy the agents service.
+11. Run eval smoke and health checks.
+12. Prove one end-to-end recurring-memory path.
 
 ## Definition of done
 

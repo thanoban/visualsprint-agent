@@ -6,11 +6,16 @@ This document captures repo issues that affect the VisualSprint implementation p
 
 The `origin/udula` docs branch had one especially useful document: `docs/fixes.md`.
 
-The most important findings from that analysis are still relevant:
+The most important findings from that analysis break into two groups:
+
+Still relevant:
 
 1. Runtime bugs can slip through `compileall`.
-2. The implemented contracts are still more UI-shaped than final-agent-shaped.
-3. Mock reasoning is still coupled to the upload-complete request path.
+2. The implemented contracts still need to converge on the final agent-plus-Elastic shape.
+
+Historical but still useful as an anti-regression note:
+
+3. Mock reasoning used to be coupled to the upload-complete request path.
 
 ## Findings that matter for Elastic integration
 
@@ -32,15 +37,26 @@ Why this matters:
 - Agent Builder output validation should use the same shape.
 - The dashboard should render the same shape that Elastic stores and the agent emits.
 
-### 2. Mock processing is still synchronous inside upload completion
+### 2. Historical finding: mock processing used to be synchronous inside upload completion
 
-Today the repo still lets chunk upload completion trigger local transcript/media/reasoning behavior directly in the same request path.
+This finding was accurate in the earlier `origin/udula` review, but it is no
+longer true on the current `main` / `thanoban` code line.
+
+Today the repo has already split:
+
+- upload completion
+- explicit chunk reasoning execution
+
+The current routes are:
+
+- `POST /api/meetings/{meeting_id}/capture-sessions/chunk/upload-complete`
+- `POST /api/meetings/{meeting_id}/capture-sessions/chunks/{client_chunk_id}/reasoning/run`
 
 Why this matters:
 
-- the production flow should split deterministic lifecycle handling from managed-agent reasoning
-- Elastic write-back and lookup should hang off the clean post-processing seam
-- this is easier to replace now than after more product code builds on the mock path
+- the repo has the right seam now, so future work should preserve it
+- Elastic write-back and lookup should continue to hang off the clean post-processing seam
+- this should stay a regression watch item rather than a current architecture blocker
 
 ### 3. Verification is weaker than the final system needs
 
@@ -146,7 +162,7 @@ How to fix:
 
 ### 5. Docs contain machine-local absolute links
 
-`docs/agent-creation-chatgpt-prompts.md` and `docs/elastic-integration-handoff.md`
+`docs/agent-creation-chatgpt-prompts.md` and `docs/capture-constraints-and-plan.md`
 link with paths like `/d:/PROJECTS/Startup/VisualSprint/docs/...`.
 
 Why it matters:
@@ -188,3 +204,24 @@ How to fix:
 
 - standardize on one model id and reflect it consistently across the README, the ADK
   scaffolds, and the demo script.
+
+## Status update — udula finalize (2026-06-08)
+
+Finalized on `udula` (rebased onto the latest `main`, which now also includes the
+action agent + Jira/Slack work). Resolution of the 7 review items:
+
+| # | Issue | Status |
+| --- | --- | --- |
+| 1 | ADK persistence tools were `deferred` | **Fixed** — `adk/tools/persistence.py` POSTs to `/outputs/register` and `/final-report` when `VISUALSPRINT_CONTROL_PLANE_URL` is set; stays `deferred` otherwise. Covered by `tests/test_persistence_tools.py`. |
+| 2 | Two parallel agent paths | **Documented** — `.env.example` + `deploy.sh` default to `vertex_ai_reasoning_engine`; bridge kept as the labeled alternative. |
+| 3 | Elastic key / Secret Manager | **Addressed** — `main` now accepts `ELASTICSEARCH_API_KEY` directly; `deploy.sh` injects keys from Secret Manager via `--set-secrets`. |
+| 4 | Tenant hard-coded `"default"` | **Still open** — safe for a single-tenant demo. |
+| 5 | Machine-local absolute doc links | **Fixed on `main`** (links are now repo-relative). |
+| 6 | `agent-creation-chatgpt-prompts.md` naming | **Still open** — optional rename. |
+| 7 | Model name vs story | **Fixed** — `VISUALSPRINT_{REASONING,SUMMARY,ACTION}_MODEL` env overrides (default unchanged). |
+
+Deploy assets added (canonical deploy path; the `infra/cloud-run/*.yaml` manifests
+remain reference): `.env.example`, `services/api/Dockerfile`,
+`services/agents/Dockerfile`, `deploy.sh`, and [DEPLOY.md](./DEPLOY.md).
+Regions reflect the live config: agents/Cloud Run in **us-west1**, Elasticsearch in
+**us-central1**. Secrets stay out of git (`.env` is gitignored).

@@ -146,18 +146,53 @@ def test_processed_chunk_exposes_context_insight_and_memory_surfaces(client: Tes
     assert len(insight_payload["memoryQueries"]) >= 1
     assert context_payload["meetingState"]["openDecisions"][0]["evidence"][0]["clientChunkId"] == "client-chunk-1001"
 
-    memory_response = client.post(
-        f"/api/meetings/{meeting_id}/memory/search-prior-outcomes",
-        json={
-            "recordType": "blocker",
-            "summary": "Authentication release blocker is still active",
-            "detail": "The auth configuration drift is blocking the release and needs a historical comparison.",
-        },
+
+def test_chunk_insight_injects_backend_memory_matches_before_agent_calls(
+    client: TestClient,
+    monkeypatch,
+):
+    meeting_id = _create_live_browser_meeting(client)
+    _start_capture_session(client, meeting_id)
+    register_response = _register_chunk(client, meeting_id, "client-chunk-1101", sequence=1)
+    assert register_response.status_code == 200
+
+    _process_chunk(client, meeting_id, "client-chunk-1101")
+
+    monkeypatch.setattr(
+        "visualsprint_api.repository.settings",
+        build_settings(
+            {
+                "ELASTICSEARCH_URL": "https://elastic.example",
+                "ELASTICSEARCH_API_KEY_SECRET": "elastic-api-key",
+                "ELASTIC_INDEX_OUTCOMES": "visualsprint-outcomes",
+            }
+        ),
     )
-    assert memory_response.status_code == 200
-    matches = memory_response.json()["matches"]
-    assert len(matches) >= 1
-    assert matches[0]["sourceMeetingId"] == "mtg_hist_auth_01"
+    monkeypatch.setattr(
+        "visualsprint_api.repository.search_prior_outcomes_in_elasticsearch",
+        lambda **kwargs: [
+            MemoryMatch(
+                id="mem_elastic_injected_001",
+                sourceMeetingId="mtg_hist_injected_001",
+                summary="A similar blocker was found in Elastic.",
+                sourceMeetingTitle="Incident review",
+                strength="critical",
+                relation="recurring",
+                score=0.91,
+                snippet="Elastic search returned a closely related blocker document.",
+                recordedAt="2026-06-08T10:00:00Z",
+            )
+        ],
+    )
+
+    insight_response = client.get(
+        f"/api/meetings/{meeting_id}/insights/chunks/client-chunk-1101"
+    )
+    assert insight_response.status_code == 200
+    insight_payload = insight_response.json()["insight"]
+    assert len(insight_payload["memoryMatches"]) == 1
+    assert insight_payload["memoryMatches"][0]["sourceMeetingId"] == "mtg_hist_injected_001"
+    assert insight_payload["memoryMatches"][0]["relation"] == "recurring"
 
 
 def test_summary_packet_output_registration_and_final_report_flow(client: TestClient):
