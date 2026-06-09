@@ -82,7 +82,15 @@ type CaptureResources = {
   hasMicrophoneAudio: boolean;
 };
 
-export function MeetingDashboard() {
+export type WorkspaceView = "live" | "report" | "actions" | "dev" | "full";
+
+export function MeetingDashboard({
+  meetingId,
+  view = "full",
+}: {
+  meetingId?: string;
+  view?: WorkspaceView;
+}) {
   const [draft, setDraft] = useState<CreateMeetingRequest>(initialDraft);
   const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<MeetingDetail | null>(null);
@@ -133,28 +141,39 @@ export function MeetingDashboard() {
     return response.meeting;
   }
 
+  const showSetup = view === "full";
+  const showDevPanels = view === "dev" || view === "full";
+  const showLivePanels = view === "live" || view === "full";
+  const showReportPanels = view === "report" || view === "full";
+  const showActionPanels = view === "actions" || view === "full";
+
   useEffect(() => {
     void (async () => {
       setError(null);
       try {
-        const metaResponse = await getPlatformMeta();
-        const auditResponse = await getAgentInvocationAudit();
+        if (showDevPanels) {
+          const metaResponse = await getPlatformMeta();
+          const auditResponse = await getAgentInvocationAudit();
+          startTransition(() => {
+            setPlatformMeta(metaResponse);
+            setAgentInvocationAudit(auditResponse);
+          });
+        }
         const meetingResponse = await listMeetings();
         startTransition(() => {
-          setPlatformMeta(metaResponse);
-          setAgentInvocationAudit(auditResponse);
           setMeetings(meetingResponse.meetings);
         });
         const meetingList = meetingResponse.meetings;
-        if (meetingList.length > 0) {
-          const detailResponse = await getMeeting(meetingList[0].id);
+        const targetMeetingId = meetingId ?? meetingList[0]?.id;
+        if (targetMeetingId) {
+          const detailResponse = await getMeeting(targetMeetingId);
           applyMeeting(detailResponse.meeting);
         }
       } catch (loadError) {
         setError(getErrorMessage(loadError));
       }
     })();
-  }, []);
+  }, [meetingId, showDevPanels]);
 
   useEffect(() => {
     void (async () => {
@@ -683,41 +702,78 @@ export function MeetingDashboard() {
   const recentMemoryMatches = selectedMeeting?.recentMemoryMatches ?? [];
   const recentOpenQuestions = selectedMeeting?.recentOpenQuestions ?? [];
 
+  const viewTitle =
+    view === "live"
+      ? "Live session"
+      : view === "report"
+        ? "Meeting report"
+        : view === "actions"
+          ? "Action recommendations"
+          : view === "dev"
+            ? "Developer tools"
+            : "Meeting workspace";
+
+  const viewDescription =
+    view === "live"
+      ? "Capture meeting context and watch evidence-linked intelligence update in real time."
+      : view === "report"
+        ? "The evidence-backed report consolidates decisions, commitments, blockers, and memory highlights."
+        : view === "actions"
+          ? "Review and approve Jira and Slack recommendations generated after the meeting ends."
+          : view === "dev"
+            ? "Platform topology, adapter audit, and smoke checks for integration work."
+            : "Create meetings, run capture, and inspect live reasoning outputs.";
+
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(52,211,153,0.18),_transparent_28%),linear-gradient(180deg,#09121b_0%,#0a1521_30%,#f4efe2_30%,#f7f4ec_100%)] text-slate-100">
+    <main className="min-h-screen">
       <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8 sm:px-10 lg:px-12">
-        <header className="rounded-[2rem] border border-white/10 bg-slate-950/50 p-6 shadow-[0_30px_110px_rgba(2,8,23,0.48)] backdrop-blur">
-          <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl space-y-4">
-              <p className="inline-flex rounded-full border border-emerald-300/30 bg-emerald-300/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-emerald-100">
-                Phase 4 live processing mock
-              </p>
-              <div className="space-y-3">
-                <h1 className="text-4xl font-semibold tracking-tight text-white sm:text-5xl">
-                  Turn capture chunks into transcript, visual evidence, and reasoning signals.
-                </h1>
-                <p className="max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">
-                  This slice keeps the real browser capture path and layers in a
-                  development-safe processing loop so each chunk now produces mock
-                  transcript, visual evidence, decision, blocker, commitment, and
-                  memory outputs for the dashboard.
+        {view !== "full" ? (
+          <header className="space-y-3">
+            <p className="text-xs uppercase tracking-[0.24em] text-foreground-muted">
+              {selectedMeeting?.title ?? "Meeting"}
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{viewTitle}</h1>
+            <p className="max-w-3xl text-sm leading-7 text-foreground-muted">{viewDescription}</p>
+            {showLivePanels ? (
+              <div className="flex flex-wrap gap-3 text-sm text-foreground-muted">
+                <span>Stream: {streamStatus}</span>
+                <span>Capture: {capturePhase}</span>
+              </div>
+            ) : null}
+          </header>
+        ) : (
+          <header className="rounded-[2rem] border border-border bg-surface p-6 shadow-[0_30px_110px_rgba(2,8,23,0.12)]">
+            <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl space-y-4">
+                <p className="inline-flex rounded-full border border-brand/30 bg-brand/10 px-3 py-1 text-xs font-medium uppercase tracking-[0.22em] text-brand">
+                  Meeting workspace
                 </p>
+                <div className="space-y-3">
+                  <h1 className="text-4xl font-semibold tracking-tight sm:text-5xl">
+                    Configure, capture, and review meeting intelligence.
+                  </h1>
+                  <p className="max-w-2xl text-base leading-7 text-foreground-muted sm:text-lg">
+                    Create a meeting, start browser capture, and inspect transcript, visual evidence,
+                    and reasoning outputs as they arrive.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 rounded-[1.5rem] border border-border bg-surface-muted p-5 text-sm sm:grid-cols-2 lg:min-w-[24rem]">
+                <Metric label="Selected track" value="Elastic" />
+                <Metric label="API base URL" value={getApiBaseUrl()} />
+                <Metric label="Meetings" value={String(meetings.length)} />
+                <Metric label="Capture phase" value={capturePhase} />
+                <Metric label="Stream" value={streamStatus} />
               </div>
             </div>
+          </header>
+        )}
 
-            <div className="grid gap-3 rounded-[1.5rem] border border-white/10 bg-white/5 p-5 text-sm text-slate-200 sm:grid-cols-2 lg:min-w-[24rem]">
-              <Metric label="Selected track" value="Elastic" />
-              <Metric label="API base URL" value={getApiBaseUrl()} />
-              <Metric label="Meetings in memory" value={String(meetings.length)} />
-              <Metric label="Capture phase" value={capturePhase} />
-              <Metric label="Stream" value={streamStatus} />
-            </div>
-          </div>
-        </header>
-
-        <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
+        <section className={`grid gap-6 ${showSetup ? "xl:grid-cols-[0.92fr_1.08fr]" : ""}`}>
+          {showSetup ? (
           <div className="space-y-6">
-            <Card dark title="Create meeting shell" eyebrow="Control plane">
+            <Card dark title="Create meeting" eyebrow="Setup">
               <form className="space-y-5" onSubmit={handleCreateMeeting}>
                 <Field label="Meeting title">
                   <input
@@ -812,6 +868,7 @@ export function MeetingDashboard() {
               </form>
             </Card>
 
+            {showDevPanels ? (
             <Card title="Browser capture readiness" eyebrow="Connector check">
               <div className="grid gap-3 sm:grid-cols-3">
                 <SupportBadge label="MediaDevices" ok={captureSupport?.mediaDevices ?? false} />
@@ -824,7 +881,9 @@ export function MeetingDashboard() {
                 lifecycle state both allow it.
               </p>
             </Card>
+            ) : null}
 
+            {showDevPanels ? (
             <Card title="Platform topology" eyebrow="Service boundaries">
               {platformMeta ? (
                 <div className="space-y-4">
@@ -857,7 +916,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showDevPanels ? (
             <Card title="Agent invocation audit" eyebrow="Adapter runtime">
               {agentInvocationAudit ? (
                 <div className="space-y-4">
@@ -936,7 +997,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showDevPanels ? (
             <Card title="Capture rollout" eyebrow="Development path">
               <div className="space-y-3">
                 {captureStages.map((stage) => (
@@ -950,8 +1013,9 @@ export function MeetingDashboard() {
                 ))}
               </div>
             </Card>
+            ) : null}
 
-            <Card title="Meeting queue" eyebrow="Local development state">
+            <Card title="Meeting queue" eyebrow="Sessions">
               <div className="space-y-3">
                 {meetings.length === 0 ? (
                   <EmptyState
@@ -991,8 +1055,10 @@ export function MeetingDashboard() {
               </div>
             </Card>
           </div>
+          ) : null}
 
           <div className="space-y-6">
+            {(showLivePanels || showSetup) ? (
             <Card dark title="Selected meeting" eyebrow="Lifecycle state">
               {selectedMeeting ? (
                 <div className="space-y-6">
@@ -1063,7 +1129,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showDevPanels ? (
             <Card title="Agent smoke check" eyebrow="Hosted runtime seam">
               {selectedMeeting ? (
                 agentSmokeResult ? (
@@ -1135,7 +1203,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showActionPanels ? (
             <Card title="Action recommendations" eyebrow="Approval portal">
               {selectedMeeting ? (
                 <div className="space-y-5">
@@ -1266,7 +1336,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showLivePanels ? (
             <Card title="Browser capture session" eyebrow="Chunk registration">
               {selectedMeeting ? (
                 <div className="space-y-5">
@@ -1349,6 +1421,7 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
             <Card title="Transcript feed" eyebrow="Live processing">
               {selectedMeeting ? (
@@ -1523,6 +1596,7 @@ export function MeetingDashboard() {
               )}
             </Card>
 
+            {showDevPanels ? (
             <Card title="Summary packet" eyebrow="Summary agent input">
               {selectedMeeting ? (
                 summaryPacket ? (
@@ -1575,7 +1649,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showDevPanels ? (
             <Card title="Indexed outcomes" eyebrow="Elastic write-back preview">
               {selectedMeeting ? (
                 <SignalColumn
@@ -1594,7 +1670,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showReportPanels ? (
             <Card title="Final report" eyebrow="Hero deliverable">
               {selectedMeeting?.status === "ended" && finalReport?.meetingId === selectedMeeting.id ? (
                 <div className="space-y-5">
@@ -1634,7 +1712,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {(showLivePanels || showReportPanels) ? (
             <Card title="Lifecycle timeline" eyebrow="Deterministic plus derived events">
               {selectedMeeting ? (
                 <div className="space-y-4">
@@ -1665,7 +1745,9 @@ export function MeetingDashboard() {
                 />
               )}
             </Card>
+            ) : null}
 
+            {showSetup ? (
             <Card title="Planned live modules" eyebrow="UI target">
               <div className="grid gap-4 sm:grid-cols-2">
                 {dashboardModules.map((module) => (
@@ -1679,6 +1761,7 @@ export function MeetingDashboard() {
                 ))}
               </div>
             </Card>
+            ) : null}
           </div>
         </section>
 
@@ -1688,8 +1771,9 @@ export function MeetingDashboard() {
           </div>
         ) : null}
 
-        <footer className="rounded-[1.5rem] border border-slate-900/10 bg-[#f0eadc] px-5 py-4 text-sm leading-6 text-slate-700">
-          <p className="font-medium text-slate-900">Current implementation note</p>
+        {view === "full" ? (
+        <footer className="rounded-[1.5rem] border border-border bg-surface-muted px-5 py-4 text-sm leading-6 text-foreground-muted">
+          <p className="font-medium text-foreground">Current implementation note</p>
           <p>
             This slice adds mock chunk processing behind the real browser capture
             path, so transcript segments, visual evidence, and reasoning signals
@@ -1700,6 +1784,7 @@ export function MeetingDashboard() {
             Official track options: {partnerTracks.map((track) => track.label).join(", ")}.
           </p>
         </footer>
+        ) : null}
       </div>
     </main>
   );
