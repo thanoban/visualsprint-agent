@@ -39,6 +39,10 @@ spec:
               value: ""
             - name: JIRA_API_TOKEN_SECRET
               value: ""
+            - name: JIRA_EMAIL
+              value: ""
+            - name: JIRA_PROJECT_KEY
+              value: "VS"
             - name: SLACK_BOT_TOKEN_SECRET
               value: ""
             - name: SLACK_DEFAULT_CHANNEL

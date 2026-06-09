@@ -33,6 +33,8 @@ class Settings:
     elastic_mcp_server_url: str | None = None
     jira_base_url: str | None = None
     jira_api_token_secret: str | None = None
+    jira_email: str | None = None
+    jira_project_key: str | None = None
     slack_bot_token_secret: str | None = None
     slack_default_channel: str | None = None
     service_request_timeout_seconds: float = 0.5
@@ -101,6 +103,8 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         elastic_mcp_server_url=_get(source, "ELASTIC_MCP_SERVER_URL"),
         jira_base_url=_get(source, "JIRA_BASE_URL"),
         jira_api_token_secret=_get(source, "JIRA_API_TOKEN_SECRET"),
+        jira_email=_get(source, "JIRA_EMAIL"),
+        jira_project_key=_get(source, "JIRA_PROJECT_KEY"),
         slack_bot_token_secret=_get(source, "SLACK_BOT_TOKEN_SECRET"),
         slack_default_channel=_get(source, "SLACK_DEFAULT_CHANNEL"),
         service_request_timeout_seconds=float(
