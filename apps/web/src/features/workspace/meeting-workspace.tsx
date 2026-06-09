@@ -1,14 +1,53 @@
 "use client";
 
+import dynamic from "next/dynamic";
+
+import { MeetingSubNav } from "../../components/layout/meeting-sub-nav";
+import { PageSkeleton } from "../../components/ui/skeleton";
 import { MeetingSessionProvider } from "../meeting-session/context/meeting-session-provider";
 import type { WorkspaceView } from "../meeting-session/types";
-import { ActionsPage } from "../actions/actions-page";
-import { DevPanelsPage } from "../dev/dev-panels-page";
-import { LiveSessionPage } from "../live/live-session-page";
-import { MeetingReportPage } from "../report/meeting-report-page";
-import { MeetingSetupPage } from "../setup/meeting-setup-page";
+
+const MeetingSetupPage = dynamic(
+  () => import("../setup/meeting-setup-page").then((module) => module.MeetingSetupPage),
+  { loading: () => <PageSkeleton /> },
+);
+const LiveSessionPage = dynamic(
+  () => import("../live/live-session-page").then((module) => module.LiveSessionPage),
+  { loading: () => <PageSkeleton /> },
+);
+const MeetingReportPage = dynamic(
+  () => import("../report/meeting-report-page").then((module) => module.MeetingReportPage),
+  { loading: () => <PageSkeleton /> },
+);
+const ActionsPage = dynamic(
+  () => import("../actions/actions-page").then((module) => module.ActionsPage),
+  { loading: () => <PageSkeleton /> },
+);
+const DevPanelsPage = dynamic(
+  () => import("../dev/dev-panels-page").then((module) => module.DevPanelsPage),
+  { loading: () => <PageSkeleton /> },
+);
 
 export type { WorkspaceView };
+
+function WorkspaceViewContent({ view }: { view: WorkspaceView }) {
+  if (view === "setup") {
+    return <MeetingSetupPage />;
+  }
+  if (view === "live") {
+    return <LiveSessionPage />;
+  }
+  if (view === "report") {
+    return <MeetingReportPage />;
+  }
+  if (view === "actions") {
+    return <ActionsPage />;
+  }
+  if (view === "dev") {
+    return <DevPanelsPage />;
+  }
+  return null;
+}
 
 export function MeetingWorkspace({
   meetingId,
@@ -17,13 +56,13 @@ export function MeetingWorkspace({
   meetingId?: string;
   view?: WorkspaceView;
 }) {
+  const showSubNav =
+    Boolean(meetingId) && (view === "live" || view === "report" || view === "actions");
+
   return (
     <MeetingSessionProvider loadDevMeta={view === "dev"} meetingId={meetingId}>
-      {view === "setup" ? <MeetingSetupPage /> : null}
-      {view === "live" ? <LiveSessionPage /> : null}
-      {view === "report" ? <MeetingReportPage /> : null}
-      {view === "actions" ? <ActionsPage /> : null}
-      {view === "dev" ? <DevPanelsPage /> : null}
+      {showSubNav ? <MeetingSubNav meetingId={meetingId} /> : null}
+      <WorkspaceViewContent view={view} />
     </MeetingSessionProvider>
   );
 }

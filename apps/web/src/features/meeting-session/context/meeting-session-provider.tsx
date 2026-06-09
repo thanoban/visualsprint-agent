@@ -45,6 +45,7 @@ import {
   runAgentSmoke,
   startMeeting,
 } from "../../../lib/api";
+import { useToast } from "../../../components/providers/toast-provider";
 import { useCaptureSupport } from "../../../hooks/use-capture-support";
 import { useMeetingStream } from "../../../hooks/use-meeting-stream";
 import { getErrorMessage } from "../../../lib/format";
@@ -106,7 +107,23 @@ export function MeetingSessionProvider({
   children: ReactNode;
 }) {
   const queryClient = useQueryClient();
+  const { pushToast } = useToast();
   const captureSupport = useCaptureSupport();
+
+  const fail = useCallback(
+    (message: string) => {
+      setError(message);
+      pushToast(message, "error");
+    },
+    [pushToast],
+  );
+
+  const succeed = useCallback(
+    (message: string) => {
+      pushToast(message, "success");
+    },
+    [pushToast],
+  );
 
   const [draft, setDraft] = useState<CreateMeetingRequest>(initialDraft);
   const [meetings, setMeetings] = useState<MeetingSummary[]>([]);
@@ -136,9 +153,12 @@ export function MeetingSessionProvider({
 
   const streamStatus = useMeetingStream(meeting?.id, applyMeeting);
 
-  const onError = useCallback((message: string) => {
-    setError(message);
-  }, []);
+  const onError = useCallback(
+    (message: string) => {
+      fail(message);
+    },
+    [fail],
+  );
 
   const { capturePhase, canStartCapture, beginBrowserCapture, stopBrowserCapture } =
     useBrowserCapture({
@@ -184,10 +204,10 @@ export function MeetingSessionProvider({
           await selectMeeting(targetId);
         }
       } catch (loadError) {
-        setError(getErrorMessage(loadError));
+        fail(getErrorMessage(loadError));
       }
     })();
-  }, [loadDevMeta, meetingId, refreshMeetings, selectMeeting]);
+  }, [fail, loadDevMeta, meetingId, refreshMeetings, selectMeeting]);
 
   useEffect(() => {
     if (!loadDevMeta || !meeting?.id) {
@@ -225,11 +245,11 @@ export function MeetingSessionProvider({
           const reportResponse = await finalizeReport(meeting.id);
           setFinalReport(reportResponse.report);
         } catch (reportError) {
-          setError(getErrorMessage(reportError));
+          fail(getErrorMessage(reportError));
         }
       }
     })();
-  }, [meeting?.id, meeting?.status]);
+  }, [fail, meeting?.id, meeting?.status]);
 
   useEffect(() => {
     const latestChunk = meeting?.recentCaptureChunks[0];
@@ -315,15 +335,16 @@ export function MeetingSessionProvider({
         const response = await createMeeting(draft);
         applyMeeting(response.meeting);
         await refreshMeetings();
+        succeed("Meeting created.");
         return response.meeting;
       } catch (submitError) {
-        setError(getErrorMessage(submitError));
+        fail(getErrorMessage(submitError));
         return null;
       } finally {
         setIsBusy(false);
       }
     },
-    [applyMeeting, draft, refreshMeetings],
+    [applyMeeting, draft, fail, refreshMeetings, succeed],
   );
 
   const startMeetingSession = useCallback(async () => {
@@ -336,12 +357,13 @@ export function MeetingSessionProvider({
       const response = await startMeeting(meeting.id);
       applyMeeting(response.meeting);
       await refreshMeetings();
+      succeed("Meeting started.");
     } catch (actionError) {
-      setError(getErrorMessage(actionError));
+      fail(getErrorMessage(actionError));
     } finally {
       setIsBusy(false);
     }
-  }, [applyMeeting, meeting, refreshMeetings]);
+  }, [applyMeeting, fail, meeting, refreshMeetings, succeed]);
 
   const endMeetingSession = useCallback(async () => {
     if (!meeting) {
@@ -358,12 +380,13 @@ export function MeetingSessionProvider({
       const reportResponse = await finalizeReport(meeting.id);
       setFinalReport(reportResponse.report);
       await refreshMeetings();
+      succeed("Meeting ended. Report is ready.");
     } catch (actionError) {
-      setError(getErrorMessage(actionError));
+      fail(getErrorMessage(actionError));
     } finally {
       setIsBusy(false);
     }
-  }, [applyMeeting, capturePhase, meeting, refreshMeetings, stopBrowserCapture]);
+  }, [applyMeeting, capturePhase, fail, meeting, refreshMeetings, stopBrowserCapture, succeed]);
 
   const runAgentSmokeCheck = useCallback(async () => {
     if (!meeting) {
@@ -380,11 +403,11 @@ export function MeetingSessionProvider({
       const auditResponse = await getAgentInvocationAudit();
       setAgentInvocationAudit(auditResponse);
     } catch (smokeError) {
-      setError(getErrorMessage(smokeError));
+      fail(getErrorMessage(smokeError));
     } finally {
       setIsBusy(false);
     }
-  }, [meeting]);
+  }, [fail, meeting]);
 
   const generateRecommendations = useCallback(async () => {
     if (!meeting) {
@@ -396,12 +419,13 @@ export function MeetingSessionProvider({
       const response = await generateActionRecommendations(meeting.id);
       setActionRecommendations(response.recommendations);
       await selectMeeting(meeting.id);
+      succeed("Action recommendations generated.");
     } catch (genError) {
-      setError(getErrorMessage(genError));
+      fail(getErrorMessage(genError));
     } finally {
       setIsBusy(false);
     }
-  }, [meeting, selectMeeting]);
+  }, [fail, meeting, selectMeeting, succeed]);
 
   const approveRecommendation = useCallback(
     async (recommendationId: string) => {
@@ -418,13 +442,14 @@ export function MeetingSessionProvider({
         await selectMeeting(meeting.id);
         const response = await getActionRecommendations(meeting.id);
         setActionRecommendations(response.recommendations);
+        succeed("Recommendation approved.");
       } catch (err) {
-        setError(getErrorMessage(err));
+        fail(getErrorMessage(err));
       } finally {
         setIsBusy(false);
       }
     },
-    [meeting, selectMeeting],
+    [fail, meeting, selectMeeting, succeed],
   );
 
   const rejectRecommendation = useCallback(
@@ -442,13 +467,14 @@ export function MeetingSessionProvider({
         await selectMeeting(meeting.id);
         const response = await getActionRecommendations(meeting.id);
         setActionRecommendations(response.recommendations);
+        succeed("Recommendation rejected.");
       } catch (err) {
-        setError(getErrorMessage(err));
+        fail(getErrorMessage(err));
       } finally {
         setIsBusy(false);
       }
     },
-    [meeting, selectMeeting],
+    [fail, meeting, selectMeeting, succeed],
   );
 
   const executeRecommendation = useCallback(
@@ -463,13 +489,14 @@ export function MeetingSessionProvider({
         await selectMeeting(meeting.id);
         const response = await getActionRecommendations(meeting.id);
         setActionRecommendations(response.recommendations);
+        succeed("Action executed.");
       } catch (err) {
-        setError(getErrorMessage(err));
+        fail(getErrorMessage(err));
       } finally {
         setIsBusy(false);
       }
     },
-    [meeting, selectMeeting],
+    [fail, meeting, selectMeeting, succeed],
   );
 
   const value = useMemo<MeetingSessionContextValue>(

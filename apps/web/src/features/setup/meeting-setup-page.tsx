@@ -6,10 +6,11 @@ import { ErrorBanner } from "../../components/shared/error-banner";
 import { StatusPill } from "../../components/ui/status-pill";
 import { useMeetingSession } from "../meeting-session/context/meeting-session-provider";
 import { CaptureReadiness } from "./components/capture-readiness";
+import { CaptureStepper } from "./components/capture-stepper";
 import { CreateMeetingForm } from "./components/create-meeting-form";
 
 export function MeetingSetupPage() {
-  const { meeting, meetings, error, selectMeeting } = useMeetingSession();
+  const { meeting, meetings, error, selectMeeting, capturePhase } = useMeetingSession();
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-10 sm:px-10">
@@ -21,6 +22,11 @@ export function MeetingSetupPage() {
           live dashboard.
         </p>
       </header>
+
+      <section className="space-y-4">
+        <p className="text-xs uppercase tracking-[0.24em] text-foreground-muted">Pipeline</p>
+        <CaptureStepper capturePhase={capturePhase} meeting={meeting} />
+      </section>
 
       <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
         <div className="space-y-6">

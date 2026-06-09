@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 
 import { AppShell } from "../components/layout/app-shell";
 import { QueryProvider } from "../components/providers/query-provider";
+import { ToastProvider } from "../components/providers/toast-provider";
 import "./globals.css";
 
 const inter = Inter({
@@ -26,7 +27,9 @@ export default function RootLayout({
     <html lang="en" className={inter.variable}>
       <body>
         <QueryProvider>
-          <AppShell>{children}</AppShell>
+          <ToastProvider>
+            <AppShell>{children}</AppShell>
+          </ToastProvider>
         </QueryProvider>
       </body>
     </html>

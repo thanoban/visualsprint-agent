@@ -1,5 +1,12 @@
-import { MeetingWorkspace } from "../../../../features/workspace/meeting-workspace";
+import type { Metadata } from "next";
+
 import { ThemeWrapper } from "../../../../components/layout/theme-wrapper";
+import { MeetingWorkspace } from "../../../../features/workspace/meeting-workspace";
+
+export const metadata: Metadata = {
+  title: "Action approvals · VisualSprint",
+  description: "Review, approve, and execute recommended follow-up actions.",
+};
 
 export default async function ActionsMeetingPage({
   params,

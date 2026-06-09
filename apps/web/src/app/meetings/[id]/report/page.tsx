@@ -1,5 +1,12 @@
-import { MeetingWorkspace } from "../../../../features/workspace/meeting-workspace";
+import type { Metadata } from "next";
+
 import { ThemeWrapper } from "../../../../components/layout/theme-wrapper";
+import { MeetingWorkspace } from "../../../../features/workspace/meeting-workspace";
+
+export const metadata: Metadata = {
+  title: "Meeting report · VisualSprint",
+  description: "Final report with decisions, commitments, blockers, and evidence.",
+};
 
 export default async function ReportMeetingPage({
   params,

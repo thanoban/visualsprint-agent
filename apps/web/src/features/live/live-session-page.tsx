@@ -1,20 +1,23 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 
 import { MeetingTopBar } from "../../components/layout/meeting-top-bar";
+import { SseLiveRegion } from "../../components/shared/sse-live-region";
 import { ErrorBanner } from "../../components/shared/error-banner";
-import { primaryButtonClassName, secondaryButtonClassName } from "../../components/ui/button-styles";
-import { EmptyState } from "../../components/ui/empty-state";
 import { PageSkeleton } from "../../components/ui/skeleton";
+import { Tabs } from "../../components/ui/tabs";
 import { useMeetingSession } from "../meeting-session/context/meeting-session-provider";
 import { CapturePanel } from "./components/capture-panel";
 import { LiveMetricsRow } from "./components/live-metrics-row";
+import { MemoryPanel } from "./components/memory-panel";
 import { ReasoningPanels } from "./components/reasoning-panels";
+import { RecordsPanels } from "./components/records-panels";
 
 export function LiveSessionPage() {
   const router = useRouter();
+  const [mobileTab, setMobileTab] = useState("session");
   const {
     meeting,
     streamStatus,
@@ -22,62 +25,40 @@ export function LiveSessionPage() {
     isBusy,
     error,
     endMeetingSession,
-    startMeetingSession,
   } = useMeetingSession();
+
+  useEffect(() => {
+    if (!meeting) {
+      return;
+    }
+    if (meeting.status === "draft") {
+      router.replace(`/meetings/new?meetingId=${meeting.id}`);
+      return;
+    }
+    if (meeting.status === "ended") {
+      router.replace(`/meetings/${meeting.id}/report`);
+    }
+  }, [meeting, router]);
 
   if (!meeting) {
     return <PageSkeleton />;
   }
 
-  if (meeting.status === "draft") {
-    return (
-      <div className="mx-auto max-w-3xl px-6 py-16 sm:px-10">
-        <EmptyState
-          title="Meeting not started"
-          body="Start the meeting session before entering the live dashboard and beginning capture."
-        />
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button
-            className={primaryButtonClassName}
-            disabled={isBusy}
-            onClick={() => {
-              void startMeetingSession();
-            }}
-            type="button"
-          >
-            Start meeting
-          </button>
-          <Link className={secondaryButtonClassName} href={`/meetings/new?meetingId=${meeting.id}`}>
-            Back to setup
-          </Link>
-        </div>
-        {error ? (
-          <div className="mt-6">
-            <ErrorBanner message={error} />
-          </div>
-        ) : null}
-      </div>
-    );
+  if (meeting.status === "draft" || meeting.status === "ended") {
+    return <PageSkeleton />;
   }
 
-  if (meeting.status === "ended") {
-    return (
-      <div className="mx-auto max-w-3xl px-6 py-16 sm:px-10">
-        <EmptyState
-          title="Meeting ended"
-          body="This session has concluded. Open the evidence-backed report to review outcomes."
-        />
-        <div className="mt-6">
-          <Link className={primaryButtonClassName} href={`/meetings/${meeting.id}/report`}>
-            View report
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  const sessionPanels = (
+    <>
+      <LiveMetricsRow meeting={meeting} />
+      <CapturePanel />
+    </>
+  );
 
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 py-6 sm:px-10">
+      <SseLiveRegion meetingTitle={meeting.title} streamStatus={streamStatus} />
+
       <MeetingTopBar
         capturePhase={capturePhase}
         isBusy={isBusy}
@@ -90,9 +71,22 @@ export function LiveSessionPage() {
         streamStatus={streamStatus}
       />
 
-      <LiveMetricsRow meeting={meeting} />
-      <CapturePanel />
-      <ReasoningPanels />
+      <div className="lg:hidden">
+        <Tabs
+          activeId={mobileTab}
+          items={[
+            { id: "session", label: "Session", content: sessionPanels },
+            { id: "memory", label: "Memory", content: <MemoryPanel /> },
+            { id: "signals", label: "Signals", content: <RecordsPanels /> },
+          ]}
+          onChange={setMobileTab}
+        />
+      </div>
+
+      <div className="hidden flex-col gap-6 lg:flex">
+        {sessionPanels}
+        <ReasoningPanels />
+      </div>
 
       {error ? <ErrorBanner message={error} /> : null}
     </div>
