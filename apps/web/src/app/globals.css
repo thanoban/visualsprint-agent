@@ -4,25 +4,33 @@
   color-scheme: dark;
 
   --font-sans:
-    "Inter Variable", "Segoe UI", BlinkMacSystemFont, system-ui, sans-serif;
+    "Inter Variable", "Inter", "Segoe UI", BlinkMacSystemFont, system-ui, sans-serif;
+  --font-mono:
+    "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
 
-  /* Ink surfaces */
-  --ink-bg: #0b1118;
-  --ink-bg-elevated: #111a24;
-  --ink-surface: #161f2b;
-  --ink-surface-muted: #1c2836;
-  --ink-border: rgba(255, 255, 255, 0.08);
+  /* Ink surfaces — 3-layer elevation */
+  --ink-bg: #090e14;
+  --ink-bg-elevated: #0b1118;
+  --ink-surface-1: #111a24;
+  --ink-surface-2: #161f2b;
+  --ink-surface-3: #1c2836;
+  --ink-border: rgba(255, 255, 255, 0.06);
+  --ink-border-strong: rgba(255, 255, 255, 0.10);
   --ink-fg: #e8edf4;
   --ink-fg-muted: #94a3b8;
   --ink-fg-subtle: #64748b;
 
-  /* Parchment surfaces */
+  /* Paper surfaces — 3-layer elevation */
   --paper-bg: #f7f4ee;
-  --paper-surface: #ffffff;
-  --paper-surface-muted: #f0ebe3;
-  --paper-border: rgba(26, 35, 50, 0.1);
+  --paper-bg-elevated: #ffffff;
+  --paper-surface-1: #ffffff;
+  --paper-surface-2: #f0ebe3;
+  --paper-surface-3: #e6e0d6;
+  --paper-border: rgba(26, 35, 50, 0.08);
+  --paper-border-strong: rgba(26, 35, 50, 0.14);
   --paper-fg: #1a2332;
   --paper-fg-muted: #5c6b7e;
+  --paper-fg-subtle: #94a3b8;
 
   /* Brand */
   --brand: #2dd4a8;
@@ -39,12 +47,34 @@
   --status-error: #f87171;
   --status-success: #4ade80;
 
+  /* Shadows — brand-tinged elevation system */
+  --shadow-sm:
+    0 1px 2px rgba(0, 0, 0, 0.20),
+    0 0 0 1px var(--border);
+  --shadow-md:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    0 0 0 1px var(--border);
+  --shadow-lg:
+    0 12px 40px rgba(0, 0, 0, 0.30),
+    0 0 0 1px var(--border);
+  --shadow-glow:
+    0 0 20px rgba(45, 212, 168, 0.08);
+
+  /* Motion */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-sine: cubic-bezier(0.37, 0, 0.63, 1);
+  --duration-fast: 150ms;
+  --duration-base: 250ms;
+  --duration-slow: 400ms;
+
   /* Active theme aliases (default ink) */
   --bg: var(--ink-bg);
   --bg-elevated: var(--ink-bg-elevated);
-  --surface: var(--ink-surface);
-  --surface-muted: var(--ink-surface-muted);
+  --surface: var(--ink-surface-1);
+  --surface-2: var(--ink-surface-2);
+  --surface-muted: var(--ink-surface-3);
   --border: var(--ink-border);
+  --border-strong: var(--ink-border-strong);
   --fg: var(--ink-fg);
   --fg-muted: var(--ink-fg-muted);
   --fg-subtle: var(--ink-fg-subtle);
@@ -54,9 +84,11 @@
   color-scheme: dark;
   --bg: var(--ink-bg);
   --bg-elevated: var(--ink-bg-elevated);
-  --surface: var(--ink-surface);
-  --surface-muted: var(--ink-surface-muted);
+  --surface: var(--ink-surface-1);
+  --surface-2: var(--ink-surface-2);
+  --surface-muted: var(--ink-surface-3);
   --border: var(--ink-border);
+  --border-strong: var(--ink-border-strong);
   --fg: var(--ink-fg);
   --fg-muted: var(--ink-fg-muted);
   --fg-subtle: var(--ink-fg-subtle);
@@ -65,13 +97,15 @@
 [data-theme="paper"] {
   color-scheme: light;
   --bg: var(--paper-bg);
-  --bg-elevated: var(--paper-surface);
-  --surface: var(--paper-surface);
-  --surface-muted: var(--paper-surface-muted);
+  --bg-elevated: var(--paper-bg-elevated);
+  --surface: var(--paper-surface-1);
+  --surface-2: var(--paper-surface-2);
+  --surface-muted: var(--paper-surface-3);
   --border: var(--paper-border);
+  --border-strong: var(--paper-border-strong);
   --fg: var(--paper-fg);
   --fg-muted: var(--paper-fg-muted);
-  --fg-subtle: #94a3b8;
+  --fg-subtle: var(--paper-fg-subtle);
 }
 
 @theme inline {
@@ -81,17 +115,25 @@
   --color-accent: var(--accent);
   --color-accent-memory: var(--accent-memory);
   --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
   --color-surface-muted: var(--surface-muted);
   --color-foreground: var(--fg);
   --color-foreground-muted: var(--fg-muted);
+  --color-foreground-subtle: var(--fg-subtle);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-background: var(--bg);
   --color-status-live: var(--status-live);
   --color-status-error: var(--status-error);
+  --font-family-sans: var(--font-sans);
+  --font-family-mono: var(--font-mono);
 }
 
 html {
   font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo);
 }
 
 body {
@@ -99,6 +141,16 @@ body {
   min-height: 100vh;
   background: var(--bg);
   color: var(--fg);
+  transition: background-color 0.3s var(--ease-out-expo), color 0.3s var(--ease-out-expo);
+}
+
+html.theme-transition,
+html.theme-transition *,
+html.theme-transition *::before,
+html.theme-transition *::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-timing-function: var(--ease-out-expo);
+  transition-duration: 0.25s;
 }
 
 * {
@@ -115,6 +167,65 @@ a {
   outline-offset: 2px;
 }
 
+::selection {
+  background: rgba(56, 189, 248, 0.35);
+  color: white;
+}
+
+/* Typography utilities */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* Tabular nums for data */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Skeleton shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--surface-muted) 25%,
+    var(--surface-2) 50%,
+    var(--surface-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite ease-in-out;
+}
+
+/* Live pulse dot */
+@keyframes live-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.85);
+  }
+}
+
+.live-pulse {
+  animation: live-pulse 2s var(--ease-in-out-sine) infinite;
+}
+
+/* Backdrop support */
+@supports (backdrop-filter: blur(24px)) {
+  .backdrop-glass {
+    backdrop-filter: blur(24px) saturate(1.2);
+  }
+}
+
 .sr-only {
   position: absolute;
   width: 1px;
@@ -125,11 +236,6 @@ a {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border-width: 0;
-}
-
-::selection {
-  background: rgba(56, 189, 248, 0.35);
-  color: white;
 }
 
 @media (prefers-reduced-motion: reduce) {

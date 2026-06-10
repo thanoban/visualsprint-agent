@@ -1,14 +1,12 @@
 "use client";
 
 import { useRef } from "react";
+import { Play, Square, Radio } from "lucide-react";
 
 import { CaptureChunkCard, CaptureSessionSummary } from "../../../components/domain/capture-cards";
 import { Card } from "../../../components/ui/card";
 import { EmptyState } from "../../../components/ui/empty-state";
-import {
-  primaryLightButtonClassName,
-  secondaryLightButtonClassName,
-} from "../../../components/ui/button-styles";
+import { Button } from "../../../components/ui/button";
 import { CaptureStatusPill } from "../../../components/ui/status-pill";
 import { formatCapturePhase } from "../../../lib/format";
 import type { CapturePhase } from "../../meeting-session/types";
@@ -59,7 +57,7 @@ export function CapturePanel() {
         </p>
         <div
           aria-busy={isCaptureBusy}
-          className="rounded-[1.25rem] border border-border bg-surface-muted p-4"
+          className="rounded-xl border border-border bg-surface-muted p-4"
         >
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -85,30 +83,29 @@ export function CapturePanel() {
                 {formatCapturePhase(capturePhase)}
               </p>
             ) : null}
-            <button
+            <Button
               ref={beginButtonRef}
-              className={primaryLightButtonClassName}
+              leftIcon={<Play size={16} strokeWidth={2.5} />}
               disabled={!canStartCapture || isCaptureBusy}
               onClick={() => {
                 void beginBrowserCapture();
                 stopButtonRef.current?.focus();
               }}
-              type="button"
             >
               Begin capture
-            </button>
-            <button
+            </Button>
+            <Button
               ref={stopButtonRef}
-              className={secondaryLightButtonClassName}
+              variant="secondary"
+              leftIcon={<Square size={16} strokeWidth={2.5} />}
               disabled={capturePhase !== "recording" || isCaptureBusy}
               onClick={() => {
                 void stopBrowserCapture();
                 beginButtonRef.current?.focus();
               }}
-              type="button"
             >
               Stop capture
-            </button>
+            </Button>
           </div>
         </div>
 

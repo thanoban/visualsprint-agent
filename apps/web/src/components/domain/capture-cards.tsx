@@ -1,4 +1,5 @@
 import type { CaptureChunkSummary, CaptureSessionSummary } from "@visualsprint/contracts";
+import { Layers } from "lucide-react";
 
 import {
   formatBytes,
@@ -11,10 +12,13 @@ import { SourceModeBadge } from "./record-cards";
 
 export function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
   return (
-    <article className="rounded-[1.2rem] border border-border bg-surface p-4">
+    <article className="rounded-xl border border-border bg-surface p-4 shadow-sm transition hover:border-border-strong hover:shadow-md">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-sm font-semibold text-foreground">Segment {chunk.sequence}</p>
+          <div className="flex items-center gap-2">
+            <Layers size={14} strokeWidth={2} className="text-foreground-muted" />
+            <p className="text-sm font-semibold text-foreground">Segment {chunk.sequence}</p>
+          </div>
           <p className="mt-2 text-sm leading-6 text-foreground-muted">
             {formatBytes(chunk.byteSize)} recorded over {formatDuration(chunk.durationMs)}.
           </p>
@@ -29,10 +33,10 @@ export function CaptureChunkCard({ chunk }: { chunk: CaptureChunkSummary }) {
           </div>
         </div>
         <div className="flex flex-col items-start gap-2 sm:items-end">
-          <span className="rounded-full bg-surface-muted px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-foreground-muted">
+          <span className="rounded-lg bg-surface-muted px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-foreground-muted">
             {chunk.lifecycleStatus}
           </span>
-          <span className="rounded-full bg-surface-muted px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-foreground-muted">
+          <span className="rounded-lg bg-surface-muted px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] text-foreground-muted">
             processing {chunk.processingStatus}
           </span>
           <span className="text-xs text-foreground-muted">{formatTimestamp(chunk.recordedAt)}</span>

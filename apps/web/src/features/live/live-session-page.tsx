@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 
 import { MeetingTopBar } from "../../components/layout/meeting-top-bar";
 import { SseLiveRegion } from "../../components/shared/sse-live-region";
@@ -14,6 +15,7 @@ import { LiveMetricsRow } from "./components/live-metrics-row";
 import { MemoryPanel } from "./components/memory-panel";
 import { ReasoningPanels } from "./components/reasoning-panels";
 import { RecordsPanels } from "./components/records-panels";
+import { Radio, BrainCircuit, Activity } from "lucide-react";
 
 export function LiveSessionPage() {
   const router = useRouter();
@@ -56,7 +58,12 @@ export function LiveSessionPage() {
   );
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-8 sm:py-6 lg:px-10">
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
+      className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-8 sm:py-6 lg:px-10"
+    >
       <SseLiveRegion meetingTitle={meeting.title} streamStatus={streamStatus} />
 
       <MeetingTopBar
@@ -77,9 +84,9 @@ export function LiveSessionPage() {
         <Tabs
           activeId={mobileTab}
           items={[
-            { id: "session", label: "Session", content: sessionPanels },
-            { id: "memory", label: "Memory", content: <MemoryPanel /> },
-            { id: "signals", label: "Signals", content: <RecordsPanels /> },
+            { id: "session", label: "Session", icon: <Radio size={14} strokeWidth={2} />, content: sessionPanels },
+            { id: "memory", label: "Memory", icon: <BrainCircuit size={14} strokeWidth={2} />, content: <MemoryPanel /> },
+            { id: "signals", label: "Signals", icon: <Activity size={14} strokeWidth={2} />, content: <RecordsPanels /> },
           ]}
           onChange={setMobileTab}
         />
@@ -91,6 +98,6 @@ export function LiveSessionPage() {
       </div>
 
       {error ? <ErrorBanner message={error} /> : null}
-    </div>
+    </motion.div>
   );
 }

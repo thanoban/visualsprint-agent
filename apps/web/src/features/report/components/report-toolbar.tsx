@@ -1,7 +1,9 @@
 "use client";
 
+import { Copy, Printer, FileText } from "lucide-react";
+
 import { useToast } from "../../../components/providers/toast-provider";
-import { secondaryButtonClassName } from "../../../components/ui/button-styles";
+import { Button } from "../../../components/ui/button";
 
 const sections = [
   { id: "report-summary", label: "Executive summary" },
@@ -30,12 +32,12 @@ export function ReportToolbar({
   }
 
   return (
-    <div className="sticky top-[120px] z-30 flex flex-col gap-3 rounded-[1.25rem] border border-border bg-surface/95 p-3 backdrop-blur print:hidden sm:top-[124px] sm:gap-4 sm:rounded-[2rem] sm:p-5">
+    <div className="sticky top-[57px] z-30 flex flex-col gap-3 rounded-xl border border-border bg-[var(--bg-elevated)]/90 p-3 backdrop-glass print:hidden sm:top-[57px] sm:gap-4 sm:p-4">
       <nav aria-label="Report sections" className="-mx-1 flex gap-2 overflow-x-auto px-1">
         {sections.map((section) => (
           <a
             key={section.id}
-            className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground-muted transition hover:border-brand/40 hover:text-brand"
+            className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground-muted transition hover:border-brand/40 hover:text-brand hover:shadow-sm"
             href={`#${section.id}`}
           >
             {section.label}
@@ -43,12 +45,22 @@ export function ReportToolbar({
         ))}
       </nav>
       <div className="flex flex-wrap gap-2 sm:justify-end">
-        <button className={secondaryButtonClassName} onClick={() => void copySummary()} type="button">
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<Copy size={14} strokeWidth={2} />}
+          onClick={() => void copySummary()}
+        >
           Copy summary
-        </button>
-        <button className={secondaryButtonClassName} onClick={() => window.print()} type="button">
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          leftIcon={<Printer size={14} strokeWidth={2} />}
+          onClick={() => window.print()}
+        >
           Print report
-        </button>
+        </Button>
       </div>
     </div>
   );

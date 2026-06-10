@@ -57,7 +57,7 @@ export function CaptureStepper({
         return (
           <li
             key={stage.id}
-            className={`rounded-[1.2rem] border p-4 ${
+            className={`rounded-xl border p-4 ${
               state === "complete"
                 ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/10"
                 : state === "current"

@@ -3,14 +3,12 @@
 import { sourceConnectors } from "@visualsprint/contracts";
 import type { CreateMeetingRequest } from "@visualsprint/contracts";
 import { useRouter } from "next/navigation";
+import { PlusCircle, Play } from "lucide-react";
 
 import { Card } from "../../../components/ui/card";
 import { Field } from "../../../components/ui/field";
-import {
-  inputClassName,
-  primaryButtonClassName,
-  secondaryButtonClassName,
-} from "../../../components/ui/button-styles";
+import { inputClassName } from "../../../components/ui/button-styles";
+import { Button } from "../../../components/ui/button";
 import { useMeetingSession } from "../../meeting-session/context/meeting-session-provider";
 import { meetingRouteForStatus } from "../../../lib/meeting";
 
@@ -107,12 +105,17 @@ export function CreateMeetingForm() {
         </Field>
 
         <div className="flex flex-wrap gap-3">
-          <button className={primaryButtonClassName} disabled={isBusy} type="submit">
+          <Button
+            leftIcon={<PlusCircle size={16} strokeWidth={2} />}
+            disabled={isBusy}
+            type="submit"
+          >
             {isBusy ? "Creating…" : "Create meeting"}
-          </button>
+          </Button>
           {meeting?.status === "draft" ? (
-            <button
-              className={secondaryButtonClassName}
+            <Button
+              variant="secondary"
+              leftIcon={<Play size={16} strokeWidth={2} />}
               disabled={isBusy}
               onClick={() => {
                 void startMeetingSession().then((didStart) => {
@@ -121,10 +124,9 @@ export function CreateMeetingForm() {
                   }
                 });
               }}
-              type="button"
             >
               Start meeting
-            </button>
+            </Button>
           ) : null}
         </div>
       </form>

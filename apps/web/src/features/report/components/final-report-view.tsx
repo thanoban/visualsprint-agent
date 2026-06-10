@@ -3,6 +3,7 @@
 import type { EvidenceReference, FinalReport, ScreenEvent, TranscriptSegment } from "@visualsprint/contracts";
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { ListChecks } from "lucide-react";
 
 import {
   BlockerCard,
@@ -13,7 +14,7 @@ import {
   SourceModeBadge,
 } from "../../../components/domain/record-cards";
 import { SignalColumn } from "../../../components/domain/signal-column";
-import { secondaryButtonClassName } from "../../../components/ui/button-styles";
+import { Button } from "../../../components/ui/button";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { resolveEvidenceTargets } from "../../../lib/evidence-linking";
 import { formatTimestamp } from "../../../lib/format";
@@ -51,14 +52,14 @@ export function FinalReportView({
 
       <section
         id="report-summary"
-        className="scroll-mt-24 rounded-[1.5rem] border border-border bg-surface p-5 sm:scroll-mt-28 sm:rounded-[2rem] sm:p-8"
+        className="scroll-mt-24 rounded-xl border border-border bg-surface p-5 sm:scroll-mt-28 sm:p-8"
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-foreground-muted">
+            <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
               Evidence-backed report
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Executive summary</h2>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">Executive summary</h2>
           </div>
           <SourceModeBadge label="summary" mode={report.summarySource} />
         </div>
@@ -70,8 +71,10 @@ export function FinalReportView({
         </p>
         {hasRecommendations ? (
           <div className="mt-6 print:hidden">
-            <Link className={secondaryButtonClassName} href={`/meetings/${meetingId}/actions`}>
-              Review action recommendations
+            <Link href={`/meetings/${meetingId}/actions`}>
+              <Button variant="secondary" size="sm" leftIcon={<ListChecks size={14} strokeWidth={2} />}>
+                Review action recommendations
+              </Button>
             </Link>
           </div>
         ) : null}
@@ -159,12 +162,12 @@ export function FinalReportView({
 
       <section
         id="report-memory"
-        className="scroll-mt-24 rounded-[1.5rem] border border-[var(--accent-memory)]/25 bg-[var(--accent-memory)]/5 p-5 sm:scroll-mt-28 sm:rounded-[2rem] sm:p-6"
+        className="scroll-mt-24 rounded-xl border border-[var(--accent-memory)]/25 bg-[var(--accent-memory)]/5 p-5 sm:scroll-mt-28 sm:p-6"
       >
-        <p className="text-xs uppercase tracking-[0.24em] text-[var(--accent-memory)]">
+        <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-memory)]">
           Organizational memory
         </p>
-        <h3 className="mt-2 text-xl font-semibold sm:text-2xl">Memory highlights</h3>
+        <h3 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">Memory highlights</h3>
         <div className="mt-5 grid gap-4 md:grid-cols-2">
           {report.memoryHighlights.length === 0 ? (
             <EmptyState

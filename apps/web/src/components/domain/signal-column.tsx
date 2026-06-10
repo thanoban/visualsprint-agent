@@ -16,7 +16,7 @@ export function SignalColumn({
   const items = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
 
   return (
-    <section className="rounded-[1.25rem] border border-border bg-surface p-4">
+    <section className="rounded-xl border border-border bg-surface p-4 shadow-sm">
       <p className="text-sm font-semibold text-foreground">{title}</p>
       <div className="mt-3 space-y-3">
         {items.length > 0 ? items : <EmptyState title={emptyTitle} body={emptyBody} />}

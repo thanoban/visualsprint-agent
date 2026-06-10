@@ -3,17 +3,34 @@
 import type { ActionRecommendation } from "@visualsprint/contracts";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { motion } from "framer-motion";
+import {
+  CheckCircle2,
+  XCircle,
+  Zap,
+  Ticket,
+  MessageSquare,
+  TrendingUp,
+  AlertTriangle,
+} from "lucide-react";
 
 import { Card } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { InfoTile } from "../../components/ui/metric";
 import { PageSkeleton } from "../../components/ui/skeleton";
-import {
-  primaryButtonClassName,
-  secondaryLightButtonClassName,
-} from "../../components/ui/button-styles";
+import { Button } from "../../components/ui/button";
 import { ErrorBanner } from "../../components/shared/error-banner";
 import { useMeetingSession } from "../meeting-session/context/meeting-session-provider";
+
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+};
+
+const cardItem = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25, ease: [0.16, 1, 0.3, 1] as const } },
+};
 
 function RecommendationCard({
   recommendation,
@@ -28,17 +45,46 @@ function RecommendationCard({
   onReject: () => void;
   onExecute: () => void;
 }) {
+  const isJira = recommendation.type.startsWith("jira_");
+  const typeIcon = isJira ? (
+    <Ticket size={14} strokeWidth={2} />
+  ) : (
+    <MessageSquare size={14} strokeWidth={2} />
+  );
+
+  const typeLabel = recommendation.type.replace(/_/g, " ");
+  const title =
+    recommendation.jiraDetails?.title ??
+    recommendation.slackDetails?.title ??
+    "Untitled";
+  const description =
+    recommendation.jiraDetails?.description ??
+    recommendation.slackDetails?.message ??
+    "";
+
   return (
-    <article className="rounded-[1.2rem] border border-border bg-surface p-4">
+    <motion.article
+      variants={cardItem}
+      className="group rounded-xl border border-border bg-surface p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md sm:p-5"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground-muted">
-            {recommendation.type.replace(/_/g, " ")}
+          <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground-muted">
+            {typeIcon}
+            {typeLabel}
           </span>
-          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium uppercase text-foreground-muted">
+          <span
+            className={`rounded-md px-2 py-0.5 text-xs font-medium uppercase ${
+              recommendation.status === "pending"
+                ? "bg-[var(--status-draft)]/15 text-[var(--status-draft)]"
+                : recommendation.status === "approved"
+                  ? "bg-[var(--status-live)]/15 text-[var(--status-live)]"
+                  : "bg-surface-muted text-foreground-muted"
+            }`}
+          >
             {recommendation.status}
           </span>
-          <span className="rounded-full bg-[var(--status-draft)]/15 px-2 py-0.5 text-xs font-medium text-[var(--status-draft)]">
+          <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-[var(--status-draft)]">
             {recommendation.urgency}
           </span>
         </div>
@@ -46,48 +92,45 @@ function RecommendationCard({
           confidence {(recommendation.confidence * 100).toFixed(0)}%
         </span>
       </div>
-      <p className="mt-2 text-sm font-semibold text-foreground">
-        {recommendation.jiraDetails?.title ?? recommendation.slackDetails?.title ?? "Untitled"}
-      </p>
-      <p className="mt-1 text-sm leading-6 text-foreground-muted">
-        {recommendation.jiraDetails?.description ?? recommendation.slackDetails?.message ?? ""}
-      </p>
+      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
+      <p className="mt-1 text-sm leading-6 text-foreground-muted">{description}</p>
       {recommendation.executionResult ? (
         <p className="mt-2 text-xs text-foreground-muted">{recommendation.executionResult}</p>
       ) : null}
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
         {recommendation.status === "pending" ? (
           <>
-            <button
-              className={primaryButtonClassName}
+            <Button
+              size="sm"
+              leftIcon={<CheckCircle2 size={14} strokeWidth={2} />}
               disabled={isBusy}
               onClick={onApprove}
-              type="button"
             >
               Approve
-            </button>
-            <button
-              className={secondaryLightButtonClassName}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              leftIcon={<XCircle size={14} strokeWidth={2} />}
               disabled={isBusy}
               onClick={onReject}
-              type="button"
             >
               Reject
-            </button>
+            </Button>
           </>
         ) : null}
         {recommendation.status === "approved" ? (
-          <button
-            className={primaryButtonClassName}
+          <Button
+            size="sm"
+            leftIcon={<Zap size={14} strokeWidth={2} />}
             disabled={isBusy}
             onClick={onExecute}
-            type="button"
           >
             Execute
-          </button>
+          </Button>
         ) : null}
       </div>
-    </article>
+    </motion.article>
   );
 }
 
@@ -125,8 +168,12 @@ export function ActionsPage() {
     return <PageSkeleton />;
   }
 
-  const pendingCount = actionRecommendations.filter((item) => item.status === "pending").length;
-  const approvedCount = actionRecommendations.filter((item) => item.status === "approved").length;
+  const pendingCount = actionRecommendations.filter(
+    (item) => item.status === "pending",
+  ).length;
+  const approvedCount = actionRecommendations.filter(
+    (item) => item.status === "approved",
+  ).length;
   const completedCount = actionRecommendations.filter(
     (item) => item.status === "executed" || item.status === "failed",
   ).length;
@@ -134,8 +181,10 @@ export function ActionsPage() {
   return (
     <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-10 lg:px-10">
       <header className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.24em] text-foreground-muted">{meeting.title}</p>
-        <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Action recommendations</h1>
+        <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">{meeting.title}</p>
+        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+          Action recommendations
+        </h1>
         <p className="max-w-2xl text-sm leading-7 text-foreground-muted">
           Review Jira and Slack suggestions generated from the meeting report. Approve before
           execution.
@@ -152,16 +201,15 @@ export function ActionsPage() {
 
       <Card title="Approval portal" eyebrow="Post-meeting actions">
         <div className="space-y-5">
-          <button
-            className={secondaryLightButtonClassName}
+          <Button
+            variant="secondary"
             disabled={isBusy || meeting.status !== "ended"}
             onClick={() => {
               void generateRecommendations();
             }}
-            type="button"
           >
             Generate recommendations
-          </button>
+          </Button>
 
           {actionRecommendations.length === 0 ? (
             <EmptyState
@@ -173,7 +221,12 @@ export function ActionsPage() {
               }
             />
           ) : (
-            <div className="space-y-3">
+            <motion.div
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="space-y-3"
+            >
               {actionRecommendations.map((rec) => (
                 <RecommendationCard
                   key={rec.id}
@@ -190,7 +243,7 @@ export function ActionsPage() {
                   recommendation={rec}
                 />
               ))}
-            </div>
+            </motion.div>
           )}
         </div>
       </Card>

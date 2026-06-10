@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { RotateCcw, LayoutList } from "lucide-react";
 
-import { primaryButtonClassName } from "../components/ui/button-styles";
+import { Button } from "../components/ui/button";
 
 export default function GlobalError({
   error,
@@ -23,11 +24,13 @@ export default function GlobalError({
         An unexpected error occurred. Try again or return to the meetings list.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
-        <button className={primaryButtonClassName} onClick={reset} type="button">
+        <Button leftIcon={<RotateCcw size={16} strokeWidth={2} />} onClick={reset}>
           Try again
-        </button>
-        <a className={primaryButtonClassName} href="/meetings">
-          Meetings
+        </Button>
+        <a href="/meetings">
+          <Button variant="secondary" leftIcon={<LayoutList size={16} strokeWidth={2} />}>
+            Meetings
+          </Button>
         </a>
       </div>
     </div>

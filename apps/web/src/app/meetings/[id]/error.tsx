@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect } from "react";
+import { RotateCcw, LayoutList } from "lucide-react";
 
-import { primaryButtonClassName } from "../../../components/ui/button-styles";
+import { Button } from "../../../components/ui/button";
 
 export default function MeetingError({
   error,
@@ -23,11 +24,13 @@ export default function MeetingError({
         The meeting workspace failed to render. Retry or choose another session.
       </p>
       <div className="flex flex-wrap justify-center gap-3">
-        <button className={primaryButtonClassName} onClick={reset} type="button">
+        <Button leftIcon={<RotateCcw size={16} strokeWidth={2} />} onClick={reset}>
           Try again
-        </button>
-        <a className={primaryButtonClassName} href="/meetings">
-          All meetings
+        </Button>
+        <a href="/meetings">
+          <Button variant="secondary" leftIcon={<LayoutList size={16} strokeWidth={2} />}>
+            All meetings
+          </Button>
         </a>
       </div>
     </div>

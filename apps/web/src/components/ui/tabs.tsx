@@ -2,10 +2,12 @@
 
 import type { KeyboardEvent, ReactNode } from "react";
 import { useId } from "react";
+import { motion } from "framer-motion";
 
 export type TabItem = {
   id: string;
   label: string;
+  icon?: ReactNode;
   content: ReactNode;
 };
 
@@ -51,46 +53,41 @@ export function Tabs({
   return (
     <div className="space-y-4">
       <div
-        className="flex gap-1 overflow-x-auto rounded-2xl border border-border bg-surface-muted p-1"
+        className="relative flex gap-1 overflow-x-auto rounded-xl border border-border bg-surface-muted p-1"
         role="tablist"
       >
         {items.map((item, index) => {
           const isActive = item.id === active?.id;
           const tabId = `${tabsetId}-${item.id}-tab`;
           const panelId = `${tabsetId}-${item.id}-panel`;
-          if (isActive) {
-            return (
-              <button
-                key={item.id}
-                id={tabId}
-                aria-controls={panelId}
-                aria-selected="true"
-                className="shrink-0 rounded-xl bg-surface px-4 py-2 text-sm font-medium text-foreground shadow-sm transition"
-                onKeyDown={(event) => onTabKeyDown(event, index)}
-                onClick={() => onChange(item.id)}
-                role="tab"
-                tabIndex={0}
-                type="button"
-              >
-                {item.label}
-              </button>
-            );
-          }
-
           return (
             <button
               key={item.id}
               id={tabId}
               aria-controls={panelId}
-              aria-selected="false"
-              className="shrink-0 rounded-xl px-4 py-2 text-sm font-medium text-foreground-muted transition hover:text-foreground"
+              aria-selected={isActive}
+              className={`relative z-10 flex shrink-0 items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition ${
+                isActive
+                  ? "text-foreground"
+                  : "text-foreground-muted hover:text-foreground"
+              }`}
               onKeyDown={(event) => onTabKeyDown(event, index)}
               onClick={() => onChange(item.id)}
               role="tab"
-              tabIndex={-1}
+              tabIndex={isActive ? 0 : -1}
               type="button"
             >
-              {item.label}
+              {isActive && (
+                <motion.div
+                  layoutId={`activeTab-${tabsetId}`}
+                  className="absolute inset-0 rounded-lg bg-surface shadow-sm"
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                />
+              )}
+              <span className="relative z-10 flex items-center gap-2">
+                {item.icon}
+                {item.label}
+              </span>
             </button>
           );
         })}

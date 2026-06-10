@@ -82,7 +82,7 @@ export function LinkedEvidenceFeed({
               return (
                 <button
                   key={segment.id}
-                  className={`block w-full rounded-[1.2rem] text-left transition ${highlightClass(active)}`}
+                  className={`block w-full rounded-xl text-left transition ${highlightClass(active)}`}
                   onClick={() => {
                     setSelectedTranscriptId(segment.id);
                     setSelectedScreenEventId(null);
@@ -118,7 +118,7 @@ export function LinkedEvidenceFeed({
               return (
                 <button
                   key={screenEvent.id}
-                  className={`block w-full rounded-[1.2rem] text-left transition ${highlightClass(active)}`}
+                  className={`block w-full rounded-xl text-left transition ${highlightClass(active)}`}
                   onClick={() => {
                     setSelectedScreenEventId(screenEvent.id);
                     setSelectedTranscriptId(null);
