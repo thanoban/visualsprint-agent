@@ -51,10 +51,10 @@ export function LiveSessionPage() {
   }
 
   const sessionPanels = (
-    <>
+    <div className="space-y-8">
       <LiveMetricsRow meeting={meeting} />
       <CapturePanel />
-    </>
+    </div>
   );
 
   return (
@@ -62,7 +62,7 @@ export function LiveSessionPage() {
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] as const }}
-      className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-5 sm:gap-6 sm:px-8 sm:py-6 lg:px-10"
+      className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-5 sm:gap-8 sm:px-8 sm:py-8 lg:px-12"
     >
       <SseLiveRegion meetingTitle={meeting.title} streamStatus={streamStatus} />
 
@@ -92,7 +92,7 @@ export function LiveSessionPage() {
         />
       </div>
 
-      <div className="hidden flex-col gap-6 lg:flex">
+      <div className="hidden flex-col gap-8 lg:flex">
         {sessionPanels}
         <ReasoningPanels />
       </div>

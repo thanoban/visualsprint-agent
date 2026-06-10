@@ -32,36 +32,44 @@ export function ReportToolbar({
   }
 
   return (
-    <div className="sticky top-[57px] z-30 flex flex-col gap-3 rounded-xl border border-border bg-[var(--bg-elevated)]/90 p-3 backdrop-glass print:hidden sm:top-[57px] sm:gap-4 sm:p-4">
-      <nav aria-label="Report sections" className="-mx-1 flex gap-2 overflow-x-auto px-1">
+    <div className="sticky top-[57px] z-30 flex flex-col gap-3 rounded-2xl border border-border bg-[var(--bg-elevated)]/90 p-4 shadow-sm backdrop-glass print:hidden sm:gap-4 sm:p-5">
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-brand/10">
+            <FileText size={14} strokeWidth={2} className="text-brand" />
+          </span>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground-muted">Navigation</p>
+        </div>
+        <div className="flex flex-wrap gap-2 sm:justify-end">
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<Copy size={14} strokeWidth={2} />}
+            onClick={() => void copySummary()}
+          >
+            Copy summary
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            leftIcon={<Printer size={14} strokeWidth={2} />}
+            onClick={() => window.print()}
+          >
+            Print report
+          </Button>
+        </div>
+      </div>
+      <nav aria-label="Report sections" className="flex gap-2 overflow-x-auto pb-1">
         {sections.map((section) => (
           <a
             key={section.id}
-            className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground-muted transition hover:border-brand/40 hover:text-brand hover:shadow-sm"
+            className="shrink-0 rounded-lg border border-border bg-surface px-3 py-1.5 text-xs font-medium text-foreground-muted transition-all duration-200 hover:border-brand/40 hover:text-brand hover:shadow-sm hover:-translate-y-0.5"
             href={`#${section.id}`}
           >
             {section.label}
           </a>
         ))}
       </nav>
-      <div className="flex flex-wrap gap-2 sm:justify-end">
-        <Button
-          variant="secondary"
-          size="sm"
-          leftIcon={<Copy size={14} strokeWidth={2} />}
-          onClick={() => void copySummary()}
-        >
-          Copy summary
-        </Button>
-        <Button
-          variant="secondary"
-          size="sm"
-          leftIcon={<Printer size={14} strokeWidth={2} />}
-          onClick={() => window.print()}
-        >
-          Print report
-        </Button>
-      </div>
     </div>
   );
 }

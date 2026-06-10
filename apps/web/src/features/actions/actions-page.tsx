@@ -12,6 +12,8 @@ import {
   MessageSquare,
   TrendingUp,
   AlertTriangle,
+  ListChecks,
+  Sparkles,
 } from "lucide-react";
 
 import { Card } from "../../components/ui/card";
@@ -65,16 +67,17 @@ function RecommendationCard({
   return (
     <motion.article
       variants={cardItem}
-      className="group rounded-xl border border-border bg-surface p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-md sm:p-5"
+      className="group relative overflow-hidden rounded-2xl border border-border bg-surface p-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-brand/20 hover:shadow-lg"
     >
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-foreground-muted">
+          <span className="inline-flex items-center gap-1.5 rounded-lg bg-surface-muted px-2.5 py-1 text-xs font-medium text-foreground-muted">
             {typeIcon}
             {typeLabel}
           </span>
           <span
-            className={`rounded-md px-2 py-0.5 text-xs font-medium uppercase ${
+            className={`rounded-lg px-2.5 py-1 text-xs font-bold uppercase tracking-[0.1em] ${
               recommendation.status === "pending"
                 ? "bg-[var(--status-draft)]/15 text-[var(--status-draft)]"
                 : recommendation.status === "approved"
@@ -84,20 +87,20 @@ function RecommendationCard({
           >
             {recommendation.status}
           </span>
-          <span className="rounded-md bg-surface-muted px-2 py-0.5 text-xs font-medium text-[var(--status-draft)]">
+          <span className="rounded-lg bg-surface-muted px-2.5 py-1 text-xs font-bold uppercase tracking-[0.1em] text-[var(--status-draft)]">
             {recommendation.urgency}
           </span>
         </div>
-        <span className="text-xs text-foreground-muted">
-          confidence {(recommendation.confidence * 100).toFixed(0)}%
+        <span className="text-xs font-medium text-foreground-subtle">
+          {(recommendation.confidence * 100).toFixed(0)}% confidence
         </span>
       </div>
-      <p className="mt-3 text-sm font-semibold text-foreground">{title}</p>
-      <p className="mt-1 text-sm leading-6 text-foreground-muted">{description}</p>
+      <p className="mt-4 text-sm font-bold text-foreground">{title}</p>
+      <p className="mt-1.5 text-sm leading-6 text-foreground-muted">{description}</p>
       {recommendation.executionResult ? (
-        <p className="mt-2 text-xs text-foreground-muted">{recommendation.executionResult}</p>
+        <p className="mt-3 text-xs text-foreground-subtle">{recommendation.executionResult}</p>
       ) : null}
-      <div className="mt-4 flex flex-wrap gap-2">
+      <div className="mt-5 flex flex-wrap gap-2">
         {recommendation.status === "pending" ? (
           <>
             <Button
@@ -179,16 +182,21 @@ export function ActionsPage() {
   ).length;
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-8 sm:py-10 lg:px-10">
-      <header className="space-y-3">
-        <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">{meeting.title}</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-          Action recommendations
-        </h1>
-        <p className="max-w-2xl text-sm leading-7 text-foreground-muted">
-          Review Jira and Slack suggestions generated from the meeting report. Approve before
-          execution.
-        </p>
+    <div className="mx-auto flex max-w-7xl flex-col gap-8 px-4 py-6 sm:gap-10 sm:px-8 sm:py-10 lg:px-12">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-brand/20 bg-brand/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-brand">
+            <ListChecks size={12} strokeWidth={2} />
+            {meeting.title}
+          </div>
+          <h1 className="text-3xl font-bold tracking-tight text-balance sm:text-4xl lg:text-5xl">
+            Action recommendations
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm leading-7 text-foreground-muted sm:text-base">
+            Review Jira and Slack suggestions generated from the meeting report. Approve before
+            execution.
+          </p>
+        </div>
       </header>
 
       {actionRecommendations.length > 0 ? (
@@ -204,6 +212,7 @@ export function ActionsPage() {
           <Button
             variant="secondary"
             disabled={isBusy || meeting.status !== "ended"}
+            leftIcon={<Sparkles size={16} strokeWidth={2} />}
             onClick={() => {
               void generateRecommendations();
             }}
@@ -225,7 +234,7 @@ export function ActionsPage() {
               variants={container}
               initial="hidden"
               animate="show"
-              className="space-y-3"
+              className="grid gap-3 sm:grid-cols-2"
             >
               {actionRecommendations.map((rec) => (
                 <RecommendationCard

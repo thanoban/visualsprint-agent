@@ -16,14 +16,14 @@ const statusIconMap: Record<string, React.ReactNode> = {
 export function StatusPill({ status }: { status: MeetingDetail["status"] }) {
   const variant =
     status === "live"
-      ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/15 text-[var(--status-live)]"
+      ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/15 text-[var(--status-live)] shadow-[0_0_12px_rgba(52,211,153,0.08)]"
       : status === "ended"
         ? "border-border bg-surface-muted text-foreground-muted"
         : "border-[var(--status-draft)]/30 bg-[var(--status-draft)]/15 text-[var(--status-draft)]";
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] ${variant}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${variant}`}
     >
       {statusIconMap[status] ?? null}
       {status}
@@ -47,7 +47,7 @@ export function CaptureStatusPill({
 
   const variant =
     label === "recording"
-      ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/15 text-[var(--status-live)]"
+      ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/15 text-[var(--status-live)] shadow-[0_0_12px_rgba(52,211,153,0.08)]"
       : label === "completed"
         ? "border-border bg-surface-muted text-foreground-muted"
         : label === "requesting" || label === "stopping"
@@ -65,7 +65,7 @@ export function CaptureStatusPill({
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] ${variant}`}
+      className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] ${variant}`}
     >
       {icon}
       {label}
@@ -100,7 +100,7 @@ export function RecordStatusBadge({
 
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-medium uppercase tracking-[0.12em] ${className}`}
+      className={`inline-flex items-center gap-1 rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${className}`}
     >
       {icon}
       {status}
@@ -111,13 +111,13 @@ export function RecordStatusBadge({
 export function SupportBadge({ label, ok }: { label: string; ok: boolean }) {
   return (
     <div
-      className={`rounded-xl border px-4 py-3 ${
+      className={`rounded-xl border px-4 py-3 transition-all duration-200 ${
         ok
           ? "border-[var(--status-live)]/25 bg-[var(--status-live)]/10 text-[var(--status-live)]"
           : "border-border bg-surface-muted text-foreground-muted"
       }`}
     >
-      <p className="text-xs uppercase tracking-[0.18em]">{label}</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.18em]">{label}</p>
       <p className="mt-2 text-sm font-semibold">
         {ok ? "Available" : "Unavailable"}
       </p>

@@ -48,28 +48,45 @@ export function CapturePanel() {
   const recentChunks = meeting.recentCaptureChunks;
 
   const isCaptureBusy = capturePhase === "requesting" || capturePhase === "stopping";
+  const isRecording = capturePhase === "recording";
 
   return (
     <Card title="Live capture" eyebrow="Browser session">
-      <div className="space-y-5">
+      <div className="space-y-6">
         <p className="sr-only" role="status" aria-live="polite">
           {captureStatusMessage(capturePhase)}
         </p>
+
         <div
           aria-busy={isCaptureBusy}
-          className="rounded-xl border border-border bg-surface-muted p-4"
+          className={`relative overflow-hidden rounded-2xl border p-5 transition-all duration-300 ${
+            isRecording
+              ? "border-[var(--status-live)]/30 bg-[var(--status-live)]/5 shadow-glow"
+              : "border-border bg-surface-muted"
+          }`}
         >
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-            <div>
+          {isRecording && (
+            <div className="absolute right-4 top-4">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-[var(--status-live)]/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--status-live)]">
+                <Radio size={10} strokeWidth={2.5} className="live-pulse" />
+                Recording
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-semibold text-foreground">
                 {activeCaptureSession ? "Capture is active" : "Capture not started"}
               </p>
-              <CaptureSessionSummary
-                hasSession={Boolean(activeCaptureSession)}
-                recorderMimeType={activeCaptureSession?.recorderMimeType}
-                session={activeCaptureSession}
-                status={activeCaptureSession?.status}
-              />
+              <div className="mt-2">
+                <CaptureSessionSummary
+                  hasSession={Boolean(activeCaptureSession)}
+                  recorderMimeType={activeCaptureSession?.recorderMimeType}
+                  session={activeCaptureSession}
+                  status={activeCaptureSession?.status}
+                />
+              </div>
             </div>
             <CaptureStatusPill
               phase={capturePhase}
@@ -77,7 +94,7 @@ export function CapturePanel() {
             />
           </div>
 
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-5 flex flex-wrap gap-3">
             {isCaptureBusy ? (
               <p className="w-full text-sm text-foreground-muted">
                 {formatCapturePhase(capturePhase)}
@@ -91,6 +108,7 @@ export function CapturePanel() {
                 void beginBrowserCapture();
                 stopButtonRef.current?.focus();
               }}
+              className={isRecording ? "" : "shadow-sm"}
             >
               Begin capture
             </Button>

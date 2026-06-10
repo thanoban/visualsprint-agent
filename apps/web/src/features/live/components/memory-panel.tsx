@@ -18,6 +18,7 @@ export function MemoryPanel() {
     <Card
       title={memoryModule?.label ?? "Cross-meeting memory"}
       eyebrow="Elastic memory strip"
+      dark
     >
       <MemoryStrip matches={meeting.recentMemoryMatches} />
     </Card>

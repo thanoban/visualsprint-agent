@@ -3,7 +3,7 @@
 import { sourceConnectors } from "@visualsprint/contracts";
 import type { CreateMeetingRequest } from "@visualsprint/contracts";
 import { useRouter } from "next/navigation";
-import { PlusCircle, Play } from "lucide-react";
+import { PlusCircle, Play, PenLine } from "lucide-react";
 
 import { Card } from "../../../components/ui/card";
 import { Field } from "../../../components/ui/field";
@@ -26,8 +26,8 @@ export function CreateMeetingForm() {
   }
 
   return (
-    <Card title="Create meeting" eyebrow="Setup">
-      <form className="space-y-5" onSubmit={handleSubmit}>
+    <Card title="Create meeting" eyebrow="Configuration">
+      <form className="space-y-6" onSubmit={handleSubmit}>
         <Field label="Meeting title">
           <input
             aria-label="Meeting title"
@@ -104,11 +104,12 @@ export function CreateMeetingForm() {
           />
         </Field>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 pt-2">
           <Button
             leftIcon={<PlusCircle size={16} strokeWidth={2} />}
             disabled={isBusy}
             type="submit"
+            className="shadow-sm"
           >
             {isBusy ? "Creating…" : "Create meeting"}
           </Button>

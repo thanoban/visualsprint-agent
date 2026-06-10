@@ -16,9 +16,9 @@ export function MemoryStrip({ matches }: { matches: MemoryMatch[] }) {
   }
 
   return (
-    <div className="flex gap-4 overflow-x-auto pb-2">
+    <div className="flex gap-4 overflow-x-auto pb-3 snap-x snap-mandatory scrollbar-thin">
       {matches.map((match) => (
-        <div key={match.id} className="min-w-[18rem] max-w-sm shrink-0">
+        <div key={match.id} className="min-w-[18rem] max-w-sm shrink-0 snap-start">
           <MemoryMatchCard memoryMatch={match} />
         </div>
       ))}

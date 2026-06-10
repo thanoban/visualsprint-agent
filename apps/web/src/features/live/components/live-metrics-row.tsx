@@ -68,12 +68,20 @@ export function LiveMetricsRow({ meeting }: { meeting: MeetingDetail }) {
           >
             <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
             <div className="flex items-center gap-2 text-[var(--ink-fg-muted)]">
-              <Icon size={14} strokeWidth={2} />
+              <div className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-brand/10">
+                <Icon size={14} strokeWidth={2} className="text-brand" />
+              </div>
               <span className="text-xs uppercase tracking-[0.18em]">{cfg.label}</span>
             </div>
-            <p className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight text-[var(--ink-fg)]">
+            <motion.p
+              key={value}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.2 }}
+              className="mt-1 font-mono text-2xl font-semibold tabular-nums tracking-tight text-[var(--ink-fg)]"
+            >
               {value}
-            </p>
+            </motion.p>
             {sparkData.length > 1 && (
               <div className="mt-2">
                 <Sparkline data={sparkData} color="var(--brand)" height={32} />

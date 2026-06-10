@@ -3,6 +3,7 @@
 import type { EvidenceReference, FinalReport, ScreenEvent, TranscriptSegment } from "@visualsprint/contracts";
 import Link from "next/link";
 import { useCallback, useState } from "react";
+import { motion } from "framer-motion";
 import { ListChecks } from "lucide-react";
 
 import {
@@ -47,26 +48,30 @@ export function FinalReportView({
   );
 
   return (
-    <div className="report-document space-y-6 sm:space-y-8">
+    <div className="report-document space-y-8 sm:space-y-10">
       <ReportToolbar executiveSummary={report.executiveSummary} />
 
-      <section
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] as const }}
         id="report-summary"
-        className="scroll-mt-24 rounded-xl border border-border bg-surface p-5 sm:scroll-mt-28 sm:p-8"
+        className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6 shadow-sm sm:p-8"
       >
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/30 to-transparent" />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-foreground-muted">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground-muted">
               Evidence-backed report
             </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-balance sm:text-3xl">Executive summary</h2>
+            <h2 className="mt-2 text-2xl font-bold tracking-tight text-balance sm:text-3xl">Executive summary</h2>
           </div>
           <SourceModeBadge label="summary" mode={report.summarySource} />
         </div>
-        <p className="mt-5 text-base leading-7 text-foreground sm:mt-6 sm:text-lg sm:leading-8">
+        <p className="mt-6 text-base leading-7 text-foreground sm:text-lg sm:leading-8">
           {report.executiveSummary}
         </p>
-        <p className="mt-4 text-sm text-foreground-muted">
+        <p className="mt-4 text-sm text-foreground-subtle">
           Generated {formatTimestamp(report.generatedAt)}
         </p>
         {hasRecommendations ? (
@@ -78,7 +83,7 @@ export function FinalReportView({
             </Link>
           </div>
         ) : null}
-      </section>
+      </motion.section>
 
       <section id="report-evidence" className="scroll-mt-24 sm:scroll-mt-28 print:hidden">
         {transcriptSegments.length > 0 || screenEvents.length > 0 ? (
@@ -160,15 +165,20 @@ export function FinalReportView({
         </SignalColumn>
       </div>
 
-      <section
+      <motion.section
+        initial={{ opacity: 0, y: 12 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] as const }}
         id="report-memory"
-        className="scroll-mt-24 rounded-xl border border-[var(--accent-memory)]/25 bg-[var(--accent-memory)]/5 p-5 sm:scroll-mt-28 sm:p-6"
+        className="relative overflow-hidden rounded-2xl border border-[var(--accent-memory)]/25 bg-[var(--accent-memory)]/5 p-6 shadow-sm sm:p-8"
       >
-        <p className="text-xs uppercase tracking-[0.2em] text-[var(--accent-memory)]">
+        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-[var(--accent-memory)]/40 to-transparent" />
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--accent-memory)]">
           Organizational memory
         </p>
-        <h3 className="mt-2 text-xl font-semibold tracking-tight sm:text-2xl">Memory highlights</h3>
-        <div className="mt-5 grid gap-4 md:grid-cols-2">
+        <h3 className="mt-2 text-xl font-bold tracking-tight sm:text-2xl">Memory highlights</h3>
+        <div className="mt-6 grid gap-4 md:grid-cols-2">
           {report.memoryHighlights.length === 0 ? (
             <EmptyState
               title="No memory highlights"
@@ -180,7 +190,7 @@ export function FinalReportView({
             ))
           )}
         </div>
-      </section>
+      </motion.section>
     </div>
   );
 }

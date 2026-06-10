@@ -2,6 +2,7 @@
 
 import type { ScreenEvent, TranscriptSegment } from "@visualsprint/contracts";
 import { useMemo, useState } from "react";
+import { motion } from "framer-motion";
 
 import { ScreenEventCard, TranscriptCard } from "../../../components/domain/record-cards";
 import { Card } from "../../../components/ui/card";
@@ -14,7 +15,7 @@ import {
 function highlightClass(active: boolean) {
   return active
     ? "ring-2 ring-accent/60 ring-offset-2 ring-offset-background"
-    : "hover:border-brand/30";
+    : "hover:border-brand/30 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-sm";
 }
 
 export function LinkedEvidenceFeed({
@@ -80,9 +81,10 @@ export function LinkedEvidenceFeed({
               const active = isSelected || isLinked || isExternal;
 
               return (
-                <button
+                <motion.button
                   key={segment.id}
-                  className={`block w-full rounded-xl text-left transition ${highlightClass(active)}`}
+                  whileTap={{ scale: 0.995 }}
+                  className={`block w-full rounded-xl text-left ${highlightClass(active)}`}
                   onClick={() => {
                     setSelectedTranscriptId(segment.id);
                     setSelectedScreenEventId(null);
@@ -91,7 +93,7 @@ export function LinkedEvidenceFeed({
                   type="button"
                 >
                   <TranscriptCard segment={segment} />
-                </button>
+                </motion.button>
               );
             })
           )}
@@ -116,9 +118,10 @@ export function LinkedEvidenceFeed({
               const active = isSelected || isLinked || isExternal;
 
               return (
-                <button
+                <motion.button
                   key={screenEvent.id}
-                  className={`block w-full rounded-xl text-left transition ${highlightClass(active)}`}
+                  whileTap={{ scale: 0.995 }}
+                  className={`block w-full rounded-xl text-left ${highlightClass(active)}`}
                   onClick={() => {
                     setSelectedScreenEventId(screenEvent.id);
                     setSelectedTranscriptId(null);
@@ -127,7 +130,7 @@ export function LinkedEvidenceFeed({
                   type="button"
                 >
                   <ScreenEventCard screenEvent={screenEvent} />
-                </button>
+                </motion.button>
               );
             })
           )}

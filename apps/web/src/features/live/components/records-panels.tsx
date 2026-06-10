@@ -52,7 +52,7 @@ export function RecordsPanels({
   const moduleMap = Object.fromEntries(dashboardModules.map((module) => [module.id, module]));
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <LinkedEvidenceFeed
         highlightedScreenEventIds={highlightedScreenEventIds}
         highlightedTranscriptIds={highlightedTranscriptIds}

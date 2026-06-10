@@ -10,12 +10,14 @@ export function EmptyState({
   bodyClassName?: string;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border bg-surface-muted/50 p-8 text-center">
-      <Inbox
-        size={40}
-        strokeWidth={1.5}
-        className="mb-4 text-foreground-subtle"
-      />
+    <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-surface-muted/40 p-10 text-center">
+      <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-surface-2">
+        <Inbox
+          size={24}
+          strokeWidth={1.5}
+          className="text-foreground-subtle"
+        />
+      </div>
       <p className="text-sm font-semibold text-foreground">{title}</p>
       <p
         className={`mt-2 max-w-sm text-sm leading-6 text-foreground-muted ${bodyClassName ?? ""}`}
