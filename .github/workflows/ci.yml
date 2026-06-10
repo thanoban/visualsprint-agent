@@ -1,0 +1,34 @@
+name: VisualSprint CI
+
+on:
+  push:
+    branches:
+      - main
+      - deploy/frontend-cloud-run
+      - add-github-actions-ci
+
+  pull_request:
+
+jobs:
+  test-agents:
+    name: Test agents
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install agents package
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e services/agents
+          pip install pytest
+
+      - name: Run wrapper tests
+        run: |
+          pytest services/agents/tests/test_engine_wrappers.py

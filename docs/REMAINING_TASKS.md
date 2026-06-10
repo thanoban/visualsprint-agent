@@ -11,6 +11,7 @@ Run in **us-west1**; Elasticsearch project in **us-central1**.
 ---
 
 ## ✅ Already done
+<<<<<<< HEAD
 - [x] Multi-service architecture: `services/api` (control plane), `services/agents`
       (reasoning + summary + action), `services/ingest`, `services/media`.
 - [x] Elastic write-back + search in `services/api`; Elastic MCP client in `services/agents`.
@@ -23,6 +24,98 @@ Run in **us-west1**; Elasticsearch project in **us-central1**.
       MCP endpoint, API keys.
 - [x] Action Agent + approval portal: Jira/Slack integration with real REST API calls
       (creates issues in `SCRUM` project, posts to `#general-visualsprint-agent`).
+=======
+
+### Core architecture
+- [x] Multi-service architecture: `services/api` (control plane), `services/agents`
+      (reasoning + summary + action), `services/ingest`, `services/media`.
+- [x] FastAPI control plane with full meeting lifecycle, SSE stream, capture session
+      routes, chunk lifecycle state machine.
+- [x] In-memory repository with capture chunk, transcript, screen-event, and
+      reasoning record storage; `recentCaptureChunks` / `recentDecisions` etc.
+      capped and served to the UI.
+- [x] `npm run verify` green (45 tests).
+
+### Capture (browser layer)
+- [x] `getDisplayMedia` + `getUserMedia` capture in `apps/web/src/lib/capture.ts`.
+- [x] `MediaRecorder` at 4s intervals; per-chunk register → upload-complete →
+      reasoning-run flow in `use-browser-capture.ts`.
+- [x] Capture phase state machine (`idle / requesting / recording / stopping`).
+- [x] `StartCaptureSessionRequest` carries `hasDisplayVideo / hasDisplayAudio /
+      hasMicrophoneAudio`; `CaptureSessionSummary` stored on meeting.
+- [x] Capture readiness pre-flight checks in the setup UI.
+
+### Agents + AI
+- [x] ADK reasoning, summary, and action agent scaffolds with deployed app entrypoints
+      under `services/agents/adk_apps/`.
+- [x] Flag-gated cloud adapter: `VISUALSPRINT_AGENT_MODE=configured_cloud` +
+      `vertex_ai_reasoning_engine` or `bridge` backend.
+- [x] ADK persistence tools (`register_outputs`, `finalize_report`) wired to control
+      plane; env-configurable Gemini model ids.
+- [x] `ChunkInsight` assembler builds structured focus areas, attention flags, and
+      memory queries from chunk context.
+- [x] Deterministic template fallback for all three agents so local dev works
+      without GCP.
+
+### Elastic
+- [x] Elastic write-back + search in `services/api`; `_sync_indexed_outcomes_to_elastic`
+      on every reasoning record upsert.
+- [x] Elastic MCP client in `services/agents` with `search_prior_outcomes` tool.
+- [x] Elastic portal: outcomes index, ELSER semantic field, `search_prior_outcomes`
+      tool, MCP endpoint, API keys.
+
+### Action review + UI
+- [x] Action agent (4th agent) — Jira + Slack recommendation scaffold in agents service.
+- [x] Full approval portal in the web UI: generate / approve / reject / execute flow.
+- [x] Action executor stubs for Jira and Slack in `services/api`.
+
+### Deployment
+- [x] Deploy assets: `.env.example`, `services/api/Dockerfile`,
+      `services/agents/Dockerfile`, `deploy.sh`, `infra/cloud-run/*.yaml`, `DEPLOY.md`.
+
+### Frontend (production UI)
+- [x] Full feature-based Next.js architecture (landing, meetings list, setup, live
+      session, hero report, actions portal, dev tools).
+- [x] Evidence Ink / Parchment dual theme; SSE live region; toast feedback; mobile
+      tabs; error boundaries; route-level loading skeletons.
+- [x] Report evidence linking: clicking a decision/blocker highlights linked
+      transcript and screen events.
+- [x] Dev tools panel (`/dev`): chunk insight, summary packet, indexed outcomes
+      preview, agent smoke, audit.
+
+---
+
+## ⬜ Remaining — real capture pipeline
+> Full plan in [REAL_CAPTURE_PIPELINE.md](./REAL_CAPTURE_PIPELINE.md).
+
+These items turn the deterministic-template capture flow into a real media pipeline.
+They are independent of the operational steps below and can be done in parallel.
+
+- [ ] **Phase 0 — Storage config:** provision GCS bucket `visualsprint-capture-media`
+      with CORS for `PUT`; add `GCS_BUCKET`, `GOOGLE_CLOUD_PROJECT` settings to
+      `services/ingest/config.py` and `services/media/config.py`; add
+      `google-cloud-storage`, `google-cloud-speech` to ingest deps and
+      `google-cloud-storage`, `google-genai`, `ffmpeg` to media deps.
+- [ ] **Phase 1 — Real upload:** generate real GCS v4 signed PUT URLs in
+      `services/ingest/uploads.py`; frontend `use-browser-capture.ts` PUTs the
+      real `.webm` Blob to `uploadTarget.signedUrl` before calling
+      `upload-complete`; add `displaySurface` detection + audio-coverage warning
+      for window shares.
+- [ ] **Phase 2 — Real transcription:** pass `storageObjectPath` to ingest;
+      replace `build_transcript_segments` with GCS download + Google Speech-to-Text
+      (with speaker diarization); keep template as fallback.
+- [ ] **Phase 3 — Real vision:** pass `storageObjectPath` to media; replace
+      `build_screen_events` with ffmpeg frame sampling + Gemini multimodal
+      classification of `ScreenEventKind` / `summary`; keep template as fallback.
+- [ ] **Phase 4 — Real reasoning (config only):** deploy ADK agents to Vertex
+      Agent Engine; set `VISUALSPRINT_AGENT_MODE=configured_cloud` +
+      `VISUALSPRINT_AGENT_RUNTIME_BACKEND=vertex_ai_reasoning_engine` + engine
+      resource names; fix action-audit agent-id copy-paste bug in `action.py`.
+- [ ] **Phase 5 — Ingest + media Cloud Run:** add Dockerfiles and Cloud Run
+      manifests for ingest and media; wire `VISUALSPRINT_INGEST_SERVICE_URL` /
+      `VISUALSPRINT_MEDIA_SERVICE_URL`; grant service accounts GCS + Speech +
+      Vertex IAM.
+>>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
 ---
 
@@ -56,9 +149,14 @@ Run in **us-west1**; Elasticsearch project in **us-central1**.
       thread a real tenant id when multi-tenant is needed.
 - [ ] **Pick one agent runtime path as primary** (`vertex_ai_reasoning_engine`) and
       clearly label `bridge` as the optional fallback.
+<<<<<<< HEAD
 - [x] **Jira/Slack action executors** — confirmed real (not stubs); tested live:
       creates Jira issues (SCRUM-5, SCRUM-6) and posts Slack messages. Secrets set
       in `.env` and documented in `ACTION_AGENT_SETUP.md`.
+=======
+- [ ] **Jira/Slack action executors** — confirm whether they're real or stubs; set
+      `JIRA_*` / `SLACK_*` secrets if the demo includes the action agent.
+>>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 - [ ] **Optional:** rename `agent-creation-chatgpt-prompts.md` to a provider-neutral title.
 
 ---

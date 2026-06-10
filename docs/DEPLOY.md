@@ -59,9 +59,15 @@ register `search_prior_outcomes` → test a blocker input returns a memory match
 ```bash
 printf '%s' 'ENCODED_BACKEND_KEY' | gcloud secrets create elastic-backend-key --data-file=-
 printf '%s' 'ENCODED_MCP_KEY'     | gcloud secrets create elastic-mcp-key     --data-file=-
+<<<<<<< HEAD
 # optional (action executors are stubs today, but deploy.sh can inject them):
 # printf '%s' 'JIRA_TOKEN'  | gcloud secrets create jira-api-token --data-file=-
 # printf '%s' 'SLACK_TOKEN' | gcloud secrets create SLACK_BOT_TOKEN_SECRET --data-file=-
+=======
+# optional (action executors are stubs today):
+# printf '%s' 'JIRA_TOKEN'  | gcloud secrets create jira-api-token --data-file=-
+# printf '%s' 'SLACK_TOKEN' | gcloud secrets create slack-bot-token --data-file=-
+>>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
 gcloud iam service-accounts create visualsprint-agents
 SA_AG=visualsprint-agents@visualsprint-agent.iam.gserviceaccount.com
@@ -92,10 +98,40 @@ npm run dev:api
 bash deploy.sh
 ```
 `deploy.sh` deploys the api, then the agents (with `VISUALSPRINT_CONTROL_PLANE_URL`
+<<<<<<< HEAD
 = the api URL), then points the api at the agents URL. If `SLACK_TOKEN_SECRET`
 or `JIRA_TOKEN_SECRET` are set in `.env`, those secrets are also injected into
 the API service with Cloud Run `--set-secrets`. Region comes from `REGION` in
 `.env` (us-west1).
+=======
+= the api URL), then points the api at the agents URL — keys injected from Secret
+Manager. Region comes from `REGION` in `.env` (us-west1).
+
+## 7.5 Redeploy the Vertex ADK agents from the correct entrypoints
+The live fallback issue we verified on June 9, 2026 came from deploying the
+Reasoning Engine resources against the wrong Python entrypoint. Do not point
+Agent Engine at the FastAPI service module
+`visualsprint_agents.main:app`.
+
+Use the ADK app entrypoints instead:
+
+- reasoning: `services/agents/adk_apps/visualsprint_reasoning_agent/agent.py`
+- summary: `services/agents/adk_apps/visualsprint_summary_agent/agent.py`
+- action: `services/agents/adk_apps/visualsprint_action_agent/agent.py`
+
+The deployed object should be the ADK root agent exported from each app, not the
+Cloud Run HTTP app.
+
+Also make sure the Agent Engine deployment receives the runtime settings needed
+by the tools:
+
+- `VISUALSPRINT_CONTROL_PLANE_URL`
+- `VISUALSPRINT_MCP_ENDPOINT`
+- `VISUALSPRINT_ELASTIC_API_KEY`
+
+If these are missing, the agents can exist in Vertex but still fail internally
+or fall back in the Cloud Run adapter.
+>>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
 ## 8. Validate the seam
 ```bash
@@ -116,7 +152,10 @@ Register a blocker in one meeting (→ Elastic), then a similar blocker in anoth
 | --- | --- | --- | --- |
 | Elastic write-back/search key | api | `ELASTICSEARCH_API_KEY` (used directly as `ApiKey`) | secret `elastic-backend-key` |
 | Elastic MCP key | agents | `VISUALSPRINT_ELASTIC_API_KEY` (used directly as `ApiKey`) | secret `elastic-mcp-key` |
+<<<<<<< HEAD
 | Slack bot token | api | `SLACK_BOT_TOKEN_SECRET` | secret `SLACK_BOT_TOKEN_SECRET` |
+=======
+>>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 | MCP endpoint | agents | `VISUALSPRINT_ELASTIC_MCP_ENDPOINT` | Kibana `/api/agent_builder/mcp` |
 | Control plane for ADK persistence | agents | `VISUALSPRINT_CONTROL_PLANE_URL` | deployed api URL (set by deploy.sh) |
 | Agents service for control plane | api | `VISUALSPRINT_AGENTS_SERVICE_URL` | deployed agents URL (set by deploy.sh) |
