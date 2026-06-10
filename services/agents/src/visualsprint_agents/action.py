@@ -11,10 +11,31 @@ from visualsprint_agents.models import (
     AgentActionRecommendationInput,
     AgentJiraRecommendationInput,
     AgentSlackRecommendationInput,
-    JiraAction,
-    JiraIssueType,
-    SlackActionType,
 )
+
+
+def _recommendation_dedupe_key(
+    recommendation: AgentActionRecommendationInput,
+) -> tuple[str, str]:
+    if recommendation.jiraDetails is not None:
+        return recommendation.type, recommendation.jiraDetails.title
+    if recommendation.slackDetails is not None:
+        return recommendation.type, recommendation.slackDetails.title
+    return recommendation.type, ""
+
+
+def _dedupe_recommendations(
+    recommendations: list[AgentActionRecommendationInput],
+) -> list[AgentActionRecommendationInput]:
+    seen: set[tuple[str, str]] = set()
+    unique: list[AgentActionRecommendationInput] = []
+    for recommendation in recommendations:
+        key = _recommendation_dedupe_key(recommendation)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(recommendation)
+    return unique
 
 
 def run_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
@@ -22,7 +43,7 @@ def run_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
 
     if settings.cloud_adapter_ready:
         cloud_response = invoke_action_agent(payload)
-        if cloud_response is not None:
+        if cloud_response is not None and cloud_response.recommendations:
             audit_store.record(
                 agent_kind="action",
                 execution_mode=(
@@ -32,9 +53,9 @@ def run_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
                 ),
                 status="success",
                 target_agent_id=(
-                    settings.reasoning_engine_resource_name
+                    settings.action_engine_resource_name
                     if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
-                    else settings.reasoning_agent_id
+                    else settings.action_agent_id
                 ),
                 request_key=payload.meetingId,
                 detail=(
@@ -44,6 +65,10 @@ def run_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
                 ),
             )
             return cloud_response
+
+        empty_vertex_response = (
+            cloud_response is not None and not cloud_response.recommendations
+        )
         audit_store.record(
             agent_kind="action",
             execution_mode=(
@@ -53,13 +78,18 @@ def run_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
             ),
             status="fallback",
             target_agent_id=(
-                settings.reasoning_engine_resource_name
+                settings.action_engine_resource_name
                 if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
-                else settings.reasoning_agent_id
+                else settings.action_agent_id
             ),
             request_key=payload.meetingId,
             detail=(
-                "Configured Vertex AI runtime was unavailable, so deterministic action fallback was used."
+                "Configured Vertex AI runtime returned no recommendations, so deterministic action fallback was used."
+                if empty_vertex_response
+                and settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "Configured bridge returned no recommendations, so deterministic action fallback was used."
+                if empty_vertex_response
+                else "Configured Vertex AI runtime was unavailable, so deterministic action fallback was used."
                 if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
                 else "Configured bridge was unavailable, so deterministic action fallback was used."
             ),
@@ -167,7 +197,29 @@ def _run_mock_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
                 )
             )
 
-    if payload.blockers or payload.commitments or payload.decisions:
+    for open_question in payload.openQuestions:
+        recommendations.append(
+            AgentActionRecommendationInput(
+                type="jira_create_issue",
+                urgency="medium",
+                confidence=0.80,
+                jiraDetails=AgentJiraRecommendationInput(
+                    action="create_issue",
+                    issueType="task",
+                    title=open_question.question,
+                    description=(
+                        f"Open question from meeting '{payload.meetingTitle}'. "
+                        f"Raised by: {open_question.speakerLabel}."
+                    ),
+                    ownerLabel=open_question.speakerLabel,
+                    evidence=[],
+                    confidence=0.80,
+                ),
+                evidence=[],
+            )
+        )
+
+    if payload.blockers or payload.commitments or payload.decisions or payload.openQuestions:
         recommendations.append(
             AgentActionRecommendationInput(
                 type="slack_post_summary",
@@ -186,7 +238,7 @@ def _run_mock_action_agent(payload: ActionAgentRequest) -> ActionAgentResponse:
 
     return ActionAgentResponse(
         meetingId=payload.meetingId,
-        recommendations=recommendations,
+        recommendations=_dedupe_recommendations(recommendations),
     )
 
 
