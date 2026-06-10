@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import os
 import shutil
 import subprocess
@@ -20,6 +21,7 @@ STAGING_BUCKET = os.environ.get(
     "VISUALSPRINT_VERTEX_STAGING_BUCKET",
     "gs://visualsprint-agent-agent-engine-staging",
 )
+DEFAULT_ADK_MODEL = "gemini-2.5-flash"
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 AGENTS_ROOT = REPO_ROOT / "services" / "agents"
@@ -30,19 +32,27 @@ AGENTS_PACKAGE = AGENTS_SRC / "visualsprint_agents"
 # Make local packages importable before pickling the agent.
 sys.path.insert(0, str(ADK_APPS))
 sys.path.insert(0, str(AGENTS_SRC))
+os.environ["VISUALSPRINT_ADK_MODEL"] = DEFAULT_ADK_MODEL
 
-from visualsprint_action_agent.agent import root_agent as action_root_agent
-from visualsprint_reasoning_agent.agent import root_agent as reasoning_root_agent
-from visualsprint_summary_agent.agent import root_agent as summary_root_agent
+from visualsprint_agents.adk.engine_wrappers import (
+    VisualSprintActionEngine,
+    VisualSprintReasoningEngine,
+    VisualSprintSummaryEngine,
+)
 
 
 def deploy_agent(
     display_name: str,
     description: str,
-    root_agent: object,
+    agent_engine: object,
     extra_packages: list[str],
 ) -> str:
     env_vars = {
+        # Force google-genai / ADK to use Vertex AI credentials, not API-key mode.
+        # GOOGLE_CLOUD_PROJECT is reserved/injected by Agent Engine; do not set it here.
+        "GOOGLE_GENAI_USE_VERTEXAI": "True",
+        "GOOGLE_CLOUD_LOCATION": LOCATION,
+        "VISUALSPRINT_ADK_MODEL": DEFAULT_ADK_MODEL,
         "VISUALSPRINT_CONTROL_PLANE_URL": CONTROL_PLANE_URL,
         "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_ID": PROJECT_ID,
         "VISUALSPRINT_GOOGLE_CLOUD_PROJECT_NUMBER": PROJECT_NUMBER,
@@ -56,14 +66,18 @@ def deploy_agent(
     }
 
     remote_agent = agent_engines.create(
-        agent_engine=root_agent,
+        agent_engine=agent_engine,
         display_name=display_name,
         description=description,
+        # Pin to the local versions used to pickle the agent. A version skew
+        # between the pickling env and the deployed runtime (notably google-adk)
+        # produces runtime errors like "'LlmAgent' object has no attribute 'mode'".
         requirements=[
-            "google-cloud-aiplatform[adk,agent_engines]>=1.111.0",
-            "google-adk",
+            "google-cloud-aiplatform[adk,agent_engines]==1.156.0",
+            "google-adk==1.34.3",
+            "google-genai==1.75.0",
             "requests",
-            "pydantic",
+            "pydantic==2.12.5",
         ],
         extra_packages=extra_packages,
         env_vars=env_vars,
@@ -125,7 +139,40 @@ def prepare_flat_extra_packages() -> tuple[Path, list[str]]:
     return staging_root, prepared_paths
 
 
+AGENT_SPECS = {
+    "reasoning": (
+        "VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME",
+        "VisualSprint Reasoning Agent (query wrapper)",
+        "VisualSprint reasoning runtime wrapper exposing query(input) -> ReasoningRunResponse.",
+        VisualSprintReasoningEngine,
+    ),
+    "summary": (
+        "VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME",
+        "VisualSprint Summary Agent (query wrapper)",
+        "VisualSprint summary runtime wrapper exposing query(input) -> FinalReportDraft.",
+        VisualSprintSummaryEngine,
+    ),
+    "action": (
+        "VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME",
+        "VisualSprint Action Recommendation Agent (query wrapper)",
+        "VisualSprint action runtime wrapper exposing query(input) -> ActionAgentResponse.",
+        VisualSprintActionEngine,
+    ),
+}
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Redeploy VisualSprint Vertex Agent Engine wrappers.")
+    parser.add_argument(
+        "--agents",
+        nargs="+",
+        choices=sorted(AGENT_SPECS.keys()),
+        default=sorted(AGENT_SPECS.keys()),
+        help="Which agent wrappers to deploy (default: all). Example: --agents summary",
+    )
+    args = parser.parse_args()
+    selected = [name for name in ("reasoning", "summary", "action") if name in set(args.agents)]
+
     staging_root, extra_packages = prepare_flat_extra_packages()
 
     vertexai.init(
@@ -136,33 +183,23 @@ def main() -> None:
     )
     previous_cwd = Path.cwd()
     os.chdir(staging_root)
+    resources: dict[str, str] = {}
     try:
-        reasoning_resource = deploy_agent(
-            "VisualSprint Reasoning Agent",
-            "VisualSprint ADK reasoning agent for chunk-level meeting intelligence.",
-            reasoning_root_agent,
-            extra_packages,
-        )
-        summary_resource = deploy_agent(
-            "VisualSprint Summary Agent",
-            "VisualSprint ADK summary agent for final meeting reports.",
-            summary_root_agent,
-            extra_packages,
-        )
-        action_resource = deploy_agent(
-            "VisualSprint Action Recommendation Agent",
-            "VisualSprint ADK action recommendation agent for Jira and Slack follow-ups.",
-            action_root_agent,
-            extra_packages,
-        )
+        for name in selected:
+            env_var, display_name, description, engine_cls = AGENT_SPECS[name]
+            resources[env_var] = deploy_agent(
+                display_name,
+                description,
+                engine_cls(),
+                extra_packages,
+            )
     finally:
         os.chdir(previous_cwd)
 
     print("")
     print("New Vertex Agent Engine resources:")
-    print(f"VISUALSPRINT_REASONING_ENGINE_RESOURCE_NAME={reasoning_resource}")
-    print(f"VISUALSPRINT_SUMMARY_ENGINE_RESOURCE_NAME={summary_resource}")
-    print(f"VISUALSPRINT_ACTION_ENGINE_RESOURCE_NAME={action_resource}")
+    for env_var, resource_name in resources.items():
+        print(f"{env_var}={resource_name}")
 
 
 if __name__ == "__main__":
