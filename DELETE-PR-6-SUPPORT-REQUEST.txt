@@ -1,0 +1,14 @@
+Subject: Delete pull request #6 and refresh contributor cache
+
+Repository: VisualSprint-Labs/visualsprint-agent
+Pull request URL: https://github.com/VisualSprint-Labs/visualsprint-agent/pull/6
+
+I merged PR #6 by mistake. I have since:
+- Reset the main branch to commit e807452 (before the merge)
+- Rewritten the thanoban branch to remove all "Co-authored-by: Cursor" trailers
+
+The pull request still references old commits (af1e117) with Cursor co-author attribution, and cursoragent still appears in the repository Contributors list.
+
+Please delete pull request #6 entirely and refresh the repository contributor cache so cursoragent is no longer listed as a contributor.
+
+Thank you.

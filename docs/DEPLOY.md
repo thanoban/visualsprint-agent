@@ -95,6 +95,31 @@ bash deploy.sh
 = the api URL), then points the api at the agents URL — keys injected from Secret
 Manager. Region comes from `REGION` in `.env` (us-west1).
 
+## 7.5 Redeploy the Vertex ADK agents from the correct entrypoints
+The live fallback issue we verified on June 9, 2026 came from deploying the
+Reasoning Engine resources against the wrong Python entrypoint. Do not point
+Agent Engine at the FastAPI service module
+`visualsprint_agents.main:app`.
+
+Use the ADK app entrypoints instead:
+
+- reasoning: `services/agents/adk_apps/visualsprint_reasoning_agent/agent.py`
+- summary: `services/agents/adk_apps/visualsprint_summary_agent/agent.py`
+- action: `services/agents/adk_apps/visualsprint_action_agent/agent.py`
+
+The deployed object should be the ADK root agent exported from each app, not the
+Cloud Run HTTP app.
+
+Also make sure the Agent Engine deployment receives the runtime settings needed
+by the tools:
+
+- `VISUALSPRINT_CONTROL_PLANE_URL`
+- `VISUALSPRINT_MCP_ENDPOINT`
+- `VISUALSPRINT_ELASTIC_API_KEY`
+
+If these are missing, the agents can exist in Vertex but still fail internally
+or fall back in the Cloud Run adapter.
+
 ## 8. Validate the seam
 ```bash
 AG=$(gcloud run services describe visualsprint-agents --region us-west1 --format='value(status.url)')

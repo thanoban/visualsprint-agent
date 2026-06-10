@@ -20,6 +20,7 @@ param(
     [string]$ElasticUrlSecret = "ELASTICSEARCH_URL",
     [string]$ElasticIndexSecret = "ELASTIC_INDEX_OUTCOMES",
     [string]$ElasticMcpUrlSecret = "ELASTIC_MCP_SERVER_URL",
+    [string]$ControlPlaneUrl = "https://visualsprint-api-530780341550.us-west1.run.app",
 
     [string]$AllowedOrigins = "https://app.visualsprint.dev",
     [string]$ImageTag = "latest"
@@ -191,8 +192,9 @@ $agentsEnvVars = Join-EnvVars @(
     "VISUALSPRINT_SUMMARY_QUERY_URL=$summaryQueryUrl",
     "VISUALSPRINT_ACTION_QUERY_URL=$actionQueryUrl",
     "VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT=service-530780341550@gcp-sa-aiplatform-re.iam.gserviceaccount.com",
+    "VISUALSPRINT_CONTROL_PLANE_URL=$ControlPlaneUrl",
     "VISUALSPRINT_ALLOWED_ORIGINS=$AllowedOrigins",
-    "VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS=4.0"
+    "VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS=30.0"
 )
 
 $agentsSecrets = "VISUALSPRINT_ELASTIC_API_KEY=$($ElasticApiKeySecret):latest,VISUALSPRINT_MCP_ENDPOINT=$($ElasticMcpUrlSecret):latest"
@@ -231,7 +233,7 @@ $apiEnvVars = Join-EnvVars @(
     "SLACK_BOT_TOKEN_SECRET=",
     "SLACK_DEFAULT_CHANNEL=#general",
     "VISUALSPRINT_ALLOWED_ORIGINS=$AllowedOrigins",
-    "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=0.5"
+    "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=5.0"
 )
 
 $apiSecrets = "ELASTICSEARCH_URL=$($ElasticUrlSecret):latest,ELASTICSEARCH_API_KEY=$($ElasticApiKeySecret):latest,ELASTIC_INDEX_OUTCOMES=$($ElasticIndexSecret):latest,ELASTIC_MCP_SERVER_URL=$($ElasticMcpUrlSecret):latest"
@@ -258,6 +260,19 @@ $apiUrl = gcloud run services describe $ApiServiceName `
 if (-not $apiUrl) {
     throw "Unable to resolve the deployed API service URL."
 }
+
+$agentsEnvUpdate = Join-EnvVars @(
+    "VISUALSPRINT_CONTROL_PLANE_URL=$apiUrl"
+)
+
+Write-Host "Updating agents service with the deployed control plane URL..."
+Invoke-Native "gcloud" @(
+    "run", "services", "update", $AgentsServiceName,
+    "--project", $ProjectId,
+    "--region", $Region,
+    "--update-env-vars", $agentsEnvUpdate,
+    "--quiet"
+)
 
 Write-Host ""
 Write-Host "Deployment complete."
