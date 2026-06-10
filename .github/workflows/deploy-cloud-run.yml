@@ -114,6 +114,18 @@ jobs:
           echo "agents_url=${AGENTS_URL}" >> "${GITHUB_OUTPUT}"
           echo "web_url=${WEB_URL}" >> "${GITHUB_OUTPUT}"
 
+      - name: Sync API CORS origins
+        run: |
+          set -euo pipefail
+
+          CORS_ORIGINS="${{ steps.urls.outputs.web_url }},https://visualsprint-web-530780341550.us-west1.run.app,http://localhost:3000,http://127.0.0.1:3000"
+
+          gcloud run services update "${API_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --update-env-vars "^##^VISUALSPRINT_ALLOWED_ORIGINS=${CORS_ORIGINS}" \
+            --quiet
+
       - name: Smoke tests
         run: |
           set -euo pipefail
