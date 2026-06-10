@@ -53,7 +53,7 @@ def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
             blueprint,
             input_contract=blueprint.input_contract,
             output_contract=blueprint.output_contract,
-            output_schema_enforced=False,
+            output_schema_enforced=True,
         ),
         input_model=ChunkInsightRequest,
         output_model=ReasoningRunResponse,
@@ -64,8 +64,8 @@ def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
         include_contents="none",
         enforce_output_schema=False,
         notes=(
-            "The scaffold keeps output schema metadata for deployment/export, but it "
-            "does not enforce output_schema at runtime because this agent uses tools.",
+            "Expose memory retrieval and output registration tools for ADK deploy wiring. "
+            "The control plane may also pre-inject memoryMatches before reasoning runs.",
         ),
     )
 

@@ -46,7 +46,7 @@ def build_summary_agent_scaffold() -> AdkAgentScaffold:
             blueprint,
             input_contract=blueprint.input_contract,
             output_contract=blueprint.output_contract,
-            output_schema_enforced=False,
+            output_schema_enforced=True,
         ),
         input_model=SummaryPacketRequest,
         output_model=FinalReportDraft,
@@ -57,8 +57,8 @@ def build_summary_agent_scaffold() -> AdkAgentScaffold:
         include_contents="none",
         enforce_output_schema=False,
         notes=(
-            "The summary scaffold also keeps output schema metadata for deployment "
-            "export, while relying on instruction-driven JSON output in tool-using runs.",
+            "Expose finalize_report for ADK deploy wiring while the control plane "
+            "continues to own deterministic persistence.",
         ),
     )
 

@@ -473,7 +473,13 @@ def test_vertex_ai_runtime_mode_records_vertex_ai_audit(monkeypatch):
         "invoke_reasoning_agent",
         lambda payload: ReasoningRunResponse(
             clientChunkId=payload.clientChunkId,
-            decisions=[],
+            decisions=[
+                {
+                    "title": "Adopt the Vertex AI runtime",
+                    "rationale": "Vertex produced a structured decision.",
+                    "speakerLabel": "ReasoningAgent",
+                }
+            ],
             commitments=[],
             blockers=[],
             openQuestions=[],
@@ -556,7 +562,13 @@ def test_configured_cloud_reasoning_and_summary_use_bridge_before_fallback(monke
         "invoke_reasoning_agent",
         lambda payload: ReasoningRunResponse(
             clientChunkId=payload.clientChunkId,
-            decisions=[],
+            decisions=[
+                {
+                    "title": "Use the configured bridge",
+                    "rationale": "Bridge produced a structured decision.",
+                    "speakerLabel": "ReasoningAgent",
+                }
+            ],
             commitments=[],
             blockers=[],
             openQuestions=[],

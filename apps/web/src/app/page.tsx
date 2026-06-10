@@ -3,9 +3,9 @@ import type { Metadata } from "next";
 import { LandingPage } from "../features/landing/landing-page";
 
 export const metadata: Metadata = {
-  title: "VisualSprint — Meeting intelligence for engineering teams",
+  title: "VisualSprint — Meeting intelligence for online engineering teams",
   description:
-    "Capture live meetings, link evidence, and deliver polished reports with decisions, commitments, and organizational memory.",
+    "Capture online meeting conversations, screen activity, decisions, and commitments. Turn context into evidence-backed reports and approved Jira/Slack workflow actions.",
 };
 
 export default function HomePage() {

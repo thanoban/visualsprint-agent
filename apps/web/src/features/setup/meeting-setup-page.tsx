@@ -48,17 +48,17 @@ export function MeetingSetupPage() {
         </div>
       </motion.header>
 
-      {/* Pipeline stepper */}
-      <section>
-        <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-foreground-subtle">Pipeline</p>
-        <CaptureStepper capturePhase={capturePhase} meeting={meeting} />
-      </section>
-
       {/* Main grid */}
       <div className="grid gap-8 xl:grid-cols-5">
         {/* Left column: forms */}
         <div className="xl:col-span-3 space-y-8">
           <CreateMeetingForm />
+
+          <section>
+            <p className="mb-4 text-xs font-semibold uppercase tracking-[0.2em] text-foreground-subtle">Pipeline</p>
+            <CaptureStepper capturePhase={capturePhase} meeting={meeting} />
+          </section>
+
           <CaptureReadiness />
         </div>
 

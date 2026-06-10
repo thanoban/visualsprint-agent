@@ -6,9 +6,8 @@ from visualsprint_agents.adk.prompting import render_instruction_text
 from visualsprint_agents.adk.runtime import AdkAgentScaffold, create_root_agent
 from visualsprint_agents.adk.shared import AgentBlueprint
 from visualsprint_agents.adk.tool_contracts import CREATE_ACTION_RECOMMENDATIONS_TOOL
-from visualsprint_agents.adk.tools.actions import create_action_recommendations
 from visualsprint_agents.config import settings
-from visualsprint_agents.models import ActionAgentRequest, ActionAgentResponse, AgentActionRecommendationInput
+from visualsprint_agents.models import ActionAgentRequest, ActionAgentResponse
 
 
 def build_action_agent_blueprint() -> AgentBlueprint:
@@ -52,19 +51,20 @@ def build_action_agent_scaffold() -> AdkAgentScaffold:
             blueprint,
             input_contract=blueprint.input_contract,
             output_contract=blueprint.output_contract,
-            output_schema_enforced=False,
+            output_schema_enforced=True,
         ),
         input_model=ActionAgentRequest,
         output_model=ActionAgentResponse,
         input_schema=ActionAgentRequest.model_json_schema(),
         output_schema=ActionAgentResponse.model_json_schema(),
-        tools=(create_action_recommendations,),
+        tools=(),
         output_key="action_recommendations_response",
         include_contents="none",
-        enforce_output_schema=False,
+        enforce_output_schema=True,
         notes=(
-            "The scaffold keeps output schema metadata for deployment/export, but it "
-            "does not enforce output_schema at runtime because this agent uses tools.",
+            "Output schema is enforced via controlled generation so Gemini emits "
+            "schema-valid ActionAgentResponse JSON directly. The no-op recommendation "
+            "tool is intentionally omitted (persistence happens in the control plane).",
         ),
     )
 

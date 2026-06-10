@@ -10,12 +10,23 @@ from visualsprint_agents.invocation_audit import audit_store
 from visualsprint_agents.models import FinalReportDraft, SummaryPacketRequest
 
 
+def _summary_response_has_content(
+    response: FinalReportDraft, payload: SummaryPacketRequest
+) -> bool:
+    """A usable summary must synthesize real text, not return blank or echo the draft."""
+
+    generated = response.executiveSummary.strip()
+    if not generated:
+        return False
+    return generated != payload.draftExecutiveSummary.strip()
+
+
 def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
     """Generate a final report draft through the active adapter mode."""
 
     if settings.cloud_adapter_ready:
         cloud_response = invoke_summary_agent(payload)
-        if cloud_response is not None:
+        if cloud_response is not None and _summary_response_has_content(cloud_response, payload):
             audit_store.record(
                 agent_kind="summary",
                 execution_mode=(
@@ -37,6 +48,10 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
                 ),
             )
             return cloud_response
+
+        empty_cloud_response = (
+            cloud_response is not None and not _summary_response_has_content(cloud_response, payload)
+        )
         audit_store.record(
             agent_kind="summary",
             execution_mode=(
@@ -52,7 +67,12 @@ def run_summary_agent(payload: SummaryPacketRequest) -> FinalReportDraft:
             ),
             request_key=payload.meetingId,
             detail=(
-                "Configured Vertex AI runtime was unavailable, so deterministic summary fallback was used."
+                "Configured Vertex AI runtime returned no usable summary, so deterministic summary fallback was used."
+                if empty_cloud_response
+                and settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
+                else "Configured bridge returned no usable summary, so deterministic summary fallback was used."
+                if empty_cloud_response
+                else "Configured Vertex AI runtime was unavailable, so deterministic summary fallback was used."
                 if settings.agent_runtime_backend == "vertex_ai_reasoning_engine"
                 else "Configured bridge was unavailable, so deterministic summary fallback was used."
             ),

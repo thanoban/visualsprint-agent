@@ -2,29 +2,26 @@
 
 import Link from "next/link";
 import { motion, useScroll, useTransform } from "framer-motion";
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Play,
   ArrowRight,
   FileCheck,
   Radio,
   BrainCircuit,
-  FileX,
-  UserX,
-  RotateCcw,
   FileText,
-  MonitorOff,
   GitCommitHorizontal,
   CheckSquare,
-  Sparkles,
-  Paperclip,
   Monitor,
   Mic,
   Search,
   Zap,
-  Star,
-  Quote,
-  Mail,
+  UserX,
+  ClipboardList,
+  RotateCcw,
+  MessageSquare,
+  Shield,
+  Sparkles,
 } from "lucide-react";
 
 import { ThemeWrapper } from "../../components/layout/theme-wrapper";
@@ -35,20 +32,28 @@ import { HeroMockup } from "../../components/ui/hero-mockup";
 
 const highlights = [
   {
+    title: "Multi-agent intelligence",
+    body: "Dedicated agents reason over live chunks, compose final reports, and recommend workflow actions — each with a focused role in the pipeline.",
+    icon: Sparkles,
+  },
+  {
     title: "Evidence-backed reports",
-    body: "Every decision, commitment, and blocker links back to transcript and visual moments from the meeting.",
+    body: "Every decision, commitment, and blocker links back to transcript and screen moments from the meeting.",
     icon: FileCheck,
   },
   {
-    title: "Live intelligence",
-    body: "Watch decisions, blockers, and memory matches assemble in real time as the meeting unfolds.",
-    icon: Radio,
+    title: "Approved workflow actions",
+    body: "Jira issue recommendations and Slack update drafts your team reviews before anything is sent.",
+    icon: CheckSquare,
   },
-  {
-    title: "Organizational memory",
-    body: "Elastic semantic search surfaces recurring blockers and reopened issues across past meetings.",
-    icon: BrainCircuit,
-  },
+];
+
+const integrationItems = [
+  { label: "Jira action recommendations", icon: CheckSquare },
+  { label: "Slack update approvals", icon: MessageSquare },
+  { label: "Evidence-backed meeting reports", icon: FileCheck },
+  { label: "Browser-based online meeting capture", icon: Monitor },
+  { label: "Multi-agent reasoning pipeline", icon: Sparkles },
 ];
 
 const pipelineSteps = [
@@ -58,117 +63,73 @@ const pipelineSteps = [
     body: "Browser audio + screen context streamed in real time.",
   },
   {
-    icon: BrainCircuit,
-    label: "Reason",
-    body: "Gemini 3 multimodal insight per chunk — not just transcript.",
+    icon: Sparkles,
+    label: "Agents",
+    body: "Reasoning, summary, and action agents work together over each chunk and at meeting close.",
   },
   {
     icon: Search,
     label: "Memory",
-    body: "Elastic ELSER cross-meeting retrieval for recurring issues.",
+    body: "Cross-meeting retrieval surfaces recurring blockers and related past decisions.",
   },
   {
     icon: FileText,
     label: "Report",
-    body: "Evidence-backed final document with decisions, owners, and proof.",
+    body: "Summary agent produces an evidence-backed report with decisions, owners, and proof.",
   },
 ];
 
-const painPoints = [
-  {
-    icon: FileX,
-    title: "Decisions disappear",
-    body: "Teams leave meetings with no durable record of what was actually decided. Context evaporates within hours.",
-  },
+const problemSolutions = [
   {
     icon: UserX,
-    title: "Ownership is vague",
-    body: "Commitments are made verbally but never tracked. Follow-ups fall through because no one was named.",
-  },
-  {
-    icon: RotateCcw,
-    title: "Same blockers, different week",
-    body: "Recurring problems are never flagged against history. The team debates the same issues every sprint.",
+    problemTitle: "Missed meeting means missed context",
+    problemBody:
+      "When a team member misses an online meeting, they usually need to watch the full recording or ask others what happened.",
+    solutionTitle: "Get the full context without replaying everything",
+    solutionBody:
+      "VisualSprint turns the meeting into a structured record with discussions, screen context, decisions, owners, and next actions.",
   },
   {
     icon: FileText,
-    title: "Transcripts are not intelligence",
-    body: "A wall of text is not actionable. Hours of conversation reduced to a document no one reads.",
+    problemTitle: "Transcripts don't show the full story",
+    problemBody:
+      "A transcript only shows what people said. It does not explain the slide, demo, screen share, diagram, or product flow being discussed.",
+    solutionTitle: "Capture what was said and shown",
+    solutionBody:
+      "VisualSprint connects conversations with screen activity so the context behind each decision is easier to understand.",
   },
   {
-    icon: MonitorOff,
-    title: "Visual evidence is lost",
-    body: "Screenshots of errors, diagrams, and code reviews vanish. The 'why' behind a decision is unprovable.",
+    icon: ClipboardList,
+    problemTitle: "Meeting notes are manual and incomplete",
+    problemBody:
+      "Someone has to write down decisions, plans, blockers, and who will do what after the meeting.",
+    solutionTitle: "Generate structured meeting reports",
+    solutionBody:
+      "VisualSprint creates evidence-backed reports with decisions, commitments, blockers, open questions, and ownership.",
   },
-];
-
-const solutions = [
   {
     icon: GitCommitHorizontal,
-    title: "Decision log",
-    body: "Every decision is captured with rationale, speaker, and linked evidence — a permanent system of record.",
+    problemTitle: "Follow-up work happens after the meeting",
+    problemBody:
+      "Teams still need to create Jira tasks, send Slack updates, and remind owners manually.",
+    solutionTitle: "Recommend workflow-ready actions",
+    solutionBody:
+      "VisualSprint suggests Jira issues, Slack summaries, blocker alerts, and follow-up reminders based on the meeting discussion.",
   },
   {
-    icon: CheckSquare,
-    title: "Tracked commitments",
-    body: "Clear ownership, due hints, and status tracking so follow-ups actually ship.",
-  },
-  {
-    icon: BrainCircuit,
-    title: "Cross-meeting memory",
-    body: "Elastic semantic search detects recurring and reopened issues across your full meeting history.",
-  },
-  {
-    icon: Sparkles,
-    title: "Structured intelligence",
-    body: "Gemini reasons across transcript and screen context to extract decisions, blockers, and open questions automatically.",
-  },
-  {
-    icon: Paperclip,
-    title: "Evidence linking",
-    body: "Every record is tied to transcript segments and screen moments. Click a decision, see the proof.",
+    icon: RotateCcw,
+    problemTitle: "Decisions disappear over time",
+    problemBody:
+      "Teams repeat the same discussions because past decisions and blockers are difficult to find later.",
+    solutionTitle: "Build searchable team knowledge",
+    solutionBody:
+      "Every meeting becomes structured knowledge your team can search, review, and use in future planning.",
   },
 ];
-
-const testimonials = [
-  {
-    name: "Sarah Chen",
-    role: "Engineering Lead",
-    company: "Vercel",
-    quote:
-      "VisualSprint eliminated our 'what did we decide?' Slack threads. The evidence-linked reports are now our single source of truth for architecture decisions.",
-    rating: 5,
-    initials: "SC",
-    color: "bg-blue-500/20 text-blue-400",
-  },
-  {
-    name: "Marcus Johnson",
-    role: "Staff Product Manager",
-    company: "Linear",
-    quote:
-      "I used to spend 2 hours writing meeting summaries. Now I get a structured report with decisions and blockers before the meeting ends. It's honestly unfair.",
-    rating: 5,
-    initials: "MJ",
-    color: "bg-teal-500/20 text-teal-400",
-  },
-  {
-    name: "Aiko Tanaka",
-    role: "CTO",
-    company: "FintechLabs",
-    quote:
-      "The cross-meeting memory caught a recurring dependency issue we'd been ignoring for 3 sprints. That alone paid for the enterprise plan.",
-    rating: 5,
-    initials: "AT",
-    color: "bg-violet-500/20 text-violet-400",
-  },
-];
-
-
 
 const footerLinks = {
-  Product: ["Features", "Integrations", "Changelog", "Roadmap"],
-  Company: ["About", "Blog", "Careers", "Press"],
-  Resources: ["Documentation", "API Reference", "Community", "Support"],
+  Workflow: ["Meeting capture", "Evidence reports", "Decision records", "Action recommendations"],
+  Integrations: ["Jira", "Slack", "Browser capture", "Online meetings"],
   Legal: ["Privacy", "Terms", "Security", "Cookies"],
 };
 
@@ -184,87 +145,50 @@ const item = {
   show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } },
 };
 
-const rowContainer = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
-};
-
-const rowItem = {
-  hidden: { opacity: 0, x: -12 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
-};
-
-const rowItemRight = {
-  hidden: { opacity: 0, x: 12 },
-  show: { opacity: 1, x: 0, transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
-};
-
 /* ──────────────────────────  Sub-components  ────────────────────────── */
 
-function StarRating({ count }: { count: number }) {
+function particleSeed(index: number, salt: number) {
+  const x = Math.sin(index * 12.9898 + salt * 78.233) * 43758.5453;
+  return Math.round((x - Math.floor(x)) * 10000) / 10000;
+}
+
+const heroParticles = Array.from({ length: 24 }, (_, i) => ({
+  size: Math.round((particleSeed(i, 1) * 3 + 1) * 100) / 100,
+  left: Math.round(particleSeed(i, 2) * 10000) / 100,
+  delay: Math.round(particleSeed(i, 3) * 100) / 100,
+  duration: Math.round((particleSeed(i, 4) * 15 + 15) * 100) / 100,
+  opacity: Math.round((particleSeed(i, 5) * 0.5 + 0.2) * 10000) / 10000,
+}));
+
+function ParticleField() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) {
+    return null;
+  }
+
   return (
-    <div className="flex gap-0.5">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Star
+    <div className="pointer-events-none absolute inset-0 overflow-hidden">
+      {heroParticles.map((particle, i) => (
+        <div
           key={i}
-          size={14}
-          strokeWidth={2}
-          className={i < count ? "text-amber-400 fill-amber-400" : "text-foreground-muted"}
+          className="particle"
+          style={{
+            width: `${particle.size}px`,
+            height: `${particle.size}px`,
+            left: `${particle.left}%`,
+            bottom: `-${particle.size}px`,
+            animationDelay: `${particle.delay}s`,
+            animationDuration: `${particle.duration}s`,
+            opacity: particle.opacity,
+          }}
         />
       ))}
     </div>
-  );
-}
-
-function ParticleField() {
-  const particles = Array.from({ length: 24 });
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {particles.map((_, i) => {
-        const size = Math.random() * 3 + 1;
-        const left = Math.random() * 100;
-        const delay = Math.random() * 10;
-        const duration = Math.random() * 15 + 15;
-        return (
-          <div
-            key={i}
-            className="particle"
-            style={{
-              width: size,
-              height: size,
-              left: `${left}%`,
-              bottom: `-${size}px`,
-              animationDelay: `${delay}s`,
-              animationDuration: `${duration}s`,
-              opacity: Math.random() * 0.5 + 0.2,
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-}
-
-function TrustBadge() {
-  return (
-    <motion.div
-      variants={item}
-      className="inline-flex items-center gap-3 rounded-full border border-border bg-surface/80 px-4 py-2 text-sm text-foreground-muted shadow-sm backdrop-blur-sm"
-    >
-      <span className="flex -space-x-2">
-        {["bg-blue-500", "bg-teal-500", "bg-violet-500", "bg-amber-500", "bg-rose-500"].map(
-          (c, i) => (
-            <span
-              key={i}
-              className={`inline-flex h-6 w-6 items-center justify-center rounded-full border-2 border-background text-[10px] font-bold text-white ${c}`}
-            >
-              {String.fromCharCode(65 + i)}
-            </span>
-          )
-        )}
-      </span>
-      <span className="font-medium text-foreground">Trusted by 500+ engineering teams</span>
-    </motion.div>
   );
 }
 
@@ -296,9 +220,9 @@ function HeroSection() {
             className="max-w-2xl space-y-6"
           >
             <motion.div variants={item}>
-              <span className="inline-flex items-center gap-2 rounded-full border border-brand/30 bg-brand/10 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-brand">
-                <span className="h-1.5 w-1.5 rounded-full bg-brand live-pulse" />
-                Meeting intelligence for engineering teams
+              <span className="inline-flex items-center gap-2 rounded-full bg-brand/10 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.18em] text-brand shadow-glow animate-glow-pulse">
+                <span className="h-1.5 w-1.5 rounded-full bg-brand live-pulse shadow-[0_0_8px_rgba(45,212,168,0.6)]" />
+                Multi-agent meeting intelligence for online teams
               </span>
             </motion.div>
 
@@ -307,39 +231,38 @@ function HeroSection() {
               className="text-balance text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl xl:text-7xl"
               style={{ lineHeight: 1.08 }}
             >
-              Turn meetings into your team's{" "}
+              Turn meetings into{" "}
               <span className="bg-gradient-to-r from-brand via-[#5eead4] to-[#38bdf8] bg-clip-text text-transparent">
-                system of record
-              </span>
+                structured knowledge
+              </span>{" "}
+              for your workflow
             </motion.h1>
 
-            <motion.p
-              variants={item}
-              className="max-w-xl text-lg leading-8 text-foreground-muted sm:text-xl sm:leading-9"
-            >
-              AI-powered meeting intelligence that captures context, surfaces insights, and delivers
-              evidence-backed reports your engineering team can act on.
-            </motion.p>
+            <motion.div variants={item} className="max-w-xl space-y-4 text-lg leading-8 sm:text-xl sm:leading-9">
+              <p className="font-medium text-foreground">
+                When your team misses an online meeting, they shouldn&apos;t miss the context.
+              </p>
+              <div className="text-[#7dd3fc] [&_p]:m-0 [&_p+p]:mt-0">
+                <p className="font-medium">Skip recordings and transcript-only notes.</p>
+                <p>Turn meeting context into reports, knowledge, and workflow-ready actions.</p>
+              </div>
+            </motion.div>
 
             <motion.div variants={item} className="flex flex-wrap gap-3 pt-2">
               <Link href="/meetings/new">
                 <Button size="lg" leftIcon={<Play size={18} strokeWidth={2.5} />} className="shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 transition-all hover:-translate-y-0.5">
-                  Start Free Trial
+                  Start a meeting
                 </Button>
               </Link>
               <Link href="/meetings">
                 <Button variant="secondary" size="lg" rightIcon={<ArrowRight size={18} strokeWidth={2} />} className="hover:-translate-y-0.5 transition-all">
-                  Watch Demo
+                  View demo
                 </Button>
               </Link>
             </motion.div>
-
-            <motion.div variants={item} className="pt-2">
-              <TrustBadge />
-            </motion.div>
           </motion.div>
 
-          {/* Mockup */}
+          {/* Product screenshot */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -349,43 +272,46 @@ function HeroSection() {
             <HeroMockup />
           </motion.div>
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const, delay: 0.5 }}
+          className="mx-auto max-w-3xl rounded-2xl border border-brand/25 bg-brand/[0.06] px-6 py-4 text-center shadow-lg shadow-brand/5 sm:px-8 sm:py-5"
+        >
+          <p className="text-base font-medium leading-7 text-foreground sm:text-lg sm:leading-8">
+            Transform meeting conversations into{" "}
+            <span className="bg-gradient-to-r from-brand via-[#5eead4] to-[#38bdf8] bg-clip-text font-semibold text-transparent">
+              decisions, plans, and Jira/Slack actions
+            </span>
+            .
+          </p>
+        </motion.div>
       </div>
     </section>
   );
 }
 
-function TrustBar() {
-  const logos = [
-    { name: "Vercel", abbr: "▲" },
-    { name: "Linear", abbr: "⌘" },
-    { name: "Stripe", abbr: "S" },
-    { name: "Notion", abbr: "N" },
-    { name: "Figma", abbr: "F" },
-    { name: "GitHub", abbr: "<>" },
-    { name: "Slack", abbr: "#" },
-    { name: "Datadog", abbr: "D" },
-  ];
-
+function IntegrationStrip() {
   return (
-    <section className="relative border-y border-border bg-[var(--ink-bg-elevated)]/50 py-8">
+    <section className="relative border-y border-border bg-[var(--ink-bg-elevated)]/50 py-8 sm:py-10">
       <div className="mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
         <p className="mb-6 text-center text-xs font-semibold uppercase tracking-[0.2em] text-foreground-muted">
-          Used by teams at
+          Built for your engineering workflow
         </p>
-        <div className="relative overflow-hidden">
-          <div className="flex animate-marquee gap-12 whitespace-nowrap">
-            {[...logos, ...logos].map((logo, i) => (
+        <div className="flex flex-wrap items-center justify-center gap-3 sm:gap-4">
+          {integrationItems.map((entry) => {
+            const Icon = entry.icon;
+            return (
               <span
-                key={i}
-                className="inline-flex items-center gap-2 text-lg font-semibold text-foreground-muted/60 transition hover:text-foreground-muted"
+                key={entry.label}
+                className="inline-flex items-center gap-2 rounded-full border border-border bg-surface px-4 py-2 text-sm text-foreground-muted shadow-sm"
               >
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-surface-2 text-sm">
-                  {logo.abbr}
-                </span>
-                {logo.name}
+                <Icon size={16} strokeWidth={2} className="shrink-0 text-brand" />
+                {entry.label}
               </span>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
     </section>
@@ -458,6 +384,31 @@ function HowItWorksSection() {
           <h2 className="mx-auto mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
             From capture to evidence-backed report
           </h2>
+        </motion.div>
+
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
+          className="mx-auto mb-12 max-w-4xl rounded-2xl border border-brand/25 bg-brand/[0.06] px-6 py-5 text-center shadow-lg shadow-brand/5 sm:px-8"
+        >
+          <p className="text-sm font-semibold uppercase tracking-[0.18em] text-brand">Multi-agent system</p>
+          <p className="mt-3 text-base leading-7 text-foreground sm:text-lg sm:leading-8">
+            A{" "}
+            <span className="bg-gradient-to-r from-brand via-[#5eead4] to-[#38bdf8] bg-clip-text font-semibold text-transparent">
+              reasoning agent
+            </span>{" "}
+            analyzes live transcript and screen context, a{" "}
+            <span className="bg-gradient-to-r from-brand via-[#5eead4] to-[#38bdf8] bg-clip-text font-semibold text-transparent">
+              summary agent
+            </span>{" "}
+            composes the final report, and an{" "}
+            <span className="bg-gradient-to-r from-brand via-[#5eead4] to-[#38bdf8] bg-clip-text font-semibold text-transparent">
+              action agent
+            </span>{" "}
+            recommends Jira and Slack updates for your team to approve.
+          </p>
         </motion.div>
 
         <div className="relative">
@@ -534,7 +485,7 @@ function LiveDemoSection() {
         >
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#38bdf8]">Live Demo</p>
           <h2 className="mx-auto mt-3 max-w-3xl text-balance text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Watch decisions, blockers, and memory matches assemble in real time
+            Transform meeting conversations into decisions, plans, and Jira/Slack actions.
           </h2>
         </motion.div>
 
@@ -684,85 +635,7 @@ function ProblemSolutionSection() {
         >
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground-muted">The problem</p>
           <h2 className="mx-auto mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Why engineering teams lose decisions
-          </h2>
-        </motion.div>
-
-        <div className="grid gap-8 lg:grid-cols-2">
-          <motion.div
-            variants={rowContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            className="space-y-4"
-          >
-            {painPoints.map((p, i) => {
-              const Icon = p.icon;
-              return (
-                <motion.div
-                  key={i}
-                  variants={rowItem}
-                  className="flex items-start gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm transition hover:border-[var(--status-error)]/30 hover:shadow-md"
-                >
-                  <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--status-error)]/10 text-[var(--status-error)]">
-                    <Icon size={18} strokeWidth={2} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{p.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-foreground-muted">{p.body}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-
-          <motion.div
-            variants={rowContainer}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: "-60px" }}
-            className="space-y-4"
-          >
-            {solutions.map((s, i) => {
-              const Icon = s.icon;
-              return (
-                <motion.div
-                  key={i}
-                  variants={rowItemRight}
-                  className="flex items-start gap-4 rounded-xl border border-border bg-surface p-5 shadow-sm transition hover:border-brand/30 hover:shadow-md"
-                >
-                  <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
-                    <Icon size={18} strokeWidth={2} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-semibold text-foreground">{s.title}</h3>
-                    <p className="mt-1 text-sm leading-6 text-foreground-muted">{s.body}</p>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </motion.div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TestimonialsSection() {
-  return (
-    <section className="relative overflow-hidden py-20 sm:py-28">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-brand/[0.02] to-transparent" />
-      <div className="relative mx-auto max-w-7xl px-4 sm:px-8 lg:px-10">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, margin: "-80px" }}
-          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
-          className="mb-14 text-center"
-        >
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">Testimonials</p>
-          <h2 className="mx-auto mt-3 max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-            Loved by engineering leaders
+            Why meeting context gets lost
           </h2>
         </motion.div>
 
@@ -771,33 +644,70 @@ function TestimonialsSection() {
           initial="hidden"
           whileInView="show"
           viewport={{ once: true, margin: "-60px" }}
-          className="grid gap-6 md:grid-cols-3"
+          className="space-y-5"
         >
-          {testimonials.map((t) => (
-            <motion.article
-              key={t.name}
-              variants={item}
-              className="group relative rounded-2xl border border-border bg-surface p-8 shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-brand/20 hover:shadow-xl"
-            >
-              <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-brand/20 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
-              <Quote size={24} strokeWidth={2} className="mb-4 text-brand/40" />
-              <StarRating count={t.rating} />
-              <p className="mt-4 text-sm leading-7 text-foreground-muted">{t.quote}</p>
-              <div className="mt-6 flex items-center gap-3">
-                <span
-                  className={`inline-flex h-10 w-10 items-center justify-center rounded-full text-xs font-bold ${t.color}`}
-                >
-                  {t.initials}
-                </span>
-                <div>
-                  <p className="text-sm font-semibold">{t.name}</p>
-                  <p className="text-xs text-foreground-muted">
-                    {t.role} · {t.company}
-                  </p>
+          {problemSolutions.map((card) => {
+            const Icon = card.icon;
+            return (
+              <motion.article
+                key={card.problemTitle}
+                variants={item}
+                className="overflow-hidden rounded-2xl border border-border bg-surface shadow-md transition hover:border-border-strong hover:shadow-lg"
+              >
+                <div className="grid md:grid-cols-2">
+                  <div className="flex items-start gap-4 border-b border-border p-6 md:border-b-0 md:border-r">
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--status-error)]/10 text-[var(--status-error)]">
+                      <Icon size={18} strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--status-error)]">
+                        Problem
+                      </p>
+                      <h3 className="mt-1 text-base font-semibold text-foreground">{card.problemTitle}</h3>
+                      <p className="mt-2 text-sm leading-6 text-foreground-muted">{card.problemBody}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-4 bg-brand/[0.03] p-6">
+                    <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand/10 text-brand">
+                      <CheckSquare size={18} strokeWidth={2} />
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-brand">Solution</p>
+                      <h3 className="mt-1 text-base font-semibold text-foreground">{card.solutionTitle}</h3>
+                      <p className="mt-2 text-sm leading-6 text-foreground-muted">{card.solutionBody}</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </motion.article>
-          ))}
+              </motion.article>
+            );
+          })}
+        </motion.div>
+      </div>
+    </section>
+  );
+}
+
+function PrivacySection() {
+  return (
+    <section className="relative py-16 sm:py-20">
+      <div className="mx-auto max-w-4xl px-4 sm:px-8 lg:px-10">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-80px" }}
+          transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
+          className="rounded-2xl border border-border bg-surface p-8 text-center shadow-md sm:p-10"
+        >
+          <div className="mx-auto mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-brand/10 text-brand">
+            <Shield size={24} strokeWidth={2} />
+          </div>
+          <h2 className="text-balance text-2xl font-bold tracking-tight sm:text-3xl">
+            No silent recording. No hidden sharing.
+          </h2>
+          <p className="mx-auto mt-4 max-w-2xl text-sm leading-7 text-foreground-muted sm:text-base">
+            VisualSprint only captures meetings your team starts, then uses that context to create your
+            private reports and approved workflow actions.
+          </p>
         </motion.div>
       </div>
     </section>
@@ -820,24 +730,23 @@ function CTABanner() {
 
           <div className="relative">
             <h2 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl lg:text-5xl">
-              Ready to stop forgetting meetings?
+              Ready to turn virtual meetings into structured knowledge?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-foreground-muted">
-              Join 500+ engineering teams who use VisualSprint to turn conversations into action.
+              Make every meeting searchable, actionable, and easy to follow up.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <Link href="/meetings/new">
                 <Button size="lg" leftIcon={<Zap size={18} strokeWidth={2.5} />} className="shadow-lg shadow-brand/20 hover:shadow-xl hover:shadow-brand/30 transition-all hover:-translate-y-0.5">
-                  Start Free Trial
+                  Start a meeting
                 </Button>
               </Link>
               <Link href="/meetings">
                 <Button variant="secondary" size="lg" rightIcon={<ArrowRight size={18} strokeWidth={2} />} className="hover:-translate-y-0.5 transition-all">
-                  View Demo
+                  View demo
                 </Button>
               </Link>
             </div>
-            <p className="mt-4 text-xs text-foreground-subtle">No credit card required. 14-day free trial.</p>
           </div>
         </motion.div>
       </div>
@@ -862,32 +771,10 @@ function Footer() {
               </span>
               <span className="text-lg font-semibold tracking-tight">VisualSprint</span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-6 text-foreground-muted">
-              AI-powered meeting intelligence that captures context, surfaces insights, and delivers evidence-backed reports.
+            <p className="mt-4 max-w-sm text-sm leading-6 text-foreground-muted">
+              Meeting intelligence for online engineering teams. Turn meeting context into structured
+              knowledge, reports, and approved workflow actions.
             </p>
-            <div className="mt-6 flex gap-3">
-              <a
-                href="#"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground-muted transition hover:border-brand/30 hover:text-brand"
-                aria-label="Twitter"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"/></svg>
-              </a>
-              <a
-                href="#"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground-muted transition hover:border-brand/30 hover:text-brand"
-                aria-label="GitHub"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg>
-              </a>
-              <a
-                href="#"
-                className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-surface text-foreground-muted transition hover:border-brand/30 hover:text-brand"
-                aria-label="LinkedIn"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect width="4" height="12" x="2" y="9"/><circle cx="4" cy="4" r="2"/></svg>
-              </a>
-            </div>
           </div>
 
           {/* Links */}
@@ -907,24 +794,14 @@ function Footer() {
           ))}
         </div>
 
-        {/* Newsletter + Bottom */}
         <div className="mt-12 border-t border-border pt-8">
-          <div className="flex flex-col items-start justify-between gap-6 sm:flex-row sm:items-center">
-            <div className="flex w-full max-w-sm items-center gap-2">
-              <div className="relative flex-1">
-                <Mail size={16} strokeWidth={2} className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
-                <input
-                  type="email"
-                  placeholder="Enter your email"
-                  className="w-full rounded-lg border border-border bg-surface py-2.5 pl-9 pr-4 text-sm text-foreground placeholder-foreground-muted transition focus:border-brand focus:outline-none"
-                />
-              </div>
-              <Button size="md">Subscribe</Button>
-            </div>
-            <p className="text-xs text-foreground-subtle">
-              © {new Date().getFullYear()} VisualSprint, Inc. All rights reserved.
-            </p>
-          </div>
+          <p className="text-center text-xs leading-6 text-foreground-muted sm:text-sm">
+            No silent recording. No hidden sharing. Your team controls capture and approves workflow
+            actions.
+          </p>
+          <p className="mt-4 text-center text-xs text-foreground-subtle">
+            © 2026 VisualSprint. All rights reserved.
+          </p>
         </div>
       </div>
     </footer>
@@ -938,12 +815,12 @@ export function LandingPage() {
     <ThemeWrapper theme="ink">
       <div className="relative">
         <HeroSection />
-        <TrustBar />
+        <IntegrationStrip />
         <FeaturesSection />
         <HowItWorksSection />
         <LiveDemoSection />
         <ProblemSolutionSection />
-        <TestimonialsSection />
+        <PrivacySection />
         <CTABanner />
         <Footer />
       </div>

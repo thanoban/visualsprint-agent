@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import { LayoutList, PlusCircle, Sun, Moon, Monitor, Menu, X, Radio, ChevronRight } from "lucide-react";
 
-import { ApiStatusBadge } from "./api-status-badge";
 import { useTheme } from "../providers/theme-provider";
 import { showDevPanels } from "../../lib/env";
 
@@ -48,7 +47,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 sm:gap-4 sm:px-8 lg:px-10">
             <Logo />
             <div className="flex items-center gap-2">
-              <ApiStatusBadge />
               <nav className="flex items-center gap-1">
                 {navItems.map((item) => {
                   const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
@@ -138,8 +136,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="border-t border-border p-3">
-          <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted px-3 py-2">
-            <ApiStatusBadge />
+          <div className="flex items-center justify-end rounded-xl border border-border bg-surface-muted px-3 py-2">
             <button
               type="button"
               onClick={() => setTheme(theme === "system" ? (resolvedTheme === "ink" ? "paper" : "ink") : theme === "ink" ? "paper" : "system")}
@@ -156,7 +153,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="fixed inset-x-0 top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-background/80 px-4 backdrop-blur-xl backdrop-saturate-150 lg:hidden">
         <Logo />
         <div className="flex items-center gap-2">
-          <ApiStatusBadge />
           <button
             type="button"
             onClick={() => setMobileOpen((v) => !v)}
@@ -207,8 +203,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           )}
         </div>
         <div className="border-t border-border p-3">
-          <div className="flex items-center justify-between rounded-xl border border-border bg-surface-muted px-3 py-2">
-            <ApiStatusBadge />
+          <div className="flex items-center justify-end rounded-xl border border-border bg-surface-muted px-3 py-2">
             <button type="button" onClick={() => setTheme(theme === "system" ? (resolvedTheme === "ink" ? "paper" : "ink") : theme === "ink" ? "paper" : "system")} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-foreground-muted transition hover:bg-surface-2 hover:text-foreground" aria-label="Toggle theme">
               {theme === "system" ? <Monitor size={14} strokeWidth={2} /> : resolvedTheme === "ink" ? <Moon size={14} strokeWidth={2} /> : <Sun size={14} strokeWidth={2} />}
             </button>
