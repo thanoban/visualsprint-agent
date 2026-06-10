@@ -1,0 +1,142 @@
+name: Deploy Cloud Run
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  GCP_PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
+  GCP_REGION: ${{ vars.GCP_REGION }}
+  ARTIFACT_REPOSITORY: ${{ vars.ARTIFACT_REPOSITORY }}
+  API_SERVICE: ${{ vars.API_SERVICE }}
+  AGENTS_SERVICE: ${{ vars.AGENTS_SERVICE }}
+  WEB_SERVICE: ${{ vars.WEB_SERVICE }}
+  API_URL: ${{ vars.API_URL }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SERVICE_ACCOUNT }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Build and push container images
+        run: |
+          set -euo pipefail
+          REGISTRY="${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${ARTIFACT_REPOSITORY}"
+          TAG="${GITHUB_SHA}"
+
+          docker build \
+            -t "${REGISTRY}/api:${TAG}" \
+            -t "${REGISTRY}/api:latest" \
+            services/api
+          docker push "${REGISTRY}/api:${TAG}"
+          docker push "${REGISTRY}/api:latest"
+
+          docker build \
+            -t "${REGISTRY}/agents:${TAG}" \
+            -t "${REGISTRY}/agents:latest" \
+            services/agents
+          docker push "${REGISTRY}/agents:${TAG}"
+          docker push "${REGISTRY}/agents:latest"
+
+          docker build \
+            -f apps/web/Dockerfile \
+            --build-arg "NEXT_PUBLIC_API_BASE_URL=${API_URL}" \
+            --build-arg "NEXT_PUBLIC_SHOW_DEV_PANELS=false" \
+            -t "${REGISTRY}/web:${TAG}" \
+            -t "${REGISTRY}/web:latest" \
+            .
+          docker push "${REGISTRY}/web:${TAG}"
+          docker push "${REGISTRY}/web:latest"
+
+          echo "REGISTRY=${REGISTRY}" >> "${GITHUB_ENV}"
+          echo "IMAGE_TAG=${TAG}" >> "${GITHUB_ENV}"
+
+      - name: Update Cloud Run services (images only)
+        run: |
+          set -euo pipefail
+
+          gcloud run services update "${API_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${REGISTRY}/api:${IMAGE_TAG}" \
+            --quiet
+
+          gcloud run services update "${AGENTS_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${REGISTRY}/agents:${IMAGE_TAG}" \
+            --quiet
+
+          gcloud run services update "${WEB_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --image "${REGISTRY}/web:${IMAGE_TAG}" \
+            --quiet
+
+      - name: Resolve service URLs
+        id: urls
+        run: |
+          set -euo pipefail
+
+          API_URL_LIVE="$(gcloud run services describe "${API_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')"
+          AGENTS_URL="$(gcloud run services describe "${AGENTS_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')"
+          WEB_URL="$(gcloud run services describe "${WEB_SERVICE}" \
+            --project "${GCP_PROJECT_ID}" \
+            --region "${GCP_REGION}" \
+            --format='value(status.url)')"
+
+          echo "api_url=${API_URL_LIVE}" >> "${GITHUB_OUTPUT}"
+          echo "agents_url=${AGENTS_URL}" >> "${GITHUB_OUTPUT}"
+          echo "web_url=${WEB_URL}" >> "${GITHUB_OUTPUT}"
+
+      - name: Smoke tests
+        run: |
+          set -euo pipefail
+
+          echo ">> API health"
+          curl --fail --silent --show-error "${{ steps.urls.outputs.api_url }}/api/health"
+
+          echo ">> API meta"
+          curl --fail --silent --show-error "${{ steps.urls.outputs.api_url }}/api/meta"
+
+          echo ">> Agents health"
+          curl --fail --silent --show-error "${{ steps.urls.outputs.agents_url }}/api/health"
+
+      - name: Print service URLs
+        run: |
+          {
+            echo "Deployed Cloud Run services:"
+            echo "  API:    ${{ steps.urls.outputs.api_url }}"
+            echo "  Agents: ${{ steps.urls.outputs.agents_url }}"
+            echo "  Web:    ${{ steps.urls.outputs.web_url }}"
+            echo "  Image tag: ${IMAGE_TAG}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "API_URL=${{ steps.urls.outputs.api_url }}"
+          echo "AGENTS_URL=${{ steps.urls.outputs.agents_url }}"
+          echo "WEB_URL=${{ steps.urls.outputs.web_url }}"
