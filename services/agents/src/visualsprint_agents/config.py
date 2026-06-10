@@ -102,15 +102,9 @@ class Settings:
     cloud_run_service_url: str | None = None
     control_plane_url: str | None = None
     control_plane_bearer_token: str | None = None
-<<<<<<< HEAD
-    reasoning_model: str = "gemini-flash-latest"
-    summary_model: str = "gemini-flash-latest"
-    action_model: str = "gemini-flash-latest"
-=======
     reasoning_model: str = DEFAULT_ADK_MODEL
     summary_model: str = DEFAULT_ADK_MODEL
     action_model: str = DEFAULT_ADK_MODEL
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
     allowed_origins: tuple[str, ...] = ()
 
     @property
@@ -339,15 +333,9 @@ def build_settings(environ: Mapping[str, str] | None = None) -> Settings:
         cloud_run_service_url=_get(source, "VISUALSPRINT_CLOUD_RUN_SERVICE_URL"),
         control_plane_url=_get(source, "VISUALSPRINT_CONTROL_PLANE_URL"),
         control_plane_bearer_token=_get(source, "VISUALSPRINT_CONTROL_PLANE_BEARER_TOKEN"),
-<<<<<<< HEAD
-        reasoning_model=(source.get("VISUALSPRINT_REASONING_MODEL", "").strip() or "gemini-flash-latest"),
-        summary_model=(source.get("VISUALSPRINT_SUMMARY_MODEL", "").strip() or "gemini-flash-latest"),
-        action_model=(source.get("VISUALSPRINT_ACTION_MODEL", "").strip() or "gemini-flash-latest"),
-=======
         reasoning_model=_resolve_agent_model(source, "VISUALSPRINT_REASONING_MODEL"),
         summary_model=_resolve_agent_model(source, "VISUALSPRINT_SUMMARY_MODEL"),
         action_model=_resolve_agent_model(source, "VISUALSPRINT_ACTION_MODEL"),
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
         allowed_origins=_resolve_allowed_origins(source),
     )
 

@@ -3,7 +3,6 @@ param(
     [string]$ProjectNumber = "530780341550",
     [string]$Region = "us-west1",
     [string]$ArtifactRepository = "visualsprint",
-<<<<<<< HEAD
     [string]$AgentsServiceName = "visualsprint-agents",
     [string]$ApiServiceName = "visualsprint-api",
     [string]$AgentsServiceAccount = "visualsprint-agents@visualsprint-agent.iam.gserviceaccount.com",
@@ -18,40 +17,13 @@ param(
     [string]$ElasticMcpApiKeySecret = "elastic-mcp-server",
     [string]$JiraApiTokenSecret = "",
     [string]$SlackBotTokenSecret = "SLACK_BOT_TOKEN_SECRET",
-=======
-
-    [string]$AgentsServiceName = "visualsprint-agents",
-    [string]$ApiServiceName = "visualsprint-api",
-
-    # Existing Cloud Run runtime service account.
-    [string]$AgentsServiceAccount = "visualsprint-backend-service-a@visualsprint-agent.iam.gserviceaccount.com",
-    [string]$ApiServiceAccount = "visualsprint-backend-service-a@visualsprint-agent.iam.gserviceaccount.com",
-
-    [string]$ReasoningAgentId = "554162656492126208",
-    [string]$SummaryAgentId = "6620511354560184320",
-    [string]$ActionAgentId = "7293799498852073472",
-
-    # Secret Manager secret names, not raw secret values.
-    [string]$ElasticApiKeySecret = "ELASTICSEARCH_API_KEY",
-    [string]$ElasticUrlSecret = "ELASTICSEARCH_URL",
-    [string]$ElasticIndexSecret = "ELASTIC_INDEX_OUTCOMES",
-    [string]$ElasticMcpUrlSecret = "ELASTIC_MCP_SERVER_URL",
     [string]$ControlPlaneUrl = "https://visualsprint-api-530780341550.us-west1.run.app",
-
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
     [string]$AllowedOrigins = "https://app.visualsprint.dev",
     [string]$ImageTag = "latest"
 )
 
 $ErrorActionPreference = "Stop"
 
-<<<<<<< HEAD
-=======
-if ($PSVersionTable.PSVersion.Major -ge 7) {
-    $PSNativeCommandUseErrorActionPreference = $true
-}
-
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 function Require-Command {
     param([string]$CommandName)
 
@@ -60,8 +32,6 @@ function Require-Command {
     }
 }
 
-<<<<<<< HEAD
-=======
 function Invoke-Native {
     param(
         [string]$FilePath,
@@ -75,81 +45,29 @@ function Invoke-Native {
     }
 }
 
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 function Join-EnvVars {
     param([string[]]$Pairs)
 
     return ($Pairs | Where-Object { $_ -and $_.Trim() }) -join ","
 }
 
-<<<<<<< HEAD
 function Join-Secrets {
     param([string[]]$Pairs)
 
     return ($Pairs | Where-Object { $_ -and $_.Trim() }) -join ","
-=======
-function Test-ServiceAccountExists {
-    param(
-        [string]$ProjectId,
-        [string]$ServiceAccountEmail
-    )
-
-    $result = gcloud iam service-accounts list `
-        --project $ProjectId `
-        --filter "email=$ServiceAccountEmail" `
-        --format "value(email)"
-
-    return -not [string]::IsNullOrWhiteSpace($result)
-}
-
-function Test-ArtifactRepositoryExists {
-    param(
-        [string]$ProjectId,
-        [string]$Region,
-        [string]$Repository
-    )
-
-    $result = gcloud artifacts repositories list `
-        --project $ProjectId `
-        --location $Region `
-        --filter "name~'$Repository'" `
-        --format "value(name)"
-
-    return -not [string]::IsNullOrWhiteSpace($result)
-}
-
-function Grant-SecretAccess {
-    param(
-        [string]$SecretName,
-        [string]$ServiceAccountEmail
-    )
-
-    Write-Host "Granting Secret Manager access for $SecretName to $ServiceAccountEmail..."
-
-    Invoke-Native "gcloud" @(
-        "secrets", "add-iam-policy-binding", $SecretName,
-        "--project", $ProjectId,
-        "--member", "serviceAccount:$ServiceAccountEmail",
-        "--role", "roles/secretmanager.secretAccessor",
-        "--quiet"
-    )
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 }
 
 Require-Command "gcloud"
 Require-Command "docker"
 
-$agentsImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/agents:$ImageTag"
-$apiImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/api:$ImageTag"
-
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $agentsContext = Join-Path $repoRoot "services/agents"
 $apiContext = Join-Path $repoRoot "services/api"
-<<<<<<< HEAD
-=======
 
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 Set-Location $repoRoot
+
+$agentsImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/agents:$ImageTag"
+$apiImage = "$Region-docker.pkg.dev/$ProjectId/$ArtifactRepository/api:$ImageTag"
 
 $reasoningResource = "projects/$ProjectNumber/locations/$Region/reasoningEngines/$ReasoningAgentId"
 $summaryResource = "projects/$ProjectNumber/locations/$Region/reasoningEngines/$SummaryAgentId"
@@ -159,50 +77,11 @@ $reasoningQueryUrl = "https://$Region-aiplatform.googleapis.com/v1/${reasoningRe
 $summaryQueryUrl = "https://$Region-aiplatform.googleapis.com/v1/${summaryResource}:query"
 $actionQueryUrl = "https://$Region-aiplatform.googleapis.com/v1/${actionResource}:query"
 
-<<<<<<< HEAD
-gcloud config set project $ProjectId | Out-Null
-gcloud auth configure-docker "$Region-docker.pkg.dev" --quiet | Out-Null
-
-docker build -t $agentsImage $agentsContext
-docker push $agentsImage
-
-docker build -t $apiImage $apiContext
-docker push $apiImage
-=======
 Write-Host "Setting GCP project..."
 Invoke-Native "gcloud" @("config", "set", "project", $ProjectId)
 
-Write-Host "Checking Docker..."
-Invoke-Native "docker" @("version")
-
-Write-Host "Configuring Docker authentication for Artifact Registry..."
+Write-Host "Configuring Docker authentication..."
 Invoke-Native "gcloud" @("auth", "configure-docker", "$Region-docker.pkg.dev", "--quiet")
-
-Write-Host "Checking Artifact Registry repository..."
-if (-not (Test-ArtifactRepositoryExists -ProjectId $ProjectId -Region $Region -Repository $ArtifactRepository)) {
-    throw "Missing Artifact Registry repository: $ArtifactRepository in $Region. Create it before deploying."
-}
-
-Write-Host "Checking Cloud Run service account..."
-if (-not (Test-ServiceAccountExists -ProjectId $ProjectId -ServiceAccountEmail $AgentsServiceAccount)) {
-    throw "Missing service account: $AgentsServiceAccount. Create it before deploying."
-}
-
-if (-not (Test-ServiceAccountExists -ProjectId $ProjectId -ServiceAccountEmail $ApiServiceAccount)) {
-    throw "Missing service account: $ApiServiceAccount. Create it before deploying."
-}
-
-$requiredSecrets = @(
-    $ElasticApiKeySecret,
-    $ElasticUrlSecret,
-    $ElasticIndexSecret,
-    $ElasticMcpUrlSecret
-) | Sort-Object -Unique
-
-foreach ($secretName in $requiredSecrets) {
-    Grant-SecretAccess -SecretName $secretName -ServiceAccountEmail $AgentsServiceAccount
-    Grant-SecretAccess -SecretName $secretName -ServiceAccountEmail $ApiServiceAccount
-}
 
 Write-Host "Building agents image..."
 Invoke-Native "docker" @("build", "-t", $agentsImage, $agentsContext)
@@ -215,7 +94,6 @@ Invoke-Native "docker" @("build", "-t", $apiImage, $apiContext)
 
 Write-Host "Pushing API image..."
 Invoke-Native "docker" @("push", $apiImage)
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
 $agentsEnvVars = Join-EnvVars @(
     "VISUALSPRINT_ENV=production",
@@ -236,30 +114,17 @@ $agentsEnvVars = Join-EnvVars @(
     "VISUALSPRINT_SUMMARY_QUERY_URL=$summaryQueryUrl",
     "VISUALSPRINT_ACTION_QUERY_URL=$actionQueryUrl",
     "VISUALSPRINT_AGENT_RUNTIME_SERVICE_ACCOUNT=service-530780341550@gcp-sa-aiplatform-re.iam.gserviceaccount.com",
-<<<<<<< HEAD
+    "VISUALSPRINT_CONTROL_PLANE_URL=$ControlPlaneUrl",
     "VISUALSPRINT_MCP_ENDPOINT=$ElasticMcpUrl",
     "VISUALSPRINT_ALLOWED_ORIGINS=$AllowedOrigins",
     "VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS=4.0"
 )
 
-gcloud run deploy $AgentsServiceName `
-    --project $ProjectId `
-    --region $Region `
-    --image $agentsImage `
-    --service-account $AgentsServiceAccount `
-    --allow-unauthenticated `
-    --set-env-vars $agentsEnvVars `
-    --set-secrets "VISUALSPRINT_ELASTIC_API_KEY=$ElasticMcpApiKeySecret:latest"
-=======
-    "VISUALSPRINT_CONTROL_PLANE_URL=$ControlPlaneUrl",
-    "VISUALSPRINT_ALLOWED_ORIGINS=$AllowedOrigins",
-    "VISUALSPRINT_AGENT_REQUEST_TIMEOUT_SECONDS=30.0"
+$agentsSecrets = Join-Secrets @(
+    "VISUALSPRINT_ELASTIC_API_KEY=$ElasticMcpApiKeySecret:latest"
 )
 
-$agentsSecrets = "VISUALSPRINT_ELASTIC_API_KEY=$($ElasticApiKeySecret):latest,VISUALSPRINT_MCP_ENDPOINT=$($ElasticMcpUrlSecret):latest"
-
 Write-Host "Deploying agents service..."
-
 Invoke-Native "gcloud" @(
     "run", "deploy", $AgentsServiceName,
     "--project", $ProjectId,
@@ -271,16 +136,13 @@ Invoke-Native "gcloud" @(
     "--set-secrets=$agentsSecrets",
     "--quiet"
 )
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
-$agentsUrl = gcloud run services describe $AgentsServiceName `
-    --project $ProjectId `
-    --region $Region `
-    --format "value(status.url)"
-
-if (-not $agentsUrl) {
-    throw "Unable to resolve the deployed agents service URL."
-}
+$agentsUrl = Invoke-Native "gcloud" @(
+    "run", "services", "describe", $AgentsServiceName,
+    "--project", $ProjectId,
+    "--region", $Region,
+    "--format", "value(status.url)"
+)
 
 $apiEnvVars = Join-EnvVars @(
     "VISUALSPRINT_ENV=production",
@@ -288,19 +150,15 @@ $apiEnvVars = Join-EnvVars @(
     "VISUALSPRINT_AGENTS_SERVICE_URL=$agentsUrl",
     "VISUALSPRINT_INGEST_SERVICE_URL=",
     "VISUALSPRINT_MEDIA_SERVICE_URL=",
-<<<<<<< HEAD
     "ELASTICSEARCH_URL=$ElasticUrl",
     "ELASTIC_INDEX_OUTCOMES=$ElasticIndex",
     "ELASTIC_MCP_SERVER_URL=$ElasticMcpUrl",
-=======
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
     "JIRA_BASE_URL=",
     "JIRA_API_TOKEN_SECRET=",
     "SLACK_BOT_TOKEN_SECRET=",
     "SLACK_DEFAULT_CHANNEL=#general",
     "VISUALSPRINT_ALLOWED_ORIGINS=$AllowedOrigins",
-<<<<<<< HEAD
-    "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=0.5"
+    "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=5.0"
 )
 
 $apiSecrets = Join-Secrets @(
@@ -309,22 +167,7 @@ $apiSecrets = Join-Secrets @(
     $(if ($SlackBotTokenSecret) { "SLACK_BOT_TOKEN_SECRET=$SlackBotTokenSecret:latest" })
 )
 
-gcloud run deploy $ApiServiceName `
-    --project $ProjectId `
-    --region $Region `
-    --image $apiImage `
-    --service-account $ApiServiceAccount `
-    --allow-unauthenticated `
-    --set-env-vars $apiEnvVars `
-    --set-secrets $apiSecrets
-=======
-    "VISUALSPRINT_SERVICE_TIMEOUT_SECONDS=5.0"
-)
-
-$apiSecrets = "ELASTICSEARCH_URL=$($ElasticUrlSecret):latest,ELASTICSEARCH_API_KEY=$($ElasticApiKeySecret):latest,ELASTIC_INDEX_OUTCOMES=$($ElasticIndexSecret):latest,ELASTIC_MCP_SERVER_URL=$($ElasticMcpUrlSecret):latest"
-
 Write-Host "Deploying API service..."
-
 Invoke-Native "gcloud" @(
     "run", "deploy", $ApiServiceName,
     "--project", $ProjectId,
@@ -336,21 +179,12 @@ Invoke-Native "gcloud" @(
     "--set-secrets=$apiSecrets",
     "--quiet"
 )
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 
-$apiUrl = gcloud run services describe $ApiServiceName `
-    --project $ProjectId `
-    --region $Region `
-    --format "value(status.url)"
-
-<<<<<<< HEAD
-=======
-if (-not $apiUrl) {
-    throw "Unable to resolve the deployed API service URL."
-}
-
-$agentsEnvUpdate = Join-EnvVars @(
-    "VISUALSPRINT_CONTROL_PLANE_URL=$apiUrl"
+$apiUrl = Invoke-Native "gcloud" @(
+    "run", "services", "describe", $ApiServiceName,
+    "--project", $ProjectId,
+    "--region", $Region,
+    "--format", "value(status.url)"
 )
 
 Write-Host "Updating agents service with the deployed control plane URL..."
@@ -358,11 +192,10 @@ Invoke-Native "gcloud" @(
     "run", "services", "update", $AgentsServiceName,
     "--project", $ProjectId,
     "--region", $Region,
-    "--update-env-vars", $agentsEnvUpdate,
+    "--update-env-vars", "VISUALSPRINT_CONTROL_PLANE_URL=$apiUrl",
     "--quiet"
 )
 
->>>>>>> b63d2fcfef65d93c31e92538c565aaf431bc9c2c
 Write-Host ""
 Write-Host "Deployment complete."
 Write-Host "Agents URL: $agentsUrl"
