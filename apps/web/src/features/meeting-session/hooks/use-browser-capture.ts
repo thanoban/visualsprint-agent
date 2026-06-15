@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   buildCaptureResources,
   buildClientChunkId,
+  hasAudioCoverageWarning,
   resolveRecorderMimeType,
 } from "../../../lib/capture";
 import { getErrorMessage } from "../../../lib/format";
@@ -18,6 +19,35 @@ import {
 } from "../../../lib/api";
 import type { CapturePhase } from "../types";
 import type { CaptureSupport } from "../../../hooks/use-capture-support";
+
+const UPLOAD_RETRY_ATTEMPTS = 2;
+
+async function uploadBlobToSignedUrl(
+  signedUrl: string,
+  blob: Blob,
+  requiredHeaders: Record<string, string>,
+): Promise<void> {
+  let lastError: unknown = null;
+  for (let attempt = 0; attempt < UPLOAD_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(signedUrl, {
+        method: "PUT",
+        body: blob,
+        headers: {
+          ...requiredHeaders,
+        },
+      });
+      if (response.ok) {
+        return;
+      }
+      const detail = await response.text().catch(() => "unknown error");
+      lastError = new Error(`Upload failed (${response.status}): ${detail}`);
+    } catch (error) {
+      lastError = error;
+    }
+  }
+  throw lastError ?? new Error("Chunk upload failed after retries");
+}
 
 export function useBrowserCapture({
   meeting,
@@ -112,11 +142,25 @@ export function useBrowserCapture({
     try {
       resources = await buildCaptureResources();
       const preferredMimeType = resolveRecorderMimeType();
+
+      if (
+        hasAudioCoverageWarning(
+          resources.displaySurface,
+          resources.hasDisplayAudio,
+          resources.hasMicrophoneAudio,
+        )
+      ) {
+        onError(
+          "You are sharing only a window and no audio source was detected. Transcription may be empty unless you also share system audio or use a microphone.",
+        );
+      }
+
       const response = await startCaptureSession(currentMeeting.id, {
         recorderMimeType: preferredMimeType || null,
         hasDisplayVideo: resources.hasDisplayVideo,
         hasDisplayAudio: resources.hasDisplayAudio,
         hasMicrophoneAudio: resources.hasMicrophoneAudio,
+        displaySurface: resources.displaySurface,
       });
 
       const recorder =
@@ -149,10 +193,21 @@ export function useBrowserCapture({
         chunkSequenceRef.current = sequence;
         chunkStartedAtRef.current = now;
 
+        const chunkBlob = event.data;
+
         chunkRequestQueueRef.current = chunkRequestQueueRef.current
           .then(async () => {
             const chunkResponse = await registerCaptureChunk(activeMeeting.id, payload);
             onMeetingUpdated(chunkResponse.meeting);
+
+            const uploadTarget = chunkResponse.chunk.uploadTarget;
+            if (uploadTarget.signedUrl) {
+              await uploadBlobToSignedUrl(
+                uploadTarget.signedUrl,
+                chunkBlob,
+                uploadTarget.requiredHeaders,
+              );
+            }
 
             const uploadResponse = await completeCaptureChunkUpload(activeMeeting.id, {
               clientChunkId: payload.clientChunkId,

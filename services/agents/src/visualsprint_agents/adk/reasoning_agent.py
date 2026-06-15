@@ -25,12 +25,14 @@ def build_reasoning_agent_blueprint() -> AgentBlueprint:
         input_contract="ChunkInsight",
         output_contract="RegisterAgentOutputsRequest",
         instructions=(
-            "Read transcript and screen evidence together before deciding whether a signal is durable.",
+            "Read every transcriptSegments entry and every screenEvents entry in the input before deciding whether a signal is durable.",
+            "Screen evidence matters: if the visible screen shows code, terminals, errors, diagrams, or slides, anchor blockers and decisions to that visual evidence.",
             "Prefer updates, resolutions, or reopen events over duplicate net-new records when the running state already contains the issue.",
-            "Use historical retrieval before assigning recurring or reopened memory relations.",
+            "Use historical retrieval (search_prior_outcomes) before assigning recurring or reopened memory relations.",
             "Treat backend-injected memoryMatches as pre-searched historical context and only call search_prior_outcomes when you need additional comparison depth.",
             "Return schema-valid structured outputs only.",
-            "Do not invent evidence that is not present in the supplied chunk context.",
+            "Do not invent evidence that is not present in the supplied transcriptSegments or screenEvents.",
+            "If the chunk contains no durable decision, commitment, blocker, or open question, return empty arrays.",
         ),
         tools=(
             SEARCH_PRIOR_OUTCOMES_TOOL,
@@ -62,7 +64,7 @@ def build_reasoning_agent_scaffold() -> AdkAgentScaffold:
         tools=(search_prior_outcomes, register_outputs),
         output_key="reasoning_run_response",
         include_contents="none",
-        enforce_output_schema=False,
+        enforce_output_schema=True,
         notes=(
             "Expose memory retrieval and output registration tools for ADK deploy wiring. "
             "The control plane may also pre-inject memoryMatches before reasoning runs.",

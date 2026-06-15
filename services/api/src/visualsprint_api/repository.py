@@ -80,6 +80,20 @@ def _normalize_recorder_mime_type(value: str | None) -> str:
     return value.strip()
 
 
+def _agent_outputs_have_content(payload: RegisterAgentOutputsRequest) -> bool:
+    return bool(
+        payload.decisions
+        or payload.commitments
+        or payload.blockers
+        or payload.openQuestions
+        or payload.memoryMatches
+        or payload.resolvedDecisionIds
+        or payload.resolvedCommitmentIds
+        or payload.resolvedBlockerIds
+        or payload.resolvedOpenQuestionIds
+    )
+
+
 DECISION_TEMPLATES = (
     (
         "Stabilize the release path before feature work resumes",
@@ -594,6 +608,7 @@ class MeetingStore:
                 hasDisplayVideo=payload.hasDisplayVideo,
                 hasDisplayAudio=payload.hasDisplayAudio,
                 hasMicrophoneAudio=payload.hasMicrophoneAudio,
+                displaySurface=payload.displaySurface,
                 startedAt=started_at,
                 endedAt=None,
                 chunkCount=0,
@@ -975,7 +990,7 @@ class MeetingStore:
         )
         agent_outputs, reasoning_source = run_chunk_reasoning_with_source(chunk_insight)
         chunk.reasoningSource = reasoning_source
-        if agent_outputs is not None:
+        if agent_outputs is not None and _agent_outputs_have_content(agent_outputs):
             signal_count = self._apply_agent_outputs_to_meeting(
                 meeting=meeting,
                 payload=agent_outputs,

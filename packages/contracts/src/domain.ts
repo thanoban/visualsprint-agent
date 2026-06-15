@@ -402,11 +402,14 @@ export interface MeetingDetailResponse {
   meeting: MeetingDetail;
 }
 
+export type DisplaySurface = "browser" | "window" | "monitor" | "unknown";
+
 export interface StartCaptureSessionRequest {
   recorderMimeType: null | string;
   hasDisplayVideo: boolean;
   hasDisplayAudio: boolean;
   hasMicrophoneAudio: boolean;
+  displaySurface?: DisplaySurface;
 }
 
 export interface RegisterCaptureChunkRequest {
@@ -478,6 +481,9 @@ export interface ChunkInsight {
   reasoningChecklist: string[];
   focusAreas: ChunkInsightFocus[];
   memoryQueries: SearchPriorOutcomesRequest[];
+  memoryMatches?: MemoryMatch[];
+  transcriptSegments?: TranscriptSegment[];
+  screenEvents?: ScreenEvent[];
   meetingState: MeetingStateSnapshot;
   chunkContext: ChunkContext;
 }
